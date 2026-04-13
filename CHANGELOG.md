@@ -1,0 +1,176 @@
+# Changelog
+
+All notable changes to TetraMem-XL are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
+
+## [2.2.0] - 2026-04-12
+
+### Added — Theoretical Innovation: Mapping Cone + Adaptive Feedback + Eternity Audit
+
+#### GAP-1: Zigzag Iterative Mapping Cone Modeling
+- `MappingConeRecord` — data class capturing forward map, backward map, and stability certification per dream cycle
+- `ZigzagTracker.construct_mapping_cone()` — builds C(f): X_pre → X_post with feature-level birth/death/stability analysis
+- `ZigzagTracker.get_mapping_cone_history()` — full iterative cone chain across all dream cycles
+- `ZigzagTracker.get_dream_guidance()` — uses historical cone data to recommend focus areas for future dreams
+- `TetraDreamCycle._execute()` — automatically constructs mapping cone each cycle, feeds guidance to next dream
+- `_synthesize_and_insert_tracked()` / `_reintegrate_dreams_tracked()` — return ID lists for cone tracking
+
+#### GAP-2: Dynamic Adaptive Pyramid Closed-Loop Feedback
+- `ResolutionPyramid.record_dream_feedback()` — dream entropy change → pyramid parameter adjustment
+- `ResolutionPyramid.record_query_feedback()` — query hit rate tracking per level
+- `ResolutionPyramid._adapt_parameters()` — automatic max_levels and coarsening ratio based on feedback history
+- Closed loop: dream effect → feedback → pyramid adapts → next dream uses updated pyramid → repeat
+
+#### GAP-3: Eternity Principle Strict Audit
+- `eternity_audit.py` — new module: `EternityAudit` class for strict no-deletion verification
+- Content hash tracking (SHA-256) for every memory, transitive preservation chain propagation
+- `verify(mesh)` — full scan proving no memory was ever lost; checks liveness + preservation chains
+- `get_preservation_chain()` — trace any memory's complete content ancestry (s1 → m1 → t1)
+- `get_audit_trail()` — full operation history for any memory ID
+- Integrated into `GeoMemoryBody.store()` — automatic audit recording
+
+#### GAP-Specific Tests
+- `tests/test_gap_critical.py` — 24 tests covering all three GAPs
+
+### Fixed — P0/P1 Audit
+- P0-1: emergence loop split into snapshot→operate→persist phases (lock hold time reduced)
+- P0-2: vertex leak fixed with reference counting `_vertex_ref_count` + auto-compaction
+- P0-3: `_nodes` property now acquires `mesh._lock` + returns centroid.copy()
+- P0-4: multimodal variable shadowing fixed (`persistence` → `length`)
+- P0-5: dream reintegration threshold fixed (0.85 decay + dynamic threshold)
+- P1-6: all 5 lockless modules now have RLock protection
+- P1-7: 15+ bare except replaced with `except Exception as e:` + logging
+- P1-8: topology_shortcuts per-node cap at 50
+- P1-9: LLM Tool returns error on empty instance instead of creating one
+
+## [2.1.0] - 2026-04-12
+
+### Added — Production Hardening (4-Stage Production Roadmap)
+
+#### Stage 1: Stability & Consistency
+- `ConsistencyManager.validate_before_write()` — write-before-validate with automatic conflict resolution (version priority → timestamp fallback)
+- `ConflictRecord` — full conflict history tracking with auto-resolution status
+- `ConsistencyManager.read_repair_multi()` — batch multi-bucket staleness repair
+- `ConsistencyManager.compensate_operation()` — structured failure compensation with logging
+- `ConsistencyManager.get_health()` — comprehensive consistency health reporting
+- Zigzag snapshot persistence — `_persist_zigzag_snapshot()` records topology state as meta-dream memory after each emergence cycle
+- Emergence state persistence — `_persist_emergence_state()` saves entropy/threshold history as mesh memories
+- `GET /api/v1/health/topology` — topology health endpoint returning entropy, H₂ voids, zigzag stability, threshold status, consistency health
+
+#### Stage 2: Performance Optimization
+- `MemoryTetrahedron.__slots__` — reduced memory footprint per tetrahedron
+- `MemoryTetrahedron.centroid` — float32 (was float64), halving centroid memory
+- `catalyze_integration_batch()` — removed outer lock for parallel execution
+- Zigzag snapshot compression — old snapshots auto-compressed to entropy-only (barcodes discarded)
+- Pyramid `auto_route()` — bbox-based spatial exclusion for fast coarse→fine queries
+
+#### Stage 3: Observability
+- `structured_log.py` — new module: `StructuredLogger` with JSON output + `trace_context()` for distributed tracing
+- `get_alert_rules()` — 4 Prometheus alert rules: entropy spike, error rate, store latency, query latency
+- Nested trace context support — `trace_context()` supports nesting with stack-based tracking
+
+#### Stage 4: Final Validation & Deployment
+- 24 production-grade tests covering: eternity principle (4), integration quality (2), closed loop (2), performance (2), consistency (5), zigzag stability (2), pyramid stability (1), multi-param (2), structured logging (3)
+- `deploy.sh` — 5-step automated deployment with testing, Ray, API, health check, monitoring
+- Circuit breaker + rate limiter for emergence protection
+- Hot tetrahedron query cache (LRU)
+- 72-hour stress test framework
+
+#### Documentation
+- `README.md` — comprehensive English version (21 API endpoints, 15 LLM tools, 14 CLI commands, 24 modules)
+- `README.cn.md` — full Chinese version
+- `architecture.md` — architecture document with principle→implementation mapping, data flow diagrams, consistency model
+- `deployment_guide.md` — 5-step deployment guide with monitoring configuration and fault recovery procedures
+- `paper.md` — academic paper with methodology, experimental results, and references
+
+### Changed
+- `consistency.py` — `VersionedNode` gains `operation` field; `record_version()` accepts `operation` parameter; conflict auto-resolution on every store/dream/integrate
+- `core.py` — `_record_version()` passes `operation` parameter; emergence loop calls `_persist_zigzag_snapshot()` and `_persist_emergence_state()`
+- `tetra_mesh.py` — `MemoryTetrahedron` uses `__slots__` + manual `__init__` + float32 centroids; ID generation includes timestamp+counter to prevent collisions
+- `monitoring.py` — added `ALERT_RULES`, `GRAFANA_ALERT_GROUPS`, `get_alert_rules()`
+
+## [2.0.0] - 2026-04-12
+
+### Added
+
+#### Phase 1: Core Engine Productionization
+- Removed all decay/forgetting code, replaced with integration catalyst (Eternity principle)
+- New modules: `persistent_entropy.py`, `closed_loop.py`
+- Time law changed to integration catalyst
+- Dream cycle upgraded with LLM-ready `DreamSynthesisInput` callback architecture
+- Self-organizing entropy convergence with `EntropyTracker`
+
+#### Phase 2: Distributed & Partitioning
+- `tetra_router.py` — `TetraMeshRouter` with 4 runtime bug fixes
+- `partitioning.py` — Ray fallback fix, consistency + persistence integration
+- `multimodal_bridge.py` — `query_by_modality()` for filtered multimodal queries
+
+#### Phase 3: Persistence, Consistency, Monitoring
+- `persistence.py` — Parquet two-phase commit with atomic rename, upsert fix
+- `monitoring.py` — 5 new metrics (DREAM_COUNTER, ENTROPY_GAUGE, INTEGRATION_COUNTER, STORE_LATENCY, QUERY_LATENCY), Grafana 15-panel Dashboard
+- `consistency.py` — `ConsistencyManager` with `List[VersionedNode]`, VectorClock, CompensationLog
+- `global_coarse_mesh.py` — `GlobalCoarseMesh` with `_apply_corrections` feedback loop
+
+#### Phase 4: Production Validation & Optimization
+- TetraMesh performance optimization: O(1) boundary fast path, pure-Python hot path
+- 21 production validation tests
+- ConsistencyManager integrated into GeoMemoryBody + TetraMeshRouter + BucketActor
+- Persistence integrated into GeoMemoryBody (auto-save/load + compact)
+- Self-emergence daemon (background thread)
+- GlobalCoarseMesh feedback loop (auto-correction)
+- REST API expanded to 20 endpoints
+- LLM tools expanded to 14 tools
+- `store_batch` consistency/persistence hooks
+
+#### P0-P4: Topological Intelligence Features
+- **P0: Meaningful Dream Fusion** — Semantic fusion with label intersection extraction, weight-weighted ranking, topology bridge description, depth tags
+- **P1: Emergence Pressure Composite** — `EmergencePressure` class: persistent entropy rate + H₂ void growth + H₁ loop change + local density anomaly + integration staleness
+- **P2: Adaptive Threshold Evolution** — `AdaptiveThreshold`: good effect → lower threshold → encourage emergence; poor effect → raise threshold → avoid waste
+- **P3: Entropy-Guided Integration Priority** — Dream walk prefers high label diversity, low weight regions
+- **P4: H2 Geometric Repulsion** — Actual vertex displacement with linear force decay, stability theorem guaranteed bounded perturbation
+
+#### Phase 3-4 Extensions
+- **Zigzag Persistence Dynamic Modeling** — `ZigzagTracker`: sliding window topological feature tracking, phase transition detection, feature lifetime analysis, topology prediction
+- **Resolution Pyramid** — `ResolutionPyramid`: multi-scale hierarchical clustering, auto-route coarse-to-fine queries, k-means spatial coarsening
+- **Multi-Parameter Filter** — `MultiParameterQuery`: 6-dimensional composable filtering (spatial, temporal, density, weight, label, topology), hard/soft filter modes
+
+#### Infrastructure
+- Stateful CLI with persistence (14 commands: store, query, label, stats, clear, persist, dream, self-org, catalyze, status, mquery, build-pyramid, pyquery, zigzag, predict)
+- Session hook (`hooks.py`) with mesh-mode-aware loading
+- `tetramem_sync.py` export utility
+
+### Fixed
+- `hooks.py` mesh mode: loaded nodes now go through `_mesh.store()` instead of vanishing via `_nodes` setter
+- `multimodal_bridge.py` sort bug: `query_by_modality()` without query_point returns highest-weight memories first
+- `start_api_persisted.py` mesh mode: same fix as hooks.py
+- `tetra_mesh.py` ID collision: same content no longer silently overwrites (ID includes timestamp + counter)
+- `tetra_mesh.py` duplicate `_boundary_dirty` assignment removed
+- `__init__.py` `TextToGeometryMapper` no longer shadowed by multimodal stub
+- `__init__.py` `generate_prometheus_metrics` removed from `__all__` (conditionally imported)
+- Removed unused `networkx` dependency from `pyproject.toml`
+
+### Removed
+- Dead code: `alpha.py`, `shim.py`, `mapping.py`, `rollback.py`, `rollback_runbook.py`, `legacy_v2/` directory
+- Dead test files: 9 test files testing removed dead modules
+- Artifacts: `.bak` file, `.db` files, `pyramid_memory/` cache directory
+
+### Changed
+- All `load_from_persistence` / `hooks.py` / `start_api_persisted.py` now correctly use `_mesh.store()` in mesh mode
+- Hardcoded absolute paths replaced with `os.path.expanduser()` defaults + environment variable overrides
+- `tetramem_sync.py` export path now configurable via `TETRAMEM_EXPORT` env var
+
+## [1.0.0] - 2025-12-01
+
+### Added
+
+- Geometric memory storage using 3D point clouds on unit sphere
+- GUDHI Alpha Complex-based topological structure
+- Persistent Homology for topological feature extraction (H0, H1)
+- 4-layer association rules (direct adjacency, path connectivity, metric proximity, self-organizing)
+- Text-to-geometry mapping via deterministic hashing
+- Dynamic weight updates with EMA smoothing
+- Memory conflict detection
+- JSON-based persistence
+- Thread-safe operations
+- Octree spatial indexing
+- `MemoryNode` dataclass with id, content, geometry, timestamp, weight, labels, metadata
+- `GeoMemoryBody` main interface (store, query, query_by_label, associate, update_weight, detect_conflicts)
