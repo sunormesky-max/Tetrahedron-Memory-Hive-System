@@ -147,6 +147,7 @@ __all__ = [
     "MultimodalBridge",
     "TetraBucket",
     "TetraMeshRouter",
+    "TetraDistributedController",
     "GlobalCoarseMesh",
     "default_synthesis",
     "TetraDreamCycle",
@@ -175,6 +176,7 @@ __all__ = [
 from .circuit_breaker import CircuitBreaker, EmergenceProtector, RateLimiter
 from .global_coarse_mesh import GlobalCoarseMesh
 from .tetra_router import TetraBucket, TetraMeshRouter
+from .tetra_distributed import TetraDistributedController
 from .multimodal_bridge import MultimodalBridge
 from .emergence import AdaptiveThreshold, EmergencePressure
 from .zigzag_persistence import (
