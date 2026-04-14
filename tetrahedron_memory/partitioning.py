@@ -41,6 +41,10 @@ class GhostCell:
 
     Ghost cells enable fast cross-bucket association without querying remote actors.
     They carry enough metadata to score association relevance and expire when stale.
+
+    Version tracking (v2): Each ghost carries a version number that matches the
+    source tetrahedron's integration_count. When the source mutates (integration,
+    weight change, label change), the ghost becomes stale until re-verified.
     """
 
     node_id: str
@@ -52,13 +56,34 @@ class GhostCell:
     created_at: float = field(default_factory=time.time)
     ttl: float = 3600.0
     access_count: int = 0
+    version: int = 0
+    source_version: int = 0
+    last_verified_at: float = field(default_factory=time.time)
+    verify_interval: float = 60.0
 
     @property
     def is_expired(self) -> bool:
         return (time.time() - self.created_at) > self.ttl
 
+    @property
+    def is_stale(self) -> bool:
+        return self.version != self.source_version
+
+    @property
+    def needs_verification(self) -> bool:
+        return (time.time() - self.last_verified_at) > self.verify_interval
+
     def touch(self) -> None:
         self.access_count += 1
+
+    def verify(self, current_version: int, current_weight: float) -> bool:
+        self.last_verified_at = time.time()
+        if self.version != current_version:
+            self.version = current_version
+            self.source_version = current_version
+            self.weight = current_weight
+            return False
+        return True
 
 
 @dataclass
