@@ -1,189 +1,158 @@
-# TetraMem-XL Architecture
+# Tetrahedron-Memory-Hive-System Architecture
 
-## 概念
+**Version**: v2.2 | **Date**: 2026-04-14
 
-TetraMem-XL 是一个**纯几何驱动、拓扑自组织**的 AI 记忆系统。核心思想：
+## Core Principles (Invariant)
 
-1. **记忆附加在四面体上** — 每条记忆是一个 3-simplex（四面体），不是向量
-2. **纯几何检索** — 沿共享面/边/顶点导航，零向量嵌入
-3. **永恒法则** — 不删除、不遗忘，所有记忆通过整合永存
-4. **时间法则** — filtration 驱动整合优先级，老记忆优先被整合
-5. **梦境法则** — 自涌现闭环：随机游走→发现远距关联→融合→新记忆
-6. **分布式可扩展** — 空间分区 + Ghost Cell 跨桶拓扑
+| Principle | Implementation |
+|-----------|---------------|
+| **Eternity** | No deletion, no decay. `MemoryTetrahedron.weight` only grows via `catalyze_integration()`. EternityAudit verifies SHA-256 integrity. |
+| **Integration** | `integrate_secondary()` performs content synthesis, label consolidation, theme extraction, provenance tracking. `abstract_reorganize()` does batch processing. |
+| **Self-Emergence** | Dream Cycle: random walk → topology clustering → cross-cluster fusion → new tetrahedron insertion → self-org trigger. |
+| **Closed Loop** | Memory → Think → Execute → Reflect → Integrate → Dream → Memory. Each phase has explicit implementation. |
 
-## 架构总览
+## System Architecture
 
 ```
 ┌───────────────────────────────────────────────────────┐
-│                  TetraDistributedController            │
-│  (统一 API: store / query / dream / self-org / balance) │
+│            TetraDistributedController                  │
+│  store / query / dream / self-org / reorg / balance    │
 ├───────────────────────────────────────────────────────┤
-│                   TetraMeshRouter                      │
-│  (空间分区路由 + 跨桶拓扑导航 + 分布式 dream/self-org)    │
+│                 TetraMeshRouter                        │
+│  spatial routing + cross-bucket topology navigation   │
+│  distributed_dream + distributed_self_org              │
+│  verify_ghost_cells + invalidate_ghost_for             │
 ├──────────┬──────────┬──────────┬──────────────────────┤
 │TetraBucket│TetraBucket│TetraBucket│  ...               │
-│(TetraMesh)│(TetraMesh)│(TetraMesh)│                    │
-│  + Ghost  │  + Ghost  │  + Ghost  │                    │
+│ TetraMesh │ TetraMesh │ TetraMesh │                    │
+│ + Ghost   │ + Ghost   │ + Ghost   │                    │
 │   Cells   │   Cells   │   Cells   │                    │
 └──────────┴──────────┴──────────┴──────────────────────┘
 ```
 
-## 核心模块
+## Cognitive Closed Loop
+
+```
+    ┌─── Store (new memory on boundary face) ────┐
+    │                                              │
+    ▼                                              │
+  TetraMesh                                        │
+    │                                               │
+    ├─→ query_topological (pure BFS navigation)     │
+    │                                               │
+    ├─→ abstract_reorganize (batch reorg) ─────────┤
+    │     └→ content fusion + label merge +溯源     │
+    │                                               │
+    ├─→ Dream Cycle (self-emergent synthesis) ─────┤
+    │     ├→ THINK: analyze sources, pick strategy  │
+    │     ├→ EXECUTE: synthesize (LLM or default)   │
+    │     ├→ REFLECT: evaluate quality (7-dim)      │
+    │     └→ INSERT: new tetrahedron + DreamRecord   │
+    │                                               │
+    ├─→ Self-Organization (PH geometric surgery) ──┤
+    │     ├→ H2 caves → repulsion point insertion   │
+    │     ├→ short H0 → edge contraction (merge)    │
+    │     └→ persistent entropy convergence check   │
+    │                                               │
+    └──────→ eternal loop (integrate, never delete)─┘
+```
+
+## Module Breakdown
 
 ### MemoryTetrahedron (tetra_mesh.py)
-记忆的基本单元。每条记忆是一个四面体：
-- `content` — 记忆文本
-- `vertex_indices` — 4个顶点（纯几何）
-- `centroid` — 质心
-- `labels` — 语义标签
-- `weight` — 权重（整合催化剂，永不衰减）
-- `secondary_memories` — 子记忆列表（密度增长）
-- `filtration()` — 时间法则：spatial_alpha × integration_bonus + time_lambda × age
-- `integrate_secondary()` — 抽象重组：内容融合 + 标签合并 + 主题提取 + 来源溯源
+Memory unit as a 3-simplex:
+- `content` — memory text
+- `vertex_indices` — 4 vertices (pure geometry)
+- `centroid` — centroid point
+- `labels` — semantic tags
+- `weight` — integration catalyst (never decays)
+- `secondary_memories` — sub-memory list for density growth
+- `filtration()` — Time Law: spatial_alpha × integration_bonus + time_lambda × age
+- `integrate_secondary()` — Abstract reorganization: content synthesis + label consolidation + theme extraction + provenance
 
 ### TetraMesh (tetra_mesh.py)
-四面体网格。管理所有四面体的存储、连接、查询：
-- **store()** — 新四面体附着到边界面，网格向外生长
-- **query_topological()** — 纯拓扑查询：先按结构选种子，再 BFS 沿面/边/顶点导航
-- **navigate_topology()** — BFS 拓扑导航，返回 (id, connection_type, hop_distance)
-- **abstract_reorganize()** — 批量抽象重组：扫描密四面体 + 跨节点概念融合
-- **edge_contraction()** — 边收缩合并两个相邻四面体
-
-### TetraDreamCycle (tetra_dream.py)
-梦境闭环实现：
-- 随机游走→拓扑聚类→跨簇融合→插入新四面体→触发自组织
-- **DreamStore** — 独立梦境注册表，支持来源追踪和质量统计
-- **DreamRecord** — 每条梦的完整溯源：source_tetra_ids, fusion_quality, entropy_delta
-- **DreamProtocol** — 三阶段协议：THINK（分析）→ EXECUTE（合成）→ REFLECT（评估）
+Dynamic tetrahedral mesh:
+- `store()` — new tetrahedron attaches to boundary face, mesh grows outward
+- `query_topological()` — pure topological query: seed by structure, BFS along faces/edges/vertices
+- `navigate_topology()` — BFS topological navigation, returns (id, connection_type, hop_distance)
+- `abstract_reorganize()` — batch abstract reorganization: scan dense tetrahedra + cross-node concept fusion
+- `edge_contraction()` — merge two adjacent tetrahedra
 
 ### DreamProtocol (tetra_dream.py)
-结构化梦境认知闭环：
+Structured dream cognition:
 ```
-THINK    → 分析来源，选择策略（surface/deepen/bridge）
-EXECUTE  → 生成合成内容（自定义 LLM 回调或默认）
-REFLECT  → 评估质量（7维拓扑评分），accept/reject
+THINK    → analyze sources, select strategy (surface/deepen/bridge)
+EXECUTE  → produce synthesis (custom LLM callback or default)
+REFLECT  → evaluate quality (7-dimension score), accept/reject
 ```
-- `think_fn(inputs) → analysis` — 可替换为 LLM 分析
-- `execute_fn(inputs, analysis) → content` — 可替换为 LLM 生成
-- `reflect_fn(inputs, content) → quality` — 默认使用 fusion_quality_score v2
+- `think_fn(inputs) → analysis` — replaceable with LLM
+- `execute_fn(inputs, analysis) → content` — replaceable with LLM
+- `reflect_fn(inputs, content) → quality` — defaults to fusion_quality_score v2
+
+### DreamStore (tetra_dream.py)
+Independent dream registry:
+- `DreamRecord` — full provenance: source_tetra_ids, fusion_quality, entropy_delta
+- Source indexing — find all dreams involving a given tetrahedron
+- Quality statistics — avg/max/min quality, acceptance rate
+- LRU eviction (max 500 records)
 
 ### TetraSelfOrganizer (tetra_self_org.py)
-自组织循环：
-- H2洞穴→插入排斥点（洞穴增长）
-- 短H0间隔→边收缩合并
-- 低热记忆→整合催化剂
-- 持久熵收敛检测
+PH-driven self-organization:
+- H2 caves → repulsion point insertion (cave growth)
+- Short H0 intervals → edge contraction (merge)
+- Low heat → integration catalyst
+- Persistent entropy convergence detection
 
-### TetraMeshRouter (tetra_router.py)
-分布式路由：
-- **route_store()** — 按 centroid 分配到空间桶
-- **route_query()** — 多桶查询 + 合并排序
-- **navigate_cross_bucket()** — 跨桶拓扑导航（Ghost Cell 桥接）
-- **distributed_dream()** — 逐桶 dream + 跨桶 cross-pollination
-- **distributed_self_org()** — 并行自组织 + Ghost Cell 清理
-- **verify_ghost_cells()** — 一致性校验（版本号 + 来源验证）
+### Ghost Cell v2 (partitioning.py)
+Cross-bucket topology bridge with versioning:
+- `version` / `source_version` — version tracking
+- `is_stale` — version mismatch detection
+- `needs_verification` — timed verification trigger
+- `verify()` — sync version and weight with source
+- `invalidate_ghost_for()` — mutation-triggered propagation
+- `verify_ghost_cells()` — batch consistency repair
 
-### Ghost Cell (partitioning.py)
-跨桶拓扑桥接，带版本化一致性：
-- `version` / `source_version` — 版本追踪
-- `is_stale` — 版本不匹配检测
-- `needs_verification` — 定时校验触发
-- `verify()` — 与源桶同步版本和权重
-- `invalidate_ghost_for()` — 变异触发失效传播
+## Fusion Quality Score v2 (7 Dimensions)
 
-## 评分体系
+| Dimension | Weight | Meaning |
+|-----------|--------|---------|
+| Topological connectivity | 0.20 | Shared labels as topology proxy between source pairs |
+| Source diversity | 0.15 | Number of distinct sources (capped at 5) |
+| Source depth | 0.15 | integration_count weighting (deeper = richer) |
+| Centroid dispersion | 0.15 | Spatial spread indicates bridging value |
+| Content richness | 0.15 | Synthesis output length/quality |
+| Label diversity | 0.10 | Unique label spread |
+| Weight balance | 0.10 | How balanced source weights are |
 
-### fusion_quality_score v2 — 7维拓扑感知评分
+**Total**: 0.0–1.0. Default quality threshold for DreamProtocol: 0.3.
 
-| 维度 | 权重 | 含义 |
-|------|------|------|
-| Source diversity | 0-0.15 | 来源数量多样性 |
-| Label diversity | 0-0.10 | 标签独特性 |
-| Weight balance | 0-0.10 | 权重均衡度 |
-| Content richness | 0-0.15 | 合成内容丰富度 |
-| **Topological connectivity** | **0-0.20** | 共享标签作为拓扑连接代理 |
-| **Source depth** | **0-0.15** | integration_count 加权 |
-| **Centroid dispersion** | **0-0.15** | 空间分散度（桥接价值） |
+## Eternity Audit
 
-## 永恒 + 自涌现闭环
+- Every tetrahedron gets SHA-256 content hash in metadata
+- `EternityAudit` (eternity_audit.py) verifies no memory was deleted
+- `MemoryTetrahedron.weight` only increases via `catalyze_integration()` — never decays
+- `MemoryTetrahedron.init_weight` preserves original weight for comparison
+- Self-organization uses edge contraction (merge) not deletion
 
-```
-    ┌─── Store（新记忆附着到边界面）────┐
-    │                                    │
-    ▼                                    │
-  TetraMesh                             │
-    │                                    │
-    ├─→ query_topological（纯拓扑检索）   │
-    │                                    │
-    ├─→ abstract_reorganize（抽象重组）──┤
-    │     └→ 内容融合 + 标签合并 + 溯源  │
-    │                                    │
-    ├─→ Dream Cycle（梦境自涌现）───────┤
-    │     ├→ THINK: 分析来源            │
-    │     ├→ EXECUTE: 合成新记忆        │
-    │     ├→ REFLECT: 评估质量          │
-    │     └→ 插入新四面体               │
-    │                                    │
-    ├─→ Self-Organization（拓扑自修复）─┤
-    │     ├→ H2洞穴 → 排斥点            │
-    │     ├→ 短H0 → 边收缩              │
-    │     └→ 持久熵收敛                 │
-    │                                    │
-    └──────→ 永恒循环（不删除，只整合）──┘
-```
-
-**核心理念**：记忆永不衰减。低活跃记忆不是被遗忘，而是被整合到更高阶的抽象概念中。梦境系统自发发现远距关联，自组织维持拓扑健康。
-
-## 使用示例
-
-```python
-from tetrahedron_memory.tetra_distributed import TetraDistributedController
-import numpy as np
-
-ctrl = TetraDistributedController(num_buckets=4, use_ray=False)
-ctrl.initialize()
-
-# 存储记忆
-bid, tid = ctrl.store(
-    "Machine learning fundamentals",
-    seed_point=np.array([0.5, 0.0, 0.0]),
-    labels=["ai", "ml"],
-    weight=1.5,
-)
-
-# 拓扑查询（无向量嵌入）
-results = ctrl.query(np.array([0.5, 0.0, 0.0]), k=5)
-
-# 梦境周期
-dream_stats = ctrl.run_dream_cycle()
-
-# 自组织
-org_stats = ctrl.run_self_organization()
-
-# 统计
-stats = ctrl.get_statistics()
-```
-
-## 文件结构
+## File Structure
 
 ```
 tetrahedron_memory/
-├── __init__.py              # 包导出
-├── tetra_mesh.py            # MemoryTetrahedron + TetraMesh（核心）
+├── tetra_mesh.py            # MemoryTetrahedron + TetraMesh (core)
 ├── tetra_dream.py           # TetraDreamCycle + DreamProtocol + DreamStore
 ├── tetra_self_org.py        # TetraSelfOrganizer
-├── tetra_router.py          # TetraBucket + TetraMeshRouter（分布式路由）
-├── tetra_distributed.py     # TetraDistributedController（统一API）
-├── partitioning.py          # BoundingBox + GhostCell + Octree + SpatialBucketRouter
-├── persistence.py           # Parquet + S3 持久化
-├── global_coarse_mesh.py    # 全局粗网格拓扑校正
-├── closed_loop.py           # 闭环熵控制
-├── emergence.py             # 自涌现机制
-├── circuit_breaker.py       # 熔断器
-├── resolution_pyramid.py    # 分辨率金字塔
-├── persistent_entropy.py    # 持久熵
-├── multiparameter_filter.py # 多参数过滤
-├── zigzag_persistence.py    # 锯齿持久同调
-├── eternity_audit.py        # 永恒审计
+├── tetra_router.py          # TetraBucket + TetraMeshRouter (distributed routing)
+├── tetra_distributed.py     # TetraDistributedController (unified API)
+├── partitioning.py          # BoundingBox + GhostCell v2 + Octree + SpatialBucketRouter
+├── persistence.py           # Parquet + S3 persistence
+├── global_coarse_mesh.py    # Global coarse mesh topology correction
+├── closed_loop.py           # Closed-loop entropy control
+├── emergence.py             # Self-emergence mechanism
+├── circuit_breaker.py       # Circuit breaker
+├── resolution_pyramid.py    # Resolution pyramid
+├── persistent_entropy.py    # Persistent entropy
+├── multiparameter_filter.py # Multi-parameter filtering
+├── zigzag_persistence.py    # Zigzag persistent homology
+├── eternity_audit.py        # Eternity audit
 └── ...
 ```
