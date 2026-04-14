@@ -46,6 +46,8 @@ class TetraSelfOrganizer:
         self.max_iterations = max_iterations
         self.convergence_threshold = convergence_threshold
         self._total_actions = 0
+        self._prev_actions: List[int] = []
+        self._max_history = 5
         self._entropy_tracker = EntropyTracker()
         self._entropy_convergence_window = 3
         self._entropy_convergence_tolerance = 0.05
@@ -200,6 +202,15 @@ class TetraSelfOrganizer:
         return merges
 
     def _detect_and_integrate(self, h0_intervals: np.ndarray) -> int:
+        integrated = 0
+        for tid, tetra in self.mesh.tetrahedra.items():
+            if hasattr(tetra, 'secondary_memories') and tetra.secondary_memories:
+                if tetra.weight > 0.5:
+                    count = self.mesh.integrate_tetra(tid)
+                    integrated += count
+        return integrated
+
+    def _detect_and_integrate_legacy(self, h0_intervals: np.ndarray) -> int:
         if len(h0_intervals) == 0:
             return 0
 
