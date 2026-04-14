@@ -1,0 +1,31 @@
+{
+  "title": "TetraMem-XL: A Tetrahedron-Based Eternal Memory System with Topological Self-Organization and Dream-Driven Emergence",
+  "creators": [
+    {
+      "name": "Liu, Qihang",
+      "affiliation": "Independent Researcher"
+    }
+  ],
+  "description": "TetraMem-XL is a pure geometric AI memory system using tetrahedral (3-simplex) structures. Memory is stored on tetrahedra in a dynamic simplicial complex, with all retrieval and association via topological BFS (zero vector embeddings). The system enforces four core principles: Eternity (no deletion/decay), Integration (abstract reorganization), Self-Emergence (dream cycles), and Closed-Loop Cognition. Features include 7-dimensional fusion quality scoring, DreamProtocol (THINK-EXECUTE-REFLECT), DreamStore with provenance tracking, and Ghost Cell v2 for distributed consistency.",
+  "keywords": [
+    "Persistent Homology",
+    "Simplicial Complex",
+    "Eternal Memory",
+    "Self-Emergence",
+    "Geometric AI Memory",
+    "Topological Data Analysis",
+    "Cognitive Closed Loop",
+    "Dream Cycle"
+  ],
+  "license": "CC-BY-NC-4.0",
+  "upload_type": "software",
+  "access_right": "open",
+  "version": "2.2.0",
+  "related_identifiers": [
+    {
+      "scheme": "url",
+      "identifier": "https://github.com/sunormesky-max/Tetrahedron-Memory-Hive-System",
+      "relation": "isSupplementTo"
+    }
+  ]
+}
