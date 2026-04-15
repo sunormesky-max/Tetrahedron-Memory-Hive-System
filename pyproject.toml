@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tetrahedron-memory"
-version = "2.2.0"
+version = "2.3.0"
 description = "Pure geometric-driven AI memory system using GUDHI Alpha Complex and Persistent Homology"
 readme = "README.md"
 requires-python = ">=3.8"
