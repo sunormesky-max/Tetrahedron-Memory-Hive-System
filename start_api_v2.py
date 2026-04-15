@@ -179,6 +179,7 @@ def store(req: StoreReq):
             labels=req.labels,
             weight=req.weight,
             metadata=req.metadata,
+            dedup=True,
         )
         _schedule_save()
         return {"id": tid}
@@ -192,7 +193,7 @@ def query(req: QueryReq):
         with _state_lock:
             mesh = _mesh
         pt = _text_to_point(req.query)
-        results = mesh.query_topological(pt, k=req.k, labels=req.labels)
+        results = mesh.query_topological(pt, k=req.k, labels=req.labels, query_text=req.query)
         items = []
         for tid, dist in results:
             t = mesh.get_tetrahedron(tid)

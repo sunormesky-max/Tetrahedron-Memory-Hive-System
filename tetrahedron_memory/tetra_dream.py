@@ -906,11 +906,20 @@ class TetraDreamCycle:
                     bridge_point = np.random.randn(3)
                     bridge_point /= np.linalg.norm(bridge_point) + 1e-12
 
-                shared_labels = set()
-                for inp in all_inputs:
-                    shared_labels.update(inp.get("labels", []))
-                shared_labels.discard("__dream__")
-                shared_labels.discard("__system__")
+                labels_a = set()
+                for inp in inputs_a:
+                    labels_a.update(inp.get("labels", []))
+                labels_b = set()
+                for inp in inputs_b:
+                    labels_b.update(inp.get("labels", []))
+                labels_a.discard("__dream__")
+                labels_a.discard("__system__")
+                labels_b.discard("__dream__")
+                labels_b.discard("__system__")
+                bridge_labels = labels_a & labels_b
+                if not bridge_labels:
+                    bridge_labels = (labels_a | labels_b) - {"__dream__", "__system__"}
+                bridge_labels = list(bridge_labels)[:6]
 
                 source_ids_a = [inp["tetra_id"] for inp in inputs_a if "tetra_id" in inp]
                 source_ids_b = [inp["tetra_id"] for inp in inputs_b if "tetra_id" in inp]
@@ -925,7 +934,7 @@ class TetraDreamCycle:
                 tid = self.mesh.store(
                     content=synthesized,
                     seed_point=bridge_point,
-                    labels=list(shared_labels) + ["__dream__"],
+                    labels=list(bridge_labels) + ["__dream__"],
                     metadata={
                         "type": "dream",
                         "source_clusters": [source_ids_a[:3], source_ids_b[:3]],
@@ -948,7 +957,7 @@ class TetraDreamCycle:
                     entropy_after=0.0,
                     entropy_delta=0.0,
                     creation_time=time.time(),
-                    labels=list(shared_labels),
+                    labels=list(bridge_labels),
                     reintegrated=False,
                     reintegration_count=0,
                     walk_path_hash=walk_hash,

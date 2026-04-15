@@ -235,6 +235,9 @@ class TetraMesh:
         self._hub_node_id: Optional[str] = None
         self._hub_node_score: float = -1.0
 
+    def _content_hash(self, content: str) -> str:
+        return hashlib.sha256(content.strip().lower().encode()).hexdigest()[:16]
+
     def store(
         self,
         content: str,
@@ -242,8 +245,14 @@ class TetraMesh:
         labels: Optional[List[str]] = None,
         metadata: Optional[Dict[str, Any]] = None,
         weight: float = 1.0,
+        dedup: bool = False,
     ) -> str:
         with self._lock:
+            if dedup:
+                chash = self._content_hash(content)
+                for tid, t in self._tetrahedra.items():
+                    if self._content_hash(t.content) == chash:
+                        return tid
             tetra_id = hashlib.sha256(
                 (content + str(time.time()) + str(len(self._tetrahedra))).encode()
             ).hexdigest()[:16]
@@ -296,8 +305,62 @@ class TetraMesh:
             self._hub_node_id = None
             return tetra_id
 
+    def _extract_text_tokens(self, text: str) -> set:
+        tokens = set()
+        for w in re.findall(r"[a-zA-Z0-9]{2,}", text.lower()):
+            tokens.add(w)
+        for c in re.findall(r"[\u4e00-\u9fff]", text):
+            tokens.add(c)
+        for bigram in re.findall(r"[\u4e00-\u9fff]{2}", text):
+            tokens.add(bigram)
+        return tokens
+
+    def _seed_by_text(self, query_text: str) -> Optional[str]:
+        qtokens = self._extract_text_tokens(query_text)
+        if not qtokens:
+            return None
+        best_id = None
+        best_score = 0
+        for tid, t in self._tetrahedra.items():
+            ctokens = self._extract_text_tokens(t.content)
+            overlap = len(qtokens & ctokens)
+            if overlap > best_score:
+                best_score = overlap
+                best_id = tid
+        return best_id if best_score > 0 else None
+
+    def _seed_by_labels_text(self, labels, query_text):
+        if labels:
+            for lbl in labels:
+                for tid in self._label_index.get(lbl, set()):
+                    if tid in self._tetrahedra:
+                        return tid
+        if query_text:
+            return self._seed_by_text(query_text)
+        return self.seed_by_structure(labels)
+
+    def _rank_by_text_relevance(self, query_text, k):
+        if not query_text:
+            return []
+        qtokens = self._extract_text_tokens(query_text)
+        if not qtokens:
+            return []
+        scored = []
+        for tid, t in self._tetrahedra.items():
+            ctokens = self._extract_text_tokens(t.content)
+            if not ctokens:
+                continue
+            overlap = len(qtokens & ctokens)
+            if overlap == 0:
+                continue
+            score = overlap / max(len(qtokens), 1)
+            scored.append((tid, score))
+        scored.sort(key=lambda x: -x[1])
+        return scored[:k]
+
     def query_topological(self, query_point: np.ndarray, k: int = 5,
-                          labels: Optional[List[str]] = None) -> List[Tuple[str, float]]:
+                          labels: Optional[List[str]] = None,
+                          query_text: Optional[str] = None) -> List[Tuple[str, float]]:
         """Pure topological query — seeds by structure, navigates by topology.
 
         No Euclidean distance used for ranking. Scores come from:
@@ -307,7 +370,7 @@ class TetraMesh:
           - Label overlap (Jaccard)
           - Time score (freshness)
         """
-        cache_key = f"{query_point.tobytes().hex()}_{k}_{tuple(labels or [])}"
+        cache_key = f"{query_point.tobytes().hex()}_{k}_{tuple(labels or [])}_{query_text or ''}"
 
         with self._lock:
             if not self._query_cache_dirty and cache_key in self._query_cache:
@@ -316,7 +379,13 @@ class TetraMesh:
             if not self._tetrahedra:
                 return []
 
-            seed_id = self.seed_by_structure(labels)
+            if query_text:
+                text_results = self._rank_by_text_relevance(query_text, k)
+                if text_results:
+                    self._query_cache[cache_key] = text_results
+                    return text_results
+
+            seed_id = self._seed_by_labels_text(labels, query_text)
             if seed_id is None:
                 return []
 
@@ -325,6 +394,7 @@ class TetraMesh:
             nav = self.navigate_topology(seed_id, max_steps=k * 3)
 
             type_penalty = {"seed": 0.1, "face": 0.3, "edge": 0.6, "vertex": 0.85}
+            qtokens = self._extract_text_tokens(query_text) if query_text else set()
             results = []
             seen = set()
             for tid, conn_type, hop in nav:
@@ -348,12 +418,19 @@ class TetraMesh:
                 if seed_t.labels and tetra.labels:
                     l_score = 0.15 * len(set(seed_t.labels) & set(tetra.labels)) / len(set(seed_t.labels) | set(tetra.labels))
 
+                text_score = 0.0
+                if qtokens:
+                    ctokens = self._extract_text_tokens(tetra.content)
+                    if ctokens:
+                        overlap = len(qtokens & ctokens)
+                        text_score = 0.5 * overlap / max(len(qtokens), 1)
+
                 fil = tetra.filtration(self._time_lambda)
                 t_score = 0.2 * 1.0 / (1.0 + fil * 0.5)
                 w_factor = tetra.weight / (tetra.init_weight + 1e-6)
                 t_score *= w_factor
 
-                total_score = penalty + v_score + w_score + l_score + t_score
+                total_score = penalty + v_score + w_score + l_score + t_score + text_score
                 results.append((tid, total_score))
 
                 if len(results) >= k * 2:
