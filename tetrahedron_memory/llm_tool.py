@@ -519,37 +519,6 @@ def execute_tool_call(
     else:
         return {"error": f"Unknown tool: {tool_name}"}
 
-    if tool_name == "tetramem_get":
-        memory_id = arguments.get("memory_id", "")
-        result = memory.get(memory_id)
-        if result is None:
-            return {"error": f"Memory not found: {memory_id}"}
-        return result
-
-    elif tool_name == "tetramem_update":
-        memory_id = arguments.get("memory_id", "")
-        success = memory.update(
-            memory_id=memory_id,
-            content=arguments.get("content"),
-            labels=arguments.get("labels"),
-            metadata=arguments.get("metadata"),
-            weight=arguments.get("weight"),
-        )
-        return {"memory_id": memory_id, "updated": success}
-
-    elif tool_name == "tetramem_query_by_label":
-        label = arguments.get("label", "")
-        k = arguments.get("k", 20)
-        nodes = memory.query_by_label(label, k=k)
-        return {
-            "results": [
-                {"id": n.id, "content": n.content, "weight": n.weight, "labels": n.labels}
-                for n in nodes
-            ]
-        }
-
-    return {"error": f"Unknown tool: {tool_name}"}
-
 
 def create_tool_response(
     tool_call_id: str,
