@@ -80,7 +80,9 @@ class GeoMemoryBody:
         self._query_count = 0
         self._topology_shortcuts: Dict[str, Set[str]] = defaultdict(set)
         self._topology_shortcuts_max_per_node = 50
+        self._topology_shortcuts_max_total = 5000
         self._label_sector_cache: Dict[str, np.ndarray] = {}
+        self._label_sector_cache_max = 200
         self._dirty_nodes: Set[str] = set()
         self._rebuild_threshold: int = 20
         self._octree: Optional[Octree] = None
@@ -785,6 +787,15 @@ class GeoMemoryBody:
                     ):
                         self._topology_shortcuts[node.id].add(memory_id)
 
+            if len(self._topology_shortcuts) > self._topology_shortcuts_max_total:
+                keys_by_size = sorted(
+                    self._topology_shortcuts.keys(),
+                    key=lambda k: len(self._topology_shortcuts[k]),
+                )
+                excess = len(self._topology_shortcuts) - self._topology_shortcuts_max_total // 2
+                for k in keys_by_size[:excess]:
+                    del self._topology_shortcuts[k]
+
             shortcut_assoc = self._find_shortcut_connections(source_node, visited)
             for node, score in shortcut_assoc:
                 associations.append((node, score, "shortcut"))
@@ -1487,6 +1498,10 @@ class GeoMemoryBody:
             return np.array([1.0, 0.0, 0.0])
         primary = labels[0]
         if primary not in self._label_sector_cache:
+            if len(self._label_sector_cache) > self._label_sector_cache_max:
+                oldest = list(self._label_sector_cache.keys())[: self._label_sector_cache_max // 2]
+                for k in oldest:
+                    del self._label_sector_cache[k]
             h = int(hashlib.sha256(primary.encode()).hexdigest()[:8], 16)
             rng = np.random.RandomState(h % (2**31))
             theta = rng.uniform(0, 2 * np.pi)
