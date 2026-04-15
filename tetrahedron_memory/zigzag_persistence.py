@@ -153,6 +153,8 @@ class ZigzagTracker:
         self._mapping_cones: List[MappingConeRecord] = []
         self._max_cones: int = 50
         self._iterative_model: Dict[int, List[float]] = {0: [], 1: [], 2: []}
+        self._max_iterative_model: int = 100
+        self._max_feature_registry: int = 500
 
     def record_snapshot(self, mesh: Any) -> PersistenceSnapshot:
         st = mesh.compute_ph()
@@ -443,6 +445,10 @@ class ZigzagTracker:
                 self._mapping_cones = self._mapping_cones[-self._max_cones :]
             for dim in [0, 1, 2]:
                 self._iterative_model[dim].append(len(stability_cert.get(dim, [])))
+                if len(self._iterative_model[dim]) > self._max_iterative_model:
+                    self._iterative_model[dim] = self._iterative_model[dim][
+                        -self._max_iterative_model :
+                    ]
 
         return record
 
@@ -619,6 +625,14 @@ class ZigzagTracker:
 
         if len(self._transitions) > self._window_size * 6:
             self._transitions = self._transitions[-self._window_size * 4 :]
+
+        if len(self._feature_registry) > self._max_feature_registry:
+            sorted_keys = sorted(
+                self._feature_registry.keys(), key=lambda k: len(self._feature_registry[k])
+            )
+            excess = len(self._feature_registry) - self._max_feature_registry // 2
+            for k in sorted_keys[:excess]:
+                del self._feature_registry[k]
 
     @staticmethod
     def _extract_barcodes(simplex_tree: Any, dim: int) -> List[Tuple[float, float]]:
