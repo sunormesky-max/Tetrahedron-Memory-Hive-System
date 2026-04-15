@@ -48,6 +48,7 @@ class EternityAudit:
         self._preservation_map: Dict[str, Set[str]] = {}
         self._lock = threading.RLock()
         self._violations: List[Dict[str, Any]] = []
+        self._max_violations: int = 100
 
     @staticmethod
     def _hash_content(content: str) -> str:
@@ -216,6 +217,8 @@ class EternityAudit:
 
             if violations:
                 self._violations.append(result)
+                if len(self._violations) > self._max_violations:
+                    self._violations = self._violations[-self._max_violations :]
                 logger_msg.warning(
                     "ETERNITY VIOLATION: %d memories have no preservation proof",
                     len(violations),
@@ -257,7 +260,16 @@ class EternityAudit:
     def _trim(self) -> None:
         if len(self._log) > self._max_entries:
             excess = len(self._log) - self._max_entries
+            removed_ids = set()
             for entry in self._log[:excess]:
                 if entry.operation == "store":
-                    pass
+                    removed_ids.add(entry.target_id)
             self._log = self._log[-self._max_entries :]
+            if removed_ids and len(self._content_registry) > self._max_entries * 2:
+                for rid in removed_ids:
+                    self._content_registry.pop(rid, None)
+                    self._preservation_map.pop(rid, None)
+            if len(self._preservation_map) > self._max_entries * 2:
+                dead_keys = [k for k, v in self._preservation_map.items() if not v]
+                for k in dead_keys[: len(dead_keys) // 2]:
+                    del self._preservation_map[k]
