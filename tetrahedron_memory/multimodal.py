@@ -208,41 +208,4 @@ class PixHomology:
         )
 
 
-class TextToGeometryMapper:
-    """
-    Text to geometry mapping for multimodal support.
-    """
-
-    def __init__(self):
-        pass
-
-    def text_to_geometry(self, text: str) -> np.ndarray:
-        hash_val = int(hashlib.md5(text.encode()).hexdigest()[:8], 16)
-        rng = np.random.RandomState(hash_val % (2**31))
-
-        theta = rng.uniform(0, 2 * np.pi)
-        phi = np.arccos(2 * rng.uniform(0, 1) - 1)
-
-        x = np.sin(phi) * np.cos(theta)
-        y = np.sin(phi) * np.sin(theta)
-        z = np.cos(phi)
-
-        return np.array([x, y, z], dtype=np.float64)
-
-    def text_to_tetrahedron(self, text: str) -> np.ndarray:
-        vertices = []
-        for i in range(4):
-            vertex_text = f"{text}_v{i}"
-            hash_val = int(hashlib.md5(vertex_text.encode()).hexdigest()[:8], 16)
-            rng = np.random.RandomState(hash_val % (2**31))
-
-            theta = rng.uniform(0, 2 * np.pi)
-            phi = np.arccos(2 * rng.uniform(0, 1) - 1)
-
-            x = np.sin(phi) * np.cos(theta)
-            y = np.sin(phi) * np.sin(theta)
-            z = np.cos(phi)
-
-            vertices.append([x, y, z])
-
-        return np.array(vertices, dtype=np.float64)
+from .geometry import TextToGeometryMapper  # noqa: E402, F401 — re-export for backward compat
