@@ -118,6 +118,7 @@ class ParquetPersistence:
     def __init__(self, storage_path: str = "./tetramem_data"):
         self.storage_path = storage_path
         self._snapshots: List[MemorySnapshot] = []
+        self._max_in_memory_snapshots: int = 1000
         self._base_path = Path(storage_path)
         self._base_path.mkdir(parents=True, exist_ok=True)
         self._global_file = self._base_path / "memories.parquet"
@@ -291,6 +292,8 @@ class ParquetPersistence:
             metadata=metadata,
         )
         self._snapshots.append(snapshot)
+        if len(self._snapshots) > self._max_in_memory_snapshots:
+            self._snapshots = self._snapshots[-self._max_in_memory_snapshots :]
 
     def save_to_parquet(self) -> None:
         try:
