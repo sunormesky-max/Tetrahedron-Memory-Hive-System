@@ -128,7 +128,7 @@ class TestStats:
     def test_health(self, fresh_api):
         resp = fresh_api.health()
         assert resp["status"] == "ok"
-        assert resp["version"] == "2.4.0"
+        assert resp["version"] == "2.5.0"
         assert resp["uptime_seconds"] >= 0
 
 

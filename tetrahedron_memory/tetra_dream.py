@@ -778,11 +778,13 @@ class TetraDreamCycle:
         scored.sort(reverse=True)
 
         top_n = min(5, len(scored))
-        total_priority = sum(s[0] for s in scored[:top_n])
+        weights = [s[0] for s in scored[:top_n]]
+        import math
+        weights = [w if math.isfinite(w) and w > 0 else 1e-6 for w in weights]
+        total_priority = sum(weights)
         if total_priority <= 0:
             return None
 
-        weights = [s[0] for s in scored[:top_n]]
         import random as _rng
         idx = _rng.choices(range(top_n), weights=weights, k=1)[0]
         return scored[idx][1]

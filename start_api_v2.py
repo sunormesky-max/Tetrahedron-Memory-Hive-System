@@ -1,6 +1,6 @@
 """
-TetraMem-XL API v2.4 — TetraMesh + TetraDreamCycle Core
-P0 fixes + P1 perf + P2 thread-safety + LLM dream synthesis
+TetraMem-XL API v2.5 — TetraMesh + TetraDreamCycle Core
+Hybrid query + SQLite persistence + semantic geometry embedding
 """
 import os, time, hashlib, threading, numpy as np
 from contextlib import asynccontextmanager
@@ -9,7 +9,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 from typing import Any, Dict, List, Optional
 
-from tetrahedron_memory.tetra_mesh import TetraMesh, text_to_geometry
+from tetrahedron_memory.tetra_mesh import TetraMesh, TetraMeshStore, text_to_geometry
 from tetrahedron_memory.tetra_dream import TetraDreamCycle
 from tetrahedron_memory.tetra_self_org import TetraSelfOrganizer
 
@@ -18,10 +18,12 @@ STORAGE_DIR = os.environ.get("TETRAMEM_STORAGE", "./tetramem_data_v2")
 _mesh: TetraMesh = None
 _dream: TetraDreamCycle = None
 _self_org: TetraSelfOrganizer = None
+_store: TetraMeshStore = None
 _state_lock = threading.RLock()
 _save_timer: threading.Timer = None
 _save_lock = threading.Lock()
 _dirty = False
+_dirty_ids: set = set()
 _start_time = time.time()
 
 
@@ -42,30 +44,40 @@ def _init_llm_executor():
 
 def init_state():
     """Initialize global state. Called by lifespan or directly in tests."""
-    global _mesh, _dream, _self_org
+    global _mesh, _dream, _self_org, _store
     Path(STORAGE_DIR).mkdir(parents=True, exist_ok=True)
-    _mesh = TetraMesh()
+
+    db_path = os.path.join(STORAGE_DIR, "tetramem.db")
+    _store = TetraMeshStore(db_path)
+    _store.init_db()
+
+    loaded = _store.load_full_mesh()
+    if loaded and len(loaded.tetrahedra) > 0:
+        _mesh = loaded
+        print(f"[TetraMem v2.5] Loaded {len(_mesh.tetrahedra)} tetrahedra from SQLite")
+    else:
+        _mesh = TetraMesh()
+        json_file = Path(STORAGE_DIR) / "mesh_index.json"
+        if json_file.exists():
+            import json
+            data = json.loads(json_file.read_text())
+            for item in data.get("tetrahedra", []):
+                pt = np.array(item["centroid"])
+                _mesh.store(
+                    content=item["content"],
+                    seed_point=pt,
+                    labels=item.get("labels", []),
+                    weight=item.get("weight", 1.0),
+                    metadata=item.get("metadata"),
+                )
+            _store.save_full_mesh(_mesh)
+            print(f"[TetraMem v2.5] Migrated {len(_mesh.tetrahedra)} tetrahedra from JSON to SQLite")
+        else:
+            print("[TetraMem v2.5] Fresh start")
 
     llm = _init_llm_executor()
     _dream = TetraDreamCycle(_mesh, llm_executor=llm)
     _self_org = TetraSelfOrganizer(_mesh)
-
-    index_file = Path(STORAGE_DIR) / "mesh_index.json"
-    if index_file.exists():
-        import json
-        data = json.loads(index_file.read_text())
-        for item in data.get("tetrahedra", []):
-            pt = np.array(item["centroid"])
-            _mesh.store(
-                content=item["content"],
-                seed_point=pt,
-                labels=item.get("labels", []),
-                weight=item.get("weight", 1.0),
-                metadata=item.get("metadata"),
-            )
-        print(f"[TetraMem v2] Loaded {len(_mesh.tetrahedra)} tetrahedra")
-    else:
-        print("[TetraMem v2] Fresh start")
 
 
 @asynccontextmanager
@@ -73,10 +85,12 @@ async def lifespan(application):
     init_state()
     yield
     _flush_save()
-    print("[TetraMem v2] Shutdown complete, data flushed")
+    if _store:
+        _store.close()
+    print("[TetraMem v2.5] Shutdown complete, data flushed to SQLite")
 
 
-app = FastAPI(title="TetraMem-XL v2", version="2.4.0", lifespan=lifespan)
+app = FastAPI(title="TetraMem-XL v2", version="2.5.0", lifespan=lifespan)
 
 
 class StoreReq(BaseModel):
@@ -123,32 +137,24 @@ class SeedByLabelReq(BaseModel):
 
 
 def _do_save():
-    import json
+    global _dirty, _dirty_ids
     with _state_lock:
         mesh = _mesh
+        store = _store
+        ids_to_save = _dirty_ids.copy()
     with _save_lock:
-        global _dirty
-        tetras = []
-        for tid, t in mesh.tetrahedra.items():
-            tetras.append({
-                "id": tid,
-                "content": t.content,
-                "centroid": t.centroid.tolist() if hasattr(t.centroid, 'tolist') else list(t.centroid),
-                "labels": list(t.labels) if t.labels else [],
-                "weight": float(t.weight),
-                "metadata": dict(t.metadata) if t.metadata else {},
-            })
-        Path(STORAGE_DIR).mkdir(parents=True, exist_ok=True)
-        tmp = Path(STORAGE_DIR) / "mesh_index.json.tmp"
-        tmp.write_text(json.dumps({"tetrahedra": tetras}, ensure_ascii=False))
-        tmp.replace(Path(STORAGE_DIR) / "mesh_index.json")
+        if store:
+            store.incremental_save(mesh, dirty_ids=ids_to_save if ids_to_save else None)
         _dirty = False
+        _dirty_ids = set()
 
 
-def _schedule_save():
+def _schedule_save(dirty_id: str = None):
     with _save_lock:
-        global _save_timer, _dirty
+        global _save_timer, _dirty, _dirty_ids
         _dirty = True
+        if dirty_id:
+            _dirty_ids.add(dirty_id)
         if _save_timer is not None:
             _save_timer.cancel()
         _save_timer = threading.Timer(2.0, _do_save)
@@ -165,8 +171,8 @@ def _flush_save():
         _do_save()
 
 
-def _text_to_point(text: str) -> np.ndarray:
-    return text_to_geometry(text)
+def _text_to_point(text: str, labels=None) -> np.ndarray:
+    return text_to_geometry(text, labels=labels)
 
 
 @app.post("/api/v1/store")
@@ -174,7 +180,7 @@ def store(req: StoreReq):
     try:
         with _state_lock:
             mesh = _mesh
-        pt = _text_to_point(req.content)
+        pt = _text_to_point(req.content, labels=req.labels)
         tid = mesh.store(
             content=req.content,
             seed_point=pt,
@@ -183,7 +189,7 @@ def store(req: StoreReq):
             metadata=req.metadata,
             dedup=True,
         )
-        _schedule_save()
+        _schedule_save(dirty_id=tid)
         return {"id": tid}
     except Exception as e:
         raise HTTPException(500, str(e))
@@ -331,7 +337,7 @@ def stats():
 
 @app.get("/api/v1/health")
 def health():
-    return {"status": "ok", "version": "2.4.0", "uptime_seconds": time.time() - _start_time}
+    return {"status": "ok", "version": "2.5.0", "uptime_seconds": time.time() - _start_time}
 
 
 @app.post("/api/v1/export")

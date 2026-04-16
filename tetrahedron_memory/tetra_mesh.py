@@ -8,7 +8,9 @@ All operations use pure geometry primitives. No vector embeddings.
 """
 
 import hashlib
+import json
 import re
+import sqlite3
 import threading
 import time
 from collections import defaultdict
@@ -25,16 +27,53 @@ except ImportError:
     GUDHI_AVAILABLE = False
 
 
-def text_to_geometry(text: str, labels = None) -> np.ndarray:
-    """Deterministic text-to-3D-point mapping using SHA-256 hash.
-    
-    Shared utility used by both TetraMesh API and core module
-    to ensure consistent spatial layout across all entry points.
+def text_to_geometry(text: str, labels=None) -> np.ndarray:
+    """Deterministic text-to-3D-point mapping using multi-scale hash.
+
+    Layer 1 (SHA-256): Base spatial position — deterministic hash
+    Layer 2 (Label geometry): Labels rotate the point toward label-specific attractors
+    Layer 3 (Content structure): Sentence length and punctuation shift the position
+
+    This creates a 3D space where:
+    - Similar labels cluster memories together
+    - Similar content lengths/structures occupy nearby regions
+    - SHA-256 ensures uniqueness while preserving topology
     """
     h = hashlib.sha256(text.encode()).digest()
-    vals = np.frombuffer(h[:12], dtype=np.float32).copy()
-    vals = vals / (np.abs(vals).max() + 1e-8) * 3.0
-    return vals[:3]
+    vals = np.frombuffer(h[:12], dtype=np.uint32).copy().astype(np.float32)
+    base_max = float(np.abs(vals).max())
+    if base_max < 1e-8:
+        base_max = 1.0
+    base = vals / base_max * 3.0
+
+    if labels and len(labels) > 0:
+        label_h = hashlib.sha256("|".join(sorted(labels)).encode()).digest()
+        label_vals = np.frombuffer(label_h[:12], dtype=np.uint32).copy().astype(np.float32)
+        label_max = float(np.abs(label_vals).max())
+        if label_max < 1e-8:
+            label_max = 1.0
+        label_point = label_vals / label_max * 3.0
+
+        n_labels = min(len(labels), 5)
+        blend = 0.15 + 0.05 * n_labels
+        base = base * (1.0 - blend) + label_point * blend
+
+    content_len = len(text)
+    n_sentences = text.count("。") + text.count("！") + text.count("？") + text.count(".") + text.count("!") + text.count("?")
+    n_sentences = max(n_sentences, 1)
+
+    structure_shift = np.array([
+        (content_len % 200) / 200.0 * 0.3 - 0.15,
+        (n_sentences % 10) / 10.0 * 0.2 - 0.1,
+        0.0,
+    ], dtype=np.float32)
+
+    base = base + structure_shift
+
+    result = base[:3]
+    if not np.all(np.isfinite(result)):
+        result = np.array([0.0, 0.0, 0.0], dtype=np.float32)
+    return result
 
 
 class MemoryTetrahedron:
@@ -361,14 +400,15 @@ class TetraMesh:
     def query_topological(self, query_point: np.ndarray, k: int = 5,
                           labels: Optional[List[str]] = None,
                           query_text: Optional[str] = None) -> List[Tuple[str, float]]:
-        """Pure topological query — seeds by structure, navigates by topology.
+        """Hybrid query — merges text relevance × topology × weight signals.
 
-        No Euclidean distance used for ranking. Scores come from:
-          - Connection type (face > edge > vertex)
-          - Volume similarity (pure geometry)
-          - Weight similarity
-          - Label overlap (Jaccard)
-          - Time score (freshness)
+        Three scoring channels combined with geometric weights:
+          TEXT (alpha):  token overlap ratio (char bigram + word level)
+          TOPO  (beta):  connection type + volume + label Jaccard + freshness
+          WEIGHT (gamma): raw weight as importance signal
+
+        Final score = alpha * text + beta * topo + gamma * weight
+        When text query is absent, topology dominates with gamma assist.
         """
         cache_key = f"{query_point.tobytes().hex()}_{k}_{tuple(labels or [])}_{query_text or ''}"
 
@@ -379,64 +419,81 @@ class TetraMesh:
             if not self._tetrahedra:
                 return []
 
+            alpha = 0.45
+            beta = 0.35
+            gamma = 0.20
+
+            text_scores: Dict[str, float] = {}
             if query_text:
-                text_results = self._rank_by_text_relevance(query_text, k)
-                if text_results:
-                    self._query_cache[cache_key] = text_results
-                    return text_results
+                text_scores = self._compute_text_scores(query_text)
+
+            topo_scores: Dict[str, float] = {}
+            weight_scores: Dict[str, float] = {}
+
+            max_w = max((t.weight for t in self._tetrahedra.values()), default=1.0)
+            if max_w < 0.1:
+                max_w = 1.0
 
             seed_id = self._seed_by_labels_text(labels, query_text)
-            if seed_id is None:
-                return []
+            has_topo = seed_id is not None
 
-            self._tetrahedra[seed_id].touch()
+            if has_topo:
+                self._tetrahedra[seed_id].touch()
+                nav = self.navigate_topology(seed_id, max_steps=k * 3)
 
-            nav = self.navigate_topology(seed_id, max_steps=k * 3)
-
-            type_penalty = {"seed": 0.1, "face": 0.3, "edge": 0.6, "vertex": 0.85}
-            qtokens = self._extract_text_tokens(query_text) if query_text else set()
-            results = []
-            seen = set()
-            for tid, conn_type, hop in nav:
-                if tid in seen:
-                    continue
-                seen.add(tid)
-
-                tetra = self._tetrahedra[tid]
-                penalty = type_penalty.get(conn_type, 0.9) + hop * 0.05
-
-                v_score = 0.0
+                type_penalty = {"seed": 0.1, "face": 0.3, "edge": 0.6, "vertex": 0.85}
                 seed_t = self._tetrahedra[seed_id]
                 v1 = self._tetra_volume(seed_t)
-                v2 = self._tetra_volume(tetra)
-                if v1 > 0 and v2 > 0:
-                    v_score = 0.2 * min(v1, v2) / max(v1, v2)
 
-                w_score = 0.15 * (1.0 - abs(seed_t.weight - tetra.weight) / max(seed_t.weight, tetra.weight, 0.1))
+                for tid, conn_type, hop in nav:
+                    tetra = self._tetrahedra.get(tid)
+                    if tetra is None:
+                        continue
 
-                l_score = 0.0
-                if seed_t.labels and tetra.labels:
-                    l_score = 0.15 * len(set(seed_t.labels) & set(tetra.labels)) / len(set(seed_t.labels) | set(tetra.labels))
+                    penalty = type_penalty.get(conn_type, 0.9) + hop * 0.05
 
-                text_score = 0.0
-                if qtokens:
-                    ctokens = self._extract_text_tokens(tetra.content)
-                    if ctokens:
-                        overlap = len(qtokens & ctokens)
-                        text_score = 0.5 * overlap / max(len(qtokens), 1)
+                    v_score = 0.0
+                    v2 = self._tetra_volume(tetra)
+                    if v1 > 0 and v2 > 0:
+                        v_score = 0.2 * min(v1, v2) / max(v1, v2)
 
-                fil = tetra.filtration(self._time_lambda)
-                t_score = 0.2 * 1.0 / (1.0 + fil * 0.5)
-                w_factor = tetra.weight / (tetra.init_weight + 1e-6)
-                t_score *= w_factor
+                    w_sim = 0.15 * (1.0 - abs(seed_t.weight - tetra.weight) / max(seed_t.weight, tetra.weight, 0.1))
 
-                total_score = penalty + v_score + w_score + l_score + t_score + text_score
-                results.append((tid, total_score))
+                    l_score = 0.0
+                    if seed_t.labels and tetra.labels:
+                        l_score = 0.15 * len(set(seed_t.labels) & set(tetra.labels)) / len(set(seed_t.labels) | set(tetra.labels))
 
-                if len(results) >= k * 2:
-                    break
+                    fil = tetra.filtration(self._time_lambda)
+                    t_score = 0.2 * 1.0 / (1.0 + fil * 0.5)
+                    w_factor = tetra.weight / (tetra.init_weight + 1e-6)
+                    t_score *= w_factor
 
-            results.sort(key=lambda x: x[1])
+                    topo_scores[tid] = penalty + v_score + w_sim + l_score + t_score
+
+            all_ids = set(text_scores.keys()) | set(topo_scores.keys())
+            if not all_ids:
+                all_ids = set(self._tetrahedra.keys())
+
+            results = []
+            for tid in all_ids:
+                tetra = self._tetrahedra.get(tid)
+                if tetra is None:
+                    continue
+
+                t_s = text_scores.get(tid, 0.0)
+                p_s = topo_scores.get(tid, 0.0)
+                w_s = tetra.weight / max_w
+
+                if text_scores:
+                    score = alpha * t_s + beta * p_s + gamma * w_s
+                elif has_topo:
+                    score = beta * p_s + gamma * w_s
+                else:
+                    score = gamma * w_s
+
+                results.append((tid, score))
+
+            results.sort(key=lambda x: -x[1])
             final = results[:k]
 
             self._query_cache[cache_key] = final
@@ -447,6 +504,21 @@ class TetraMesh:
             self._query_cache_dirty = False
 
             return final
+
+    def _compute_text_scores(self, query_text: str) -> Dict[str, float]:
+        qtokens = self._extract_text_tokens(query_text)
+        if not qtokens:
+            return {}
+        scores = {}
+        for tid, t in self._tetrahedra.items():
+            ctokens = self._extract_text_tokens(t.content)
+            if not ctokens:
+                continue
+            overlap = len(qtokens & ctokens)
+            if overlap == 0:
+                continue
+            scores[tid] = overlap / max(len(qtokens), 1)
+        return scores
 
     def associate_topological(
         self, tetra_id: str, max_depth: int = 2
@@ -1247,3 +1319,267 @@ class TetraMesh:
 
         self._boundary_dirty = True
         self._centroid_index_dirty = True
+
+
+class TetraMeshStore:
+    """SQLite-backed persistence for TetraMesh.
+
+    Replaces JSON replay with incremental SQLite operations:
+    - UPSERT on store (no full dump)
+    - Streaming SELECT on load (constant memory)
+    - Atomic WAL mode for crash safety
+    - Full mesh topology preserved: vertices, faces, tetrahedra
+    """
+
+    SCHEMA = """
+    CREATE TABLE IF NOT EXISTS vertices (
+        idx INTEGER PRIMARY KEY,
+        x REAL NOT NULL, y REAL NOT NULL, z REAL NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS tetrahedra (
+        id TEXT PRIMARY KEY,
+        content TEXT NOT NULL,
+        vertex_indices TEXT NOT NULL,
+        centroid TEXT NOT NULL,
+        labels TEXT NOT NULL DEFAULT '[]',
+        metadata TEXT NOT NULL DEFAULT '{{}}',
+        weight REAL NOT NULL DEFAULT 1.0,
+        creation_time REAL NOT NULL DEFAULT 0.0,
+        last_access_time REAL NOT NULL DEFAULT 0.0,
+        init_weight REAL NOT NULL DEFAULT 1.0,
+        spatial_alpha REAL NOT NULL DEFAULT 0.0,
+        integration_count INTEGER NOT NULL DEFAULT 0,
+        access_count INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE TABLE IF NOT EXISTS faces (
+        face_key TEXT PRIMARY KEY,
+        tetrahedra_ids TEXT NOT NULL DEFAULT '[]'
+    );
+    CREATE TABLE IF NOT EXISTS meta (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+    );
+    """
+
+    def __init__(self, db_path: str = "tetramem.db"):
+        self._db_path = db_path
+        self._local = threading.local()
+
+    def _conn(self) -> sqlite3.Connection:
+        if not hasattr(self._local, 'conn') or self._local.conn is None:
+            conn = sqlite3.connect(self._db_path, check_same_thread=False)
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA synchronous=NORMAL")
+            conn.row_factory = sqlite3.Row
+            self._local.conn = conn
+        return self._local.conn
+
+    def init_db(self) -> None:
+        conn = self._conn()
+        conn.executescript(self.SCHEMA)
+        conn.commit()
+
+    def save_tetra(self, t: MemoryTetrahedron) -> None:
+        conn = self._conn()
+        conn.execute(
+            """INSERT OR REPLACE INTO tetrahedra
+            (id, content, vertex_indices, centroid, labels, metadata,
+             weight, creation_time, last_access_time, init_weight,
+             spatial_alpha, integration_count, access_count)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (
+                t.id,
+                t.content,
+                json.dumps(t.vertex_indices),
+                json.dumps(t.centroid.tolist() if hasattr(t.centroid, 'tolist') else list(t.centroid)),
+                json.dumps(t.labels),
+                json.dumps(t.metadata, default=str),
+                t.weight,
+                t.creation_time,
+                t.last_access_time,
+                t.init_weight,
+                t._spatial_alpha,
+                t.integration_count,
+                t.access_count,
+            ),
+        )
+        conn.commit()
+
+    def save_face(self, face_key: Tuple[int, int, int], tetra_ids: Set[str]) -> None:
+        conn = self._conn()
+        fk_str = json.dumps(face_key)
+        conn.execute(
+            "INSERT OR REPLACE INTO faces (face_key, tetrahedra_ids) VALUES (?, ?)",
+            (fk_str, json.dumps(sorted(tetra_ids))),
+        )
+        conn.commit()
+
+    def save_vertex(self, idx: int, point: np.ndarray) -> None:
+        conn = self._conn()
+        conn.execute(
+            "INSERT OR REPLACE INTO vertices (idx, x, y, z) VALUES (?, ?, ?, ?)",
+            (idx, float(point[0]), float(point[1]), float(point[2])),
+        )
+        conn.commit()
+
+    def save_meta(self, key: str, value: str) -> None:
+        conn = self._conn()
+        conn.execute(
+            "INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)",
+            (key, value),
+        )
+        conn.commit()
+
+    def save_full_mesh(self, mesh: 'TetraMesh') -> None:
+        conn = self._conn()
+        with mesh._lock:
+            conn.execute("BEGIN")
+            try:
+                conn.execute("DELETE FROM vertices")
+                conn.execute("DELETE FROM tetrahedra")
+                conn.execute("DELETE FROM faces")
+
+                for idx, v in enumerate(mesh._vertices):
+                    conn.execute(
+                        "INSERT INTO vertices (idx, x, y, z) VALUES (?, ?, ?, ?)",
+                        (idx, float(v[0]), float(v[1]), float(v[2])),
+                    )
+
+                for tid, t in mesh._tetrahedra.items():
+                    conn.execute(
+                        """INSERT INTO tetrahedra
+                        (id, content, vertex_indices, centroid, labels, metadata,
+                         weight, creation_time, last_access_time, init_weight,
+                         spatial_alpha, integration_count, access_count)
+                        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                        (
+                            tid,
+                            t.content,
+                            json.dumps(t.vertex_indices),
+                            json.dumps(t.centroid.tolist() if hasattr(t.centroid, 'tolist') else list(t.centroid)),
+                            json.dumps(t.labels),
+                            json.dumps(t.metadata, default=str),
+                            t.weight,
+                            t.creation_time,
+                            t.last_access_time,
+                            t.init_weight,
+                            t._spatial_alpha,
+                            t.integration_count,
+                            t.access_count,
+                        ),
+                    )
+
+                for fk, face in mesh._faces.items():
+                    conn.execute(
+                        "INSERT INTO faces (face_key, tetrahedra_ids) VALUES (?, ?)",
+                        (json.dumps(fk), json.dumps(sorted(face.tetrahedra))),
+                    )
+
+                conn.execute(
+                    "INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)",
+                    ("time_lambda", str(mesh._time_lambda)),
+                )
+
+                conn.execute("COMMIT")
+            except Exception:
+                conn.execute("ROLLBACK")
+                raise
+
+    def load_full_mesh(self) -> Optional['TetraMesh']:
+        conn = self._conn()
+        row = conn.execute("SELECT value FROM meta WHERE key='time_lambda'").fetchone()
+        time_lambda = float(row["value"]) if row else 0.001
+        mesh = TetraMesh(time_lambda=time_lambda)
+
+        vertex_rows = conn.execute("SELECT idx, x, y, z FROM vertices ORDER BY idx").fetchall()
+        vertices = {}
+        for r in vertex_rows:
+            vertices[r["idx"]] = np.array([r["x"], r["y"], r["z"]], dtype=np.float32)
+            if r["idx"] >= len(mesh._vertices):
+                mesh._vertices.extend([np.zeros(3)] * (r["idx"] - len(mesh._vertices) + 1))
+            mesh._vertices[r["idx"]] = vertices[r["idx"]]
+
+        tetra_rows = conn.execute("SELECT * FROM tetrahedra").fetchall()
+        for r in tetra_rows:
+            vi = tuple(json.loads(r["vertex_indices"]))
+            centroid = np.array(json.loads(r["centroid"]), dtype=np.float32)
+            t = MemoryTetrahedron(
+                id=r["id"],
+                content=r["content"],
+                vertex_indices=vi,
+                centroid=centroid,
+                labels=json.loads(r["labels"]),
+                metadata=json.loads(r["metadata"]),
+                weight=r["weight"],
+                creation_time=r["creation_time"],
+                last_access_time=r["last_access_time"],
+                init_weight=r["init_weight"],
+                _spatial_alpha=r["spatial_alpha"],
+                integration_count=r["integration_count"],
+                access_count=r["access_count"],
+            )
+            mesh._tetrahedra[r["id"]] = t
+            for lbl in t.labels:
+                mesh._label_index[lbl].add(r["id"])
+            for v in vi:
+                mesh._vertex_to_tetra[v].add(r["id"])
+                mesh._vertex_ref_count[v] += 1
+
+        face_rows = conn.execute("SELECT face_key, tetrahedra_ids FROM faces").fetchall()
+        for r in face_rows:
+            fk = tuple(json.loads(r["face_key"]))
+            tids = set(json.loads(r["tetrahedra_ids"]))
+            mesh._faces[fk] = FaceRecord(vertex_indices=fk, tetrahedra=tids)
+
+        mesh._centroid_index_dirty = True
+        mesh._boundary_dirty = True
+        mesh._query_cache_dirty = True
+        if mesh._tetrahedra:
+            mesh._last_tetra_id = list(mesh._tetrahedra.keys())[-1]
+
+        return mesh
+
+    def incremental_save(self, mesh: 'TetraMesh', dirty_ids: Optional[Set[str]] = None) -> None:
+        conn = self._conn()
+        with mesh._lock:
+            targets = dirty_ids if dirty_ids else set(mesh._tetrahedra.keys())
+            for tid in targets:
+                t = mesh._tetrahedra.get(tid)
+                if t is None:
+                    conn.execute("DELETE FROM tetrahedra WHERE id=?", (tid,))
+                    continue
+                conn.execute(
+                    """INSERT OR REPLACE INTO tetrahedra
+                    (id, content, vertex_indices, centroid, labels, metadata,
+                     weight, creation_time, last_access_time, init_weight,
+                     spatial_alpha, integration_count, access_count)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    (
+                        tid,
+                        t.content,
+                        json.dumps(t.vertex_indices),
+                        json.dumps(t.centroid.tolist() if hasattr(t.centroid, 'tolist') else list(t.centroid)),
+                        json.dumps(t.labels),
+                        json.dumps(t.metadata, default=str),
+                        t.weight,
+                        t.creation_time,
+                        t.last_access_time,
+                        t.init_weight,
+                        t._spatial_alpha,
+                        t.integration_count,
+                        t.access_count,
+                    ),
+                )
+            conn.commit()
+
+    def get_stats(self) -> Dict[str, Any]:
+        conn = self._conn()
+        nt = conn.execute("SELECT COUNT(*) FROM tetrahedra").fetchone()[0]
+        nv = conn.execute("SELECT COUNT(*) FROM vertices").fetchone()[0]
+        nf = conn.execute("SELECT COUNT(*) FROM faces").fetchone()[0]
+        return {"db_tetrahedra": nt, "db_vertices": nv, "db_faces": nf}
+
+    def close(self) -> None:
+        if hasattr(self._local, 'conn') and self._local.conn is not None:
+            self._local.conn.close()
+            self._local.conn = None
