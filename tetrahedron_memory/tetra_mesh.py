@@ -748,6 +748,57 @@ class TetraMesh:
     def label_index(self) -> Dict[str, Set[str]]:
         return self._label_index
 
+    def browse_timeline(
+        self,
+        direction: str = "newest",
+        limit: int = 20,
+        label_filter: Optional[List[str]] = None,
+        min_weight: float = 0.0,
+        exclude_labels: Optional[List[str]] = None,
+    ) -> List[Dict[str, Any]]:
+        """Navigate the mesh along the temporal dimension via filtration values.
+
+        Filtration = spatial_alpha * integration_bonus + time_lambda * age,
+        so sorting by filtration is navigating the 3D mesh through time.
+
+        Args:
+            direction: 'newest' (low filtration = recent) or 'oldest'
+            limit: max results
+            label_filter: only include tetrahedra with these labels
+            min_weight: minimum weight threshold
+            exclude_labels: exclude tetrahedra with ANY of these labels
+        """
+        with self._lock:
+            exclude_set = set(exclude_labels or [])
+            items = []
+            for tid, t in self._tetrahedra.items():
+                if exclude_set & set(t.labels):
+                    continue
+                if t.weight < min_weight:
+                    continue
+                if label_filter:
+                    if not set(label_filter) & set(t.labels):
+                        continue
+                fil = t.filtration(self._time_lambda)
+                items.append({
+                    "id": tid,
+                    "content": t.content,
+                    "labels": list(t.labels),
+                    "weight": float(t.weight),
+                    "filtration": float(fil),
+                    "centroid": t.centroid.tolist() if hasattr(t.centroid, 'tolist') else list(t.centroid),
+                    "creation_time": t.creation_time,
+                    "access_count": t.access_count,
+                    "integration_count": t.integration_count,
+                    "metadata": {
+                        k: v for k, v in t.metadata.items()
+                        if k in ("type", "source", "fusion_quality")
+                    },
+                })
+            reverse = direction == "newest"
+            items.sort(key=lambda x: x["creation_time"], reverse=reverse)
+            return items[:limit]
+
     def get_statistics(self) -> Dict[str, Any]:
         stats = {
             "total_tetrahedra": len(self._tetrahedra),

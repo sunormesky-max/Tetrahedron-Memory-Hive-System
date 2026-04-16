@@ -90,6 +90,8 @@ class QueryReq(BaseModel):
     query: str
     k: int = Field(default=5, ge=1, le=100)
     labels: Optional[List[str]] = None
+    exclude_dreams: bool = False
+    exclude_low_confidence: bool = True
 
 
 class AssociateReq(BaseModel):
@@ -193,11 +195,16 @@ def query(req: QueryReq):
         with _state_lock:
             mesh = _mesh
         pt = _text_to_point(req.query)
-        results = mesh.query_topological(pt, k=req.k, labels=req.labels, query_text=req.query)
+        results = mesh.query_topological(pt, k=req.k * 3, labels=req.labels, query_text=req.query)
+        exclude = set()
+        if req.exclude_dreams:
+            exclude.add("__dream__")
+        if req.exclude_low_confidence:
+            exclude.add("low_confidence")
         items = []
         for tid, dist in results:
             t = mesh.get_tetrahedron(tid)
-            if t:
+            if t and not (exclude & set(t.labels)):
                 items.append({
                     "id": tid,
                     "content": t.content,
@@ -205,6 +212,8 @@ def query(req: QueryReq):
                     "weight": float(t.weight),
                     "labels": list(t.labels) if t.labels else [],
                 })
+                if len(items) >= req.k:
+                    break
         return {"results": items}
     except Exception as e:
         raise HTTPException(500, str(e))
@@ -375,6 +384,31 @@ def topology_health():
         with _state_lock:
             mesh = _mesh
         return {"result": mesh.get_statistics()}
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+class TimelineReq(BaseModel):
+    direction: str = "newest"
+    limit: int = Field(default=20, ge=1, le=100)
+    labels: Optional[List[str]] = None
+    min_weight: float = Field(default=0.0, ge=0.0)
+    exclude_labels: Optional[List[str]] = None
+
+
+@app.post("/api/v1/timeline")
+def timeline(req: TimelineReq):
+    try:
+        with _state_lock:
+            mesh = _mesh
+        items = mesh.browse_timeline(
+            direction=req.direction,
+            limit=req.limit,
+            label_filter=req.labels,
+            min_weight=req.min_weight,
+            exclude_labels=req.exclude_labels,
+        )
+        return {"items": items, "count": len(items)}
     except Exception as e:
         raise HTTPException(500, str(e))
 

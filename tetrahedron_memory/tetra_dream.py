@@ -926,6 +926,11 @@ class TetraDreamCycle:
                 all_source_ids = source_ids_a + source_ids_b
 
                 quality = protocol_result.get("quality", 0.0)
+                confidence = "high" if quality >= 0.5 else "low"
+                dream_weight = self.dream_weight * quality if quality > 0 else self.dream_weight * 0.1
+                dream_labels = list(bridge_labels) + ["__dream__"]
+                if confidence == "low":
+                    dream_labels.append("low_confidence")
 
                 walk_hash = hashlib.md5(
                     ("_".join(group_a[:3] + group_b[:3])).encode()
@@ -934,14 +939,15 @@ class TetraDreamCycle:
                 tid = self.mesh.store(
                     content=synthesized,
                     seed_point=bridge_point,
-                    labels=list(bridge_labels) + ["__dream__"],
+                    labels=dream_labels,
                     metadata={
                         "type": "dream",
                         "source_clusters": [source_ids_a[:3], source_ids_b[:3]],
                         "fusion_depth": len(all_inputs),
                         "fusion_quality": quality,
+                        "confidence": confidence,
                     },
-                    weight=self.dream_weight,
+                    weight=dream_weight,
                 )
 
                 dream_rec = DreamRecord(
