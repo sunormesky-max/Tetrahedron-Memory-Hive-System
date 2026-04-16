@@ -6,6 +6,7 @@ import os, time, hashlib, threading, numpy as np
 from contextlib import asynccontextmanager
 from pathlib import Path
 from fastapi import FastAPI, HTTPException
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from typing import Any, Dict, List, Optional
 
@@ -419,6 +420,182 @@ def timeline(req: TimelineReq):
         raise HTTPException(500, str(e))
 
 
+class UpdateTetraReq(BaseModel):
+    content: Optional[str] = None
+    labels: Optional[List[str]] = None
+    weight: Optional[float] = Field(default=None, ge=0.1, le=10.0)
+
+
+class ImportReq(BaseModel):
+    memories: List[Dict[str, Any]]
+
+
+@app.get("/api/v1/tetrahedra")
+def list_tetrahedra():
+    try:
+        with _state_lock:
+            mesh = _mesh
+        items = []
+        for tid, t in mesh.tetrahedra.items():
+            items.append({
+                "id": tid,
+                "content": t.content,
+                "centroid": t.centroid.tolist() if hasattr(t.centroid, 'tolist') else list(t.centroid),
+                "labels": list(t.labels) if t.labels else [],
+                "weight": float(t.weight),
+                "creation_time": t.creation_time,
+                "last_access_time": t.last_access_time,
+                "access_count": t.access_count,
+                "integration_count": t.integration_count,
+                "filtration": float(t.filtration(mesh._time_lambda)),
+                "vertex_indices": list(t.vertex_indices),
+                "metadata": {k: v for k, v in t.metadata.items() if k in ("type", "source", "fusion_quality", "confidence", "source_clusters")},
+            })
+        return {"tetrahedra": items, "count": len(items)}
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+@app.get("/api/v1/tetrahedra/{tetra_id}")
+def get_tetra(tetra_id: str):
+    try:
+        with _state_lock:
+            mesh = _mesh
+        t = mesh.get_tetrahedron(tetra_id)
+        if t is None:
+            raise HTTPException(404, "Tetrahedron not found")
+        return {
+            "id": t.id,
+            "content": t.content,
+            "centroid": t.centroid.tolist() if hasattr(t.centroid, 'tolist') else list(t.centroid),
+            "labels": list(t.labels) if t.labels else [],
+            "weight": float(t.weight),
+            "creation_time": t.creation_time,
+            "last_access_time": t.last_access_time,
+            "access_count": t.access_count,
+            "integration_count": t.integration_count,
+            "filtration": float(t.filtration(mesh._time_lambda)),
+            "vertex_indices": list(t.vertex_indices),
+            "metadata": dict(t.metadata) if t.metadata else {},
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+@app.put("/api/v1/tetrahedra/{tetra_id}")
+def update_tetra(tetra_id: str, req: UpdateTetraReq):
+    try:
+        with _state_lock:
+            mesh = _mesh
+        t = mesh.get_tetrahedron(tetra_id)
+        if t is None:
+            raise HTTPException(404, "Tetrahedron not found")
+        if req.content is not None:
+            t.content = req.content
+        if req.labels is not None:
+            old_labels = set(t.labels)
+            new_labels = set(req.labels)
+            for lbl in old_labels - new_labels:
+                mesh._label_index[lbl].discard(tetra_id)
+            for lbl in new_labels - old_labels:
+                mesh._label_index[lbl].add(tetra_id)
+            t.labels = list(req.labels)
+        if req.weight is not None:
+            t.weight = req.weight
+        _schedule_save(dirty_id=tetra_id)
+        return {"status": "ok", "id": tetra_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+@app.delete("/api/v1/tetrahedra/{tetra_id}")
+def delete_tetra(tetra_id: str):
+    try:
+        with _state_lock:
+            mesh = _mesh
+        if mesh.get_tetrahedron(tetra_id) is None:
+            raise HTTPException(404, "Tetrahedron not found")
+        mesh._remove_tetrahedron(tetra_id)
+        _schedule_save()
+        return {"status": "ok", "deleted": tetra_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+@app.get("/api/v1/topology-graph")
+def topology_graph():
+    try:
+        with _state_lock:
+            mesh = _mesh
+        nodes = []
+        for tid, t in mesh.tetrahedra.items():
+            nodes.append({
+                "id": tid,
+                "centroid": t.centroid.tolist() if hasattr(t.centroid, 'tolist') else list(t.centroid),
+                "weight": float(t.weight),
+                "labels": list(t.labels) if t.labels else [],
+                "is_dream": "__dream__" in t.labels,
+            })
+        edges = []
+        seen_pairs = set()
+        for tid, t in mesh.tetrahedra.items():
+            for fk in mesh._faces_of_tetra(t.vertex_indices):
+                face = mesh._faces.get(fk)
+                if face:
+                    for other_id in face.tetrahedra:
+                        if other_id != tid:
+                            pair = tuple(sorted([tid, other_id]))
+                            if pair not in seen_pairs:
+                                seen_pairs.add(pair)
+                                shared_verts = set(t.vertex_indices) & set(mesh._tetrahedra[other_id].vertex_indices)
+                                conn_type = "face" if len(shared_verts) == 3 else ("edge" if len(shared_verts) == 2 else "vertex")
+                                edges.append({"source": pair[0], "target": pair[1], "type": conn_type})
+        return {"nodes": nodes, "edges": edges}
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+@app.post("/api/v1/import")
+def import_memories(req: ImportReq):
+    try:
+        with _state_lock:
+            mesh = _mesh
+        imported = []
+        for mem in req.memories:
+            content = mem.get("content", "")
+            if not content:
+                continue
+            labels = mem.get("labels", [])
+            weight = mem.get("weight", 1.0)
+            pt = _text_to_point(content, labels=labels)
+            tid = mesh.store(
+                content=content,
+                seed_point=pt,
+                labels=labels,
+                weight=weight,
+                metadata=mem.get("metadata"),
+                dedup=True,
+            )
+            imported.append(tid)
+        _schedule_save()
+        return {"imported": len(imported), "ids": imported}
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+static_dir = Path(__file__).parent / "static"
+if static_dir.exists():
+    app.mount("/ui", StaticFiles(directory=str(static_dir), html=True))
+
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    host = os.environ.get("TETRAMEM_HOST", "127.0.0.1")
+    port = int(os.environ.get("TETRAMEM_PORT", "8000"))
+    uvicorn.run(app, host=host, port=port)

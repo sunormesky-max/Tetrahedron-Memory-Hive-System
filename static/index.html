@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TetraMem-XL — 四面体蜂巢记忆系统</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.9.1/dist/index.css">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body, #app { width: 100%; height: 100%; overflow: hidden; font-family: 'Segoe UI', system-ui, sans-serif; }
+.app-layout { display: flex; flex-direction: column; height: 100%; background: #0a0a1a; color: #e0e0e0; }
+
+.top-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 16px; background: #12122a; border-bottom: 1px solid #2a2a4a;
+  height: 48px; flex-shrink: 0;
+}
+.top-bar h1 { font-size: 16px; color: #7c8fff; font-weight: 600; }
+.top-bar h1 span { color: #4fc3f7; }
+.stats-bar { display: flex; gap: 16px; font-size: 12px; color: #888; }
+.stats-bar .stat-val { color: #4fc3f7; font-weight: 600; margin-left: 4px; }
+
+.main-area { display: flex; flex: 1; overflow: hidden; }
+.canvas-wrap { flex: 1; position: relative; }
+.canvas-wrap canvas { display: block; }
+
+.right-panel {
+  width: 360px; background: #10102a; border-left: 1px solid #2a2a4a;
+  display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0;
+}
+.panel-header { padding: 12px 16px; font-size: 14px; font-weight: 600; border-bottom: 1px solid #2a2a4a; color: #7c8fff; }
+.panel-body { flex: 1; overflow-y: auto; padding: 12px 16px; }
+
+.toolbar {
+  display: flex; align-items: center; gap: 8px; padding: 8px 16px;
+  background: #12122a; border-top: 1px solid #2a2a4a; flex-shrink: 0;
+}
+.toolbar .el-input { max-width: 200px; }
+
+.mem-card {
+  background: #1a1a3a; border: 1px solid #2a2a4a; border-radius: 8px;
+  padding: 12px; margin-bottom: 8px; cursor: pointer; transition: border-color 0.2s;
+}
+.mem-card:hover, .mem-card.active { border-color: #4fc3f7; }
+.mem-card .mem-id { font-size: 11px; color: #666; font-family: monospace; }
+.mem-card .mem-content { font-size: 13px; margin: 6px 0; line-height: 1.4; word-break: break-all; }
+.mem-card .mem-meta { display: flex; gap: 8px; font-size: 11px; align-items: center; }
+.mem-card .mem-meta .weight { color: #ff9800; }
+.tag-list { display: flex; flex-wrap: wrap; gap: 4px; }
+.tag-item { background: #2a2a4a; color: #aaa; padding: 1px 6px; border-radius: 3px; font-size: 11px; }
+.tag-item.dream { background: #1a3a2a; color: #00e676; }
+
+.detail-empty { text-align: center; color: #555; margin-top: 60px; font-size: 14px; }
+.detail-field { margin-bottom: 12px; }
+.detail-field label { font-size: 11px; color: #666; display: block; margin-bottom: 4px; text-transform: uppercase; }
+.detail-field .val { font-size: 13px; color: #ccc; }
+
+.legend { position: absolute; bottom: 60px; left: 16px; background: rgba(16,16,42,0.85); padding: 10px 14px; border-radius: 6px; font-size: 11px; }
+.legend-item { display: flex; align-items: center; gap: 6px; margin: 3px 0; }
+.legend-dot { width: 10px; height: 10px; border-radius: 2px; }
+
+.el-button--dark { background: #2a2a4a; border-color: #3a3a5a; color: #ccc; }
+.el-button--dark:hover { background: #3a3a5a; border-color: #4a4a6a; }
+.el-message-box { background: #1a1a3a; }
+.el-input__wrapper { background: #1a1a3a; box-shadow: none; border: 1px solid #2a2a4a; }
+.el-input__inner { color: #ccc; }
+.el-textarea__inner { background: #1a1a3a; color: #ccc; border: 1px solid #2a2a4a; }
+.el-dialog { background: #1a1a3a; border: 1px solid #2a2a4a; }
+.el-dialog__title { color: #ccc; }
+.el-select .el-input__wrapper { background: #1a1a3a; }
+.el-slider__bar { background: #4fc3f7; }
+.el-slider__button { border-color: #4fc3f7; }
+
+.loading-overlay {
+  position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(10,10,26,0.9); display: flex; align-items: center;
+  justify-content: center; z-index: 100; color: #4fc3f7; font-size: 18px;
+}
+</style>
+</head>
+<body>
+<div id="app">
+<div class="app-layout">
+  <div class="top-bar">
+    <h1>Tetra<span>Mem</span>-XL <span style="font-size:12px;color:#666;margin-left:8px">四面体蜂巢记忆系统</span></h1>
+    <div class="stats-bar">
+      <span>记忆 <span class="stat-val">{{ stats.total_tetrahedra || 0 }}</span></span>
+      <span>顶点 <span class="stat-val">{{ stats.total_vertices || 0 }}</span></span>
+      <span>面 <span class="stat-val">{{ stats.total_faces || 0 }}</span></span>
+      <span>边界面 <span class="stat-val">{{ stats.boundary_faces || 0 }}</span></span>
+      <span>权重 <span class="stat-val">{{ (stats.avg_weight || 0).toFixed(1) }}</span></span>
+      <span>熵 <span class="stat-val">{{ (stats.persistent_entropy || 0).toFixed(3) }}</span></span>
+    </div>
+  </div>
+
+  <div class="main-area">
+    <div class="canvas-wrap" ref="canvasWrap">
+      <div class="legend">
+        <div class="legend-item"><div class="legend-dot" style="background:#4fc3f7"></div>低权重 (1-2)</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#ff9800"></div>中权重 (2-4)</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#ffd700"></div>高权重 (4-7)</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#ff5252"></div>极高权重 (7+)</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#00e676"></div>Dream 合成</div>
+        <div class="legend-item" style="margin-top:6px">━━ 面 &nbsp; ── 边 &nbsp; ·· 顶点</div>
+      </div>
+    </div>
+
+    <div class="right-panel">
+      <div class="panel-header">{{ selectedId ? '记忆详情' : '记忆列表' }}</div>
+      <div class="panel-body">
+        <div v-if="!selectedId">
+          <el-input v-model="filterText" placeholder="搜索记忆..." size="small" clearable style="margin-bottom:10px" />
+          <div v-for="m in filteredMemories" :key="m.id" class="mem-card" :class="{active: hoveredId===m.id}" @click="selectMemory(m)" @mouseenter="hoveredId=m.id" @mouseleave="hoveredId=null">
+            <div class="mem-id">{{ m.id.slice(0,12) }}</div>
+            <div class="mem-content">{{ m.content.slice(0, 80) }}{{ m.content.length > 80 ? '...' : '' }}</div>
+            <div class="mem-meta">
+              <span class="weight">w={{ m.weight.toFixed(1) }}</span>
+              <div class="tag-list">
+                <span v-for="l in m.labels.slice(0,4)" :key="l" class="tag-item" :class="{dream: l==='__dream__'}">{{ l }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div v-else>
+          <el-button size="small" @click="selectedId=null;loadList()" style="margin-bottom:10px">&larr; 返回列表</el-button>
+          <div class="detail-field"><label>ID</label><div class="val" style="font-family:monospace">{{ detail.id }}</div></div>
+          <div class="detail-field"><label>权重</label><div class="val">
+            <el-slider v-model="editWeight" :min="0.5" :max="10" :step="0.5" :show-tooltip="true" style="width:200px" />
+          </div></div>
+          <div class="detail-field"><label>标签</label><div class="val">
+            <div class="tag-list">
+              <span v-for="l in detail.labels" :key="l" class="tag-item" :class="{dream: l==='__dream__'}">{{ l }}</span>
+            </div>
+          </div></div>
+          <div class="detail-field"><label>内容</label>
+            <el-input type="textarea" v-model="editContent" :rows="5" style="margin-top:4px" />
+          </div>
+          <div class="detail-field"><label>元数据</label>
+            <div class="val" style="font-size:11px;color:#888">
+              创建: {{ formatTime(detail.creation_time) }}<br>
+              访问: {{ detail.access_count }}次 &nbsp; 集成: {{ detail.integration_count }}次<br>
+              Filtration: {{ (detail.filtration || 0).toFixed(4) }}
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:12px">
+            <el-button type="primary" size="small" @click="saveEdit">保存修改</el-button>
+            <el-button type="danger" size="small" @click="deleteMemory">删除</el-button>
+          </div>
+          <div class="detail-field" style="margin-top:16px" v-if="associations.length">
+            <label>拓扑邻居</label>
+            <div v-for="a in associations" :key="a.id" class="mem-card" style="padding:8px" @click="selectById(a.id)">
+              <div style="display:flex;justify-content:space-between;font-size:11px;color:#666;margin-bottom:2px">
+                <span>{{ a.type }}</span><span class="weight">w={{ a.weight.toFixed(1) }}</span>
+              </div>
+              <div style="font-size:12px">{{ a.content.slice(0,60) }}...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <el-input v-model="queryText" placeholder="查询记忆..." size="small" @keyup.enter="doQuery" style="width:180px" />
+    <el-button size="small" type="primary" @click="doQuery">查询</el-button>
+    <el-divider direction="vertical" />
+    <el-button size="small" @click="triggerDream">Dream Cycle</el-button>
+    <el-button size="small" @click="doSelfOrg">Self-Organize</el-button>
+    <el-divider direction="vertical" />
+    <el-button size="small" @click="exportData">导出</el-button>
+    <el-button size="small" @click="refreshAll">刷新</el-button>
+    <div style="flex:1"></div>
+    <span style="font-size:11px;color:#555">按住鼠标左键旋转 · 滚轮缩放 · 点击选中记忆</span>
+  </div>
+</div>
+
+<el-dialog v-model="queryDialogVisible" title="查询结果" width="500px">
+  <div v-for="r in queryResults" :key="r.id" class="mem-card" @click="selectById(r.id);queryDialogVisible=false">
+    <div style="display:flex;justify-content:space-between;font-size:11px;color:#666;margin-bottom:4px">
+      <span>得分 {{ r.distance.toFixed(3) }}</span><span class="weight">w={{ r.weight.toFixed(1) }}</span>
+    </div>
+    <div style="font-size:13px">{{ r.content.slice(0,100) }}</div>
+  </div>
+  <div v-if="!queryResults.length" style="color:#666;text-align:center;padding:20px">无匹配结果</div>
+</el-dialog>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/vue@3.5.13/dist/vue.global.prod.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/element-plus@2.9.1/dist/index.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.170.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+const API = '/api/v1';
+
+const { createApp, ref, reactive, computed, onMounted, watch, nextTick } = Vue;
+
+const app = createApp({
+  setup() {
+    const stats = ref({});
+    const memories = ref([]);
+    const filterText = ref('');
+    const selectedId = ref(null);
+    const detail = ref({});
+    const hoveredId = ref(null);
+    const editContent = ref('');
+    const editWeight = ref(1.0);
+    const associations = ref([]);
+    const queryText = ref('');
+    const queryResults = ref([]);
+    const queryDialogVisible = ref(false);
+
+    let scene, camera, renderer, controls, meshGroup, edgeGroup;
+    let tetraMeshMap = {};
+    let raycaster, mouse;
+
+    const filteredMemories = computed(() => {
+      if (!filterText.value) return memories.value;
+      const ft = filterText.value.toLowerCase();
+      return memories.value.filter(m =>
+        m.content.toLowerCase().includes(ft) ||
+        m.labels.some(l => l.toLowerCase().includes(ft))
+      );
+    });
+
+    function formatTime(ts) {
+      if (!ts) return '-';
+      return new Date(ts * 1000).toLocaleString('zh-CN');
+    }
+
+    async function api(path, opts = {}) {
+      const url = API + path;
+      const method = opts.method || (opts.body ? 'POST' : 'GET');
+      const headers = opts.body ? { 'Content-Type': 'application/json' } : {};
+      const r = await fetch(url, { method, headers, body: opts.body ? JSON.stringify(opts.body) : undefined });
+      if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
+      return r.json();
+    }
+
+    async function refreshAll() {
+      const [s, d] = await Promise.all([api('/stats'), api('/tetrahedra')]);
+      stats.value = s;
+      memories.value = d.tetrahedra;
+      updateScene(d.tetrahedra);
+    }
+
+    async function loadList() {
+      const d = await api('/tetrahedra');
+      memories.value = d.tetrahedra;
+    }
+
+    function selectMemory(m) {
+      selectedId.value = m.id;
+      detail.value = m;
+      editContent.value = m.content;
+      editWeight.value = m.weight;
+      loadAssociations(m.id);
+      highlightTetra(m.id);
+    }
+
+    async function selectById(id) {
+      const d = await api('/tetrahedra/' + id);
+      selectMemory(d);
+    }
+
+    async function loadAssociations(id) {
+      try {
+        const r = await api('/associate', { body: { tetra_id: id } });
+        associations.value = r.associations || [];
+      } catch { associations.value = []; }
+    }
+
+    async function saveEdit() {
+      try {
+        await api('/tetrahedra/' + selectedId.value, {
+          method: 'PUT',
+          body: { content: editContent.value, weight: editWeight.value }
+        });
+        ElementPlus.ElMessage.success('已保存');
+        refreshAll();
+      } catch (e) { ElementPlus.ElMessage.error('保存失败: ' + e.message); }
+    }
+
+    async function deleteMemory() {
+      try {
+        await ElementPlus.ElMessageBox.confirm('确定删除这条记忆？此操作不可恢复。', '确认删除', { type: 'warning' });
+        await api('/tetrahedra/' + selectedId.value, { method: 'DELETE' });
+        ElementPlus.ElMessage.success('已删除');
+        selectedId.value = null;
+        refreshAll();
+      } catch {}
+    }
+
+    async function doQuery() {
+      if (!queryText.value) return;
+      try {
+        const r = await api('/query', { body: { query: queryText.value, k: 10 } });
+        queryResults.value = r.results || [];
+        queryDialogVisible.value = true;
+        highlightResults(r.results || []);
+      } catch (e) { ElementPlus.ElMessage.error('查询失败: ' + e.message); }
+    }
+
+    async function triggerDream() {
+      try {
+        ElementPlus.ElMessage.info('Dream cycle 触发中...');
+        const r = await api('/dream', { body: { force: true } });
+        ElementPlus.ElMessage.success('Dream 完成: ' + (r.result?.phase || JSON.stringify(r.result)));
+        refreshAll();
+      } catch (e) { ElementPlus.ElMessage.error('Dream 失败: ' + e.message); }
+    }
+
+    async function doSelfOrg() {
+      try {
+        ElementPlus.ElMessage.info('Self-organize 执行中...');
+        await api('/self-organize', { body: {} });
+        ElementPlus.ElMessage.success('自组织完成');
+        refreshAll();
+      } catch (e) { ElementPlus.ElMessage.error('失败: ' + e.message); }
+    }
+
+    async function exportData() {
+      try {
+        await api('/export');
+        ElementPlus.ElMessage.success('已导出到 tetramem_export.md');
+      } catch (e) { ElementPlus.ElMessage.error('导出失败: ' + e.message); }
+    }
+
+    function weightToColor(w, isDream) {
+      if (isDream) return new THREE.Color(0x00e676);
+      if (w >= 7) return new THREE.Color(0xff5252);
+      if (w >= 4) return new THREE.Color(0xffd700);
+      if (w >= 2) return new THREE.Color(0xff9800);
+      return new THREE.Color(0x4fc3f7);
+    }
+
+    function createTetraGeometry(scale) {
+      const geo = new THREE.BufferGeometry();
+      const r = scale || 0.15;
+      const a = r * 1.5;
+      const h = r * Math.sqrt(8/3);
+      const verts = new Float32Array([
+        0, h*0.75, 0,    -a, -h*0.25, a*0.5,
+        a, -h*0.25, a*0.5,  0, -h*0.25, -a
+      ]);
+      const indices = new Uint16Array([0,1,2, 0,2,3, 0,3,1, 1,3,2]);
+      geo.setAttribute('position', new THREE.BufferAttribute(verts, 3));
+      geo.setIndex(new THREE.BufferAttribute(indices, 1));
+      geo.computeVertexNormals();
+      return geo;
+    }
+
+    function initScene(container) {
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x0a0a1a);
+      scene.fog = new THREE.Fog(0x0a0a1a, 8, 25);
+
+      camera = new THREE.PerspectiveCamera(60, container.clientWidth / container.clientHeight, 0.1, 100);
+      camera.position.set(4, 3, 5);
+      camera.lookAt(0, 0, 0);
+
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.setSize(container.clientWidth, container.clientHeight);
+      renderer.setPixelRatio(window.devicePixelRatio);
+      container.appendChild(renderer.domElement);
+
+      controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.1;
+      controls.maxDistance = 20;
+      controls.minDistance = 1;
+
+      scene.add(new THREE.AmbientLight(0x404060, 1.5));
+      const dl = new THREE.DirectionalLight(0xffffff, 0.8);
+      dl.position.set(5, 8, 5);
+      scene.add(dl);
+
+      const grid = new THREE.GridHelper(20, 40, 0x1a1a3a, 0x1a1a3a);
+      scene.add(grid);
+
+      meshGroup = new THREE.Group();
+      edgeGroup = new THREE.Group();
+      scene.add(meshGroup);
+      scene.add(edgeGroup);
+
+      raycaster = new THREE.Raycaster();
+      mouse = new THREE.Vector2();
+
+      renderer.domElement.addEventListener('click', onCanvasClick);
+      window.addEventListener('resize', () => {
+        camera.aspect = container.clientWidth / container.clientHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(container.clientWidth, container.clientHeight);
+      });
+
+      animate();
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      const t = Date.now() * 0.001;
+      Object.entries(tetraMeshMap).forEach(([id, obj]) => {
+        if (obj._highlight) {
+          obj.material.emissiveIntensity = 0.3 + 0.2 * Math.sin(t * 3);
+        }
+      });
+      renderer.render(scene, camera);
+    }
+
+    function updateScene(tetras) {
+      meshGroup.clear();
+      edgeGroup.clear();
+      tetraMeshMap = {};
+
+      const baseGeo = createTetraGeometry(0.15);
+
+      tetras.forEach(t => {
+        const c = t.centroid;
+        const pos = new THREE.Vector3(c[0], c[1], c[2]);
+        const isDream = t.labels && t.labels.includes('__dream__');
+        const color = weightToColor(t.weight, isDream);
+
+        const mat = new THREE.MeshPhongMaterial({
+          color: color,
+          transparent: true,
+          opacity: isDream ? 0.5 : 0.7,
+          emissive: isDream ? new THREE.Color(0x00e676) : new THREE.Color(0x000000),
+          emissiveIntensity: 0,
+          shininess: 60,
+        });
+
+        const mesh = new THREE.Mesh(baseGeo.clone(), mat);
+        mesh.position.copy(pos);
+        mesh.scale.setScalar(0.5 + t.weight * 0.08);
+        mesh.userData = { id: t.id, weight: t.weight, isDream };
+        meshGroup.add(mesh);
+        tetraMeshMap[t.id] = mesh;
+
+        const wire = new THREE.LineSegments(
+          new THREE.EdgesGeometry(baseGeo),
+          new THREE.LineBasicMaterial({ color: 0x4a4a6a, transparent: true, opacity: 0.3 })
+        );
+        wire.position.copy(pos);
+        wire.scale.copy(mesh.scale);
+        meshGroup.add(wire);
+      });
+
+      loadAndDrawEdges(tetras);
+    }
+
+    async function loadAndDrawEdges(tetras) {
+      try {
+        const g = await api('/topology-graph');
+        const lineColors = { face: 0xffffff, edge: 0x888888, vertex: 0x444466 };
+        const lineOpacities = { face: 0.25, edge: 0.15, vertex: 0.08 };
+
+        g.edges.forEach(e => {
+          const sn = g.nodes.find(n => n.id === e.source);
+          const tn = g.nodes.find(n => n.id === e.target);
+          if (!sn || !tn) return;
+          const points = [
+            new THREE.Vector3(sn.centroid[0], sn.centroid[1], sn.centroid[2]),
+            new THREE.Vector3(tn.centroid[0], tn.centroid[1], tn.centroid[2]),
+          ];
+          const geo = new THREE.BufferGeometry().setFromPoints(points);
+          const mat = new THREE.LineBasicMaterial({
+            color: lineColors[e.type] || 0x444466,
+            transparent: true,
+            opacity: lineOpacities[e.type] || 0.1,
+          });
+          edgeGroup.add(new THREE.Line(geo, mat));
+        });
+      } catch {}
+    }
+
+    function onCanvasClick(event) {
+      const rect = renderer.domElement.getBoundingClientRect();
+      mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+      mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObjects(meshGroup.children.filter(c => c.isMesh));
+      if (intersects.length > 0) {
+        const id = intersects[0].object.userData.id;
+        if (id) selectById(id);
+      }
+    }
+
+    function highlightTetra(id) {
+      Object.values(tetraMeshMap).forEach(m => { m._highlight = false; m.material.emissiveIntensity = 0; });
+      const obj = tetraMeshMap[id];
+      if (obj) {
+        obj._highlight = true;
+        obj.material.emissive = new THREE.Color(0xffffff);
+        obj.material.emissiveIntensity = 0.5;
+      }
+    }
+
+    function highlightResults(results) {
+      Object.values(tetraMeshMap).forEach(m => { m._highlight = false; m.material.emissiveIntensity = 0; });
+      results.forEach(r => {
+        const obj = tetraMeshMap[r.id];
+        if (obj) {
+          obj._highlight = true;
+          obj.material.emissive = new THREE.Color(0x4fc3f7);
+          obj.material.emissiveIntensity = 0.5;
+        }
+      });
+    }
+
+    const canvasWrap = ref(null);
+    onMounted(async () => {
+      await nextTick();
+      if (canvasWrap.value) initScene(canvasWrap.value);
+      refreshAll();
+    });
+
+    return {
+      canvasWrap, stats, memories, filterText, selectedId, detail, hoveredId,
+      editContent, editWeight, associations, queryText, queryResults, queryDialogVisible,
+      filteredMemories, formatTime, selectMemory, selectById, saveEdit, deleteMemory,
+      doQuery, triggerDream, doSelfOrg, exportData, refreshAll, loadList,
+    };
+  }
+});
+
+app.use(ElementPlus);
+app.mount('#app');
+</script>
+</body>
+</html>
