@@ -231,11 +231,16 @@ class TetraSelfOrganizer:
 
     def _detect_and_integrate(self, h0_intervals: np.ndarray) -> int:
         integrated = 0
+        candidates = []
         for tid, tetra in self.mesh.tetrahedra.items():
             if hasattr(tetra, 'secondary_memories') and tetra.secondary_memories:
-                if tetra.weight > 0.5:
-                    count = self.mesh.integrate_tetra(tid)
-                    integrated += count
+                priority = 1.0 / max(tetra.weight, 0.1)
+                candidates.append((priority, tid, tetra))
+        candidates.sort(key=lambda x: x[0], reverse=True)
+        for _, tid, tetra in candidates[:10]:
+            if tetra.weight < 2.0 or len(tetra.secondary_memories) >= 3:
+                count = self.mesh.integrate_tetra(tid)
+                integrated += count
         return integrated
 
     def _detect_and_integrate_legacy(self, h0_intervals: np.ndarray) -> int:
@@ -245,18 +250,23 @@ class TetraSelfOrganizer:
         to_integrate = []
         with self.mesh._lock:
             for tid, tetra in self.mesh.tetrahedra.items():
-                if "__system__" in tetra.labels:
+                if  __system__ in tetra.labels:
+                    continue
+                if __dream__ in tetra.labels and tetra.weight < 0.5:
                     continue
                 heat = tetra.weight / (tetra.init_weight + 1e-6)
                 if heat < self.integrate_heat_threshold:
-                    to_integrate.append(tid)
+                    to_integrate.append((tetra.weight, tid))
 
-            for tid in to_integrate[:5]:
+            to_integrate.sort(key=lambda x: x[0])
+            for _, tid in to_integrate[:8]:
                 tetra = self.mesh.get_tetrahedron(tid)
                 if tetra is not None:
-                    tetra.catalyze_integration(self.integration_strength)
+                    catalyst = self.integration_strength * (2.0 / max(tetra.weight, 0.1))
+                    catalyst = min(catalyst, self.integration_strength * 3.0)
+                    tetra.catalyze_integration(catalyst)
 
-        return len(to_integrate[:5])
+        return len(to_integrate[:8])
 
     def _find_face_connected_pairs(self) -> List[Tuple[str, str]]:
         pairs = []
