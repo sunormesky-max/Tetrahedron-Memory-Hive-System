@@ -54,7 +54,7 @@ async def lifespan(application):
     print("[TetraMem v3.0] Shutdown complete, pulse engine stopped")
 
 
-app = FastAPI(title="TetraMem-XL v3", version="3.0.0", lifespan=lifespan)
+app = FastAPI(title="TetraMem-XL v3", version="3.2.0", lifespan=lifespan)
 
 
 class StoreReq(BaseModel):
@@ -121,6 +121,71 @@ def dream():
     return {"result": {"phase": "continuous", "pulse_count": status["pulse_count"], "bridge_count": status["bridge_count"]}}
 
 
+
+
+
+@app.get("/api/v1/phase-transition/status")
+def phase_status():
+    try:
+        with _state_lock:
+            field = _field
+        if not hasattr(field, 'mesh'):
+            return {"status": "no_mesh"}
+        return {"status": "ok"}
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+@app.post("/api/v1/phase-transition/trigger")
+def phase_trigger():
+    try:
+        from tetrahedron_memory.phase_transition import PhaseTransitionDetector
+        with _state_lock:
+            field = _field
+        if not hasattr(field, 'mesh'):
+            raise HTTPException(400, "No mesh available")
+        detector = PhaseTransitionDetector(tension_threshold=0.0, cooldown_seconds=0)
+        global_tension, tensions = detector.compute_global_tension(field.mesh)
+        clusters = detector.identify_tension_clusters(tensions, field.mesh)
+        if not clusters:
+            return {"status": "no_tension", "global_tension": global_tension}
+        result = detector.execute_transition(field.mesh, tensions, clusters)
+        return {"status": "transition_complete", "result": result}
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+@app.get("/api/v1/tension")
+def tension_map():
+    try:
+        with _state_lock:
+            field = _field
+        nodes = field.list_occupied()
+        if not nodes:
+            return {"tensions": {}, "global": 0, "trend": "no_data"}
+        tensions = {}
+        for n in nodes:
+            nid = n.get("id", "")
+            w = n.get("weight", 0)
+            labels = n.get("labels", [])
+            act = n.get("activation", 0)
+            neighbors = n.get("face_neighbors", 0)
+            if not isinstance(neighbors, int):
+                neighbors = len(neighbors) if neighbors else 0
+            tension = max(0, (1.0 - neighbors / 7.0) * w + act * 0.5)
+            if "__dream__" in labels:
+                tension *= 0.3
+            tensions[nid] = tension
+        global_tension = sum(tensions.values())
+        top = sorted(tensions.items(), key=lambda x: -x[1])[:20]
+        return {
+            "global_tension": round(global_tension, 3),
+            "top_tension_nodes": [{"id": tid[:12], "tension": round(t, 3)} for tid, t in top],
+            "total_scored": len(tensions),
+        }
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
 @app.post("/api/v1/self-organize")
 def self_organize():
     with _state_lock:
@@ -145,7 +210,7 @@ def stats():
 
 @app.get("/api/v1/health")
 def health():
-    return {"status": "ok", "version": "3.0.0", "uptime_seconds": time.time() - _start_time}
+    return {"status": "ok", "version": "3.2.0", "uptime_seconds": time.time() - _start_time}
 
 
 @app.get("/api/v1/tetrahedra")
