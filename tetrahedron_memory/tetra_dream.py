@@ -669,7 +669,11 @@ class TetraDreamCycle:
 
         dream_count = sum(1 for t in tetrahedra.values() if "__dream__" in t.labels)
 
-        path, path_types = self._random_walk(regular)
+        tensions = self._compute_topological_tension(regular)
+        if tensions and max(tensions.values()) > 1.0:
+            path, path_types = self._tension_guided_walk(regular, tensions)
+        else:
+            path, path_types = self._random_walk(regular)
         stats["walk_visited"] = len(path)
 
         if len(path) < 3:
@@ -743,6 +747,65 @@ class TetraDreamCycle:
 
         stats["phase"] = "complete"
         return stats
+
+    def _compute_topological_tension(self, pool):
+        tensions = {}
+        for tid, tetra in pool.items():
+            t_score = 0.0
+            neighbors_all = []
+            for method in (self.mesh._face_neighbors, self.mesh._edge_neighbors):
+                neighbors_all.extend(method(tid))
+            if not neighbors_all:
+                continue
+            n_weights = []
+            shared_labels = 0
+            for nid in set(neighbors_all):
+                nt = self.mesh.get_tetrahedron(nid)
+                if nt is None:
+                    continue
+                n_weights.append(nt.weight)
+                if set(tetra.labels) & set(nt.labels):
+                    shared_labels += 1
+            if n_weights:
+                avg_nw = sum(n_weights) / len(n_weights)
+                if avg_nw > 1.0 and tetra.weight < avg_nw * 0.5:
+                    t_score += 2.0 * (avg_nw - tetra.weight)
+                weight_var = sum((w - avg_nw) ** 2 for w in n_weights) / len(n_weights)
+                t_score += weight_var * 0.5
+            isolation = 1.0 - (shared_labels / max(len(neighbors_all), 1))
+            t_score += isolation * 0.8
+            tensions[tid] = t_score
+        return tensions
+
+    def _tension_guided_walk(self, pool, tensions, steps=8):
+        if not tensions:
+            return self._random_walk(pool, entropy_bias=True)
+        sorted_t = sorted(tensions.items(), key=lambda x: x[1], reverse=True)
+        seed_id = sorted_t[0][0] if sorted_t[0][1] > 0 else self._pick_time_priority_seed(pool)
+        if seed_id is None:
+            seed_id = random.choice(list(pool.keys()))
+        visited = [seed_id]
+        conn_types = ["tension_seed"]
+        current = seed_id
+        for _ in range(steps):
+            neighbors = self._get_weighted_neighbors(current)
+            if not neighbors:
+                break
+            tension_weighted = []
+            for nid, ctype, w in neighbors:
+                t = tensions.get(nid, 0.0)
+                boosted = w * (1.0 + t * 0.5)
+                tension_weighted.append((nid, ctype, boosted))
+            weights = [w for _, _, w in tension_weighted]
+            total = sum(weights)
+            if total == 0:
+                break
+            idx = random.choices(range(len(tension_weighted)), weights=weights, k=1)[0]
+            nid, ctype, _ = tension_weighted[idx]
+            visited.append(nid)
+            conn_types.append(ctype)
+            current = nid
+        return visited, conn_types
 
     def _random_walk(
         self, pool: Dict[str, Any], entropy_bias: bool = True
