@@ -187,18 +187,15 @@ class TetraSelfOrganizer:
         if len(h0_intervals) == 0:
             return 0
 
-        short_intervals = [
-            (b, d) for b, d in h0_intervals if (d - b) < self.merge_overlap_threshold
-        ]
-        if not short_intervals:
-            return 0
-
         tetrahedra = list(self.mesh.tetrahedra.values())
-        if len(tetrahedra) < 2:
+        if len(tetrahedra) < 4:
             return 0
 
-        merges = 0
+        before_faces = len([fk for fk, f in self.mesh._faces.items() if len(f.tetrahedra) >= 2])
+        before_count = len(self.mesh.tetrahedra)
+
         face_pairs = self._find_face_connected_pairs()
+        merges = 0
         for t1_id, t2_id in face_pairs[:3]:
             t1 = self.mesh.get_tetrahedron(t1_id)
             t2 = self.mesh.get_tetrahedron(t2_id)
@@ -206,14 +203,28 @@ class TetraSelfOrganizer:
                 continue
             if "__system__" in t1.labels or "__system__" in t2.labels:
                 continue
+            if "__dream__" in t1.labels or "__dream__" in t2.labels:
+                continue
+            if "__cave__" in t1.labels or "__cave__" in t2.labels:
+                continue
 
             v1 = set(t1.vertex_indices)
             v2 = set(t2.vertex_indices)
             overlap = len(v1 & v2) / len(v1 | v2)
 
-            if overlap >= self.merge_overlap_threshold:
-                merged = self.mesh.edge_contraction(t1_id, t2_id)
-                if merged:
+            if overlap < 0.7:
+                continue
+
+            content_sim = len(set(t1.content) & set(t2.content)) / max(len(set(t1.content) | set(t2.content)), 1)
+            if content_sim < 0.5:
+                continue
+
+            merged = self.mesh.edge_contraction(t1_id, t2_id)
+            if merged:
+                after_faces = len([fk for fk, f in self.mesh._faces.items() if len(f.tetrahedra) >= 2])
+                if before_faces - after_faces > 2:
+                    merges += 1
+                else:
                     merges += 1
 
         return merges

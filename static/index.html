@@ -4,147 +4,189 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>TetraMem-XL — 四面体蜂巢记忆系统</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.9.1/dist/index.css">
+<link rel="stylesheet" href="https://unpkg.com/element-plus@2.9.1/dist/index.css">
 <style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
 * { margin: 0; padding: 0; box-sizing: border-box; }
-html, body, #app { width: 100%; height: 100%; overflow: hidden; font-family: 'Segoe UI', system-ui, sans-serif; }
-.app-layout { display: flex; flex-direction: column; height: 100%; background: #0a0a1a; color: #e0e0e0; }
+html, body, #app { width: 100%; height: 100%; overflow: hidden; font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; }
+.app-layout { display: flex; flex-direction: column; height: 100%; background: #06060f; color: #c8c8e0; }
 
 .top-bar {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 8px 16px; background: #12122a; border-bottom: 1px solid #2a2a4a;
-  height: 48px; flex-shrink: 0;
+  padding: 10px 20px; background: linear-gradient(180deg, #0c0c1e 0%, #08081a 100%);
+  border-bottom: 1px solid rgba(100, 120, 255, 0.08);
+  height: 52px; flex-shrink: 0;
 }
-.top-bar h1 { font-size: 16px; color: #7c8fff; font-weight: 600; }
-.top-bar h1 span { color: #4fc3f7; }
-.stats-bar { display: flex; gap: 16px; font-size: 12px; color: #888; }
-.stats-bar .stat-val { color: #4fc3f7; font-weight: 600; margin-left: 4px; }
+.top-bar h1 { font-size: 17px; color: #e0e0ff; font-weight: 300; letter-spacing: 2px; }
+.top-bar h1 span { color: #7b8cff; font-weight: 500; }
+.top-bar .subtitle { font-size: 11px; color: #4a4a6a; margin-left: 12px; letter-spacing: 1px; }
+.stats-bar { display: flex; gap: 20px; font-size: 11px; color: #4a4a6a; letter-spacing: 0.5px; }
+.stats-bar .stat-label { text-transform: uppercase; font-size: 9px; color: #3a3a5a; letter-spacing: 1px; }
+.stats-bar .stat-val { color: #7b8cff; font-weight: 500; font-size: 14px; display: block; margin-top: 1px; }
 
 .main-area { display: flex; flex: 1; overflow: hidden; }
 .canvas-wrap { flex: 1; position: relative; }
 .canvas-wrap canvas { display: block; }
 
 .right-panel {
-  width: 360px; background: #10102a; border-left: 1px solid #2a2a4a;
+  width: 340px; background: linear-gradient(180deg, #0a0a1a 0%, #080816 100%);
+  border-left: 1px solid rgba(100, 120, 255, 0.06);
   display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0;
 }
-.panel-header { padding: 12px 16px; font-size: 14px; font-weight: 600; border-bottom: 1px solid #2a2a4a; color: #7c8fff; }
-.panel-body { flex: 1; overflow-y: auto; padding: 12px 16px; }
+.panel-header {
+  padding: 14px 18px; font-size: 12px; font-weight: 400;
+  border-bottom: 1px solid rgba(100, 120, 255, 0.06);
+  color: #5a5a8a; letter-spacing: 2px; text-transform: uppercase;
+}
+.panel-body { flex: 1; overflow-y: auto; padding: 14px 18px; }
+.panel-body::-webkit-scrollbar { width: 4px; }
+.panel-body::-webkit-scrollbar-track { background: transparent; }
+.panel-body::-webkit-scrollbar-thumb { background: #1a1a3a; border-radius: 2px; }
 
 .toolbar {
-  display: flex; align-items: center; gap: 8px; padding: 8px 16px;
-  background: #12122a; border-top: 1px solid #2a2a4a; flex-shrink: 0;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px 16px;
+  background: #0a0a1a; border-top: 1px solid rgba(100, 120, 255, 0.06); flex-shrink: 0;
 }
-.toolbar .el-input { max-width: 200px; }
 
 .mem-card {
-  background: #1a1a3a; border: 1px solid #2a2a4a; border-radius: 8px;
-  padding: 12px; margin-bottom: 8px; cursor: pointer; transition: border-color 0.2s;
+  background: linear-gradient(135deg, #0e0e22 0%, #0a0a1a 100%);
+  border: 1px solid rgba(100, 120, 255, 0.06); border-radius: 6px;
+  padding: 10px 12px; margin-bottom: 6px; cursor: pointer;
+  transition: all 0.3s ease;
 }
-.mem-card:hover, .mem-card.active { border-color: #4fc3f7; }
-.mem-card .mem-id { font-size: 11px; color: #666; font-family: monospace; }
-.mem-card .mem-content { font-size: 13px; margin: 6px 0; line-height: 1.4; word-break: break-all; }
-.mem-card .mem-meta { display: flex; gap: 8px; font-size: 11px; align-items: center; }
-.mem-card .mem-meta .weight { color: #ff9800; }
-.tag-list { display: flex; flex-wrap: wrap; gap: 4px; }
-.tag-item { background: #2a2a4a; color: #aaa; padding: 1px 6px; border-radius: 3px; font-size: 11px; }
-.tag-item.dream { background: #1a3a2a; color: #00e676; }
+.mem-card:hover { border-color: rgba(100, 120, 255, 0.2); background: linear-gradient(135deg, #10102a 0%, #0c0c1e 100%); }
+.mem-card.active { border-color: rgba(123, 140, 255, 0.4); box-shadow: 0 0 12px rgba(123, 140, 255, 0.08); }
+.mem-card .mem-id { font-size: 10px; color: #2a2a4a; font-family: monospace; }
+.mem-card .mem-content { font-size: 12px; margin: 5px 0; line-height: 1.5; color: #a0a0c0; }
+.mem-card .mem-meta { display: flex; gap: 8px; font-size: 10px; align-items: center; }
+.mem-card .mem-meta .weight { color: #c9a04e; font-weight: 500; }
+.tag-list { display: flex; flex-wrap: wrap; gap: 3px; }
+.tag-item { background: rgba(100, 120, 255, 0.06); color: #5a5a8a; padding: 1px 6px; border-radius: 2px; font-size: 10px; letter-spacing: 0.3px; }
+.tag-item.dream { background: rgba(0, 230, 118, 0.06); color: #4caf7a; }
 
-.detail-empty { text-align: center; color: #555; margin-top: 60px; font-size: 14px; }
-.detail-field { margin-bottom: 12px; }
-.detail-field label { font-size: 11px; color: #666; display: block; margin-bottom: 4px; text-transform: uppercase; }
-.detail-field .val { font-size: 13px; color: #ccc; }
+.detail-field { margin-bottom: 14px; }
+.detail-field label { font-size: 9px; color: #3a3a5a; display: block; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 1.5px; }
+.detail-field .val { font-size: 12px; color: #a0a0c0; }
 
-.legend { position: absolute; bottom: 60px; left: 16px; background: rgba(16,16,42,0.85); padding: 10px 14px; border-radius: 6px; font-size: 11px; }
-.legend-item { display: flex; align-items: center; gap: 6px; margin: 3px 0; }
-.legend-dot { width: 10px; height: 10px; border-radius: 2px; }
-
-.el-button--dark { background: #2a2a4a; border-color: #3a3a5a; color: #ccc; }
-.el-button--dark:hover { background: #3a3a5a; border-color: #4a4a6a; }
-.el-message-box { background: #1a1a3a; }
-.el-input__wrapper { background: #1a1a3a; box-shadow: none; border: 1px solid #2a2a4a; }
-.el-input__inner { color: #ccc; }
-.el-textarea__inner { background: #1a1a3a; color: #ccc; border: 1px solid #2a2a4a; }
-.el-dialog { background: #1a1a3a; border: 1px solid #2a2a4a; }
-.el-dialog__title { color: #ccc; }
-.el-select .el-input__wrapper { background: #1a1a3a; }
-.el-slider__bar { background: #4fc3f7; }
-.el-slider__button { border-color: #4fc3f7; }
-
-.loading-overlay {
-  position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(10,10,26,0.9); display: flex; align-items: center;
-  justify-content: center; z-index: 100; color: #4fc3f7; font-size: 18px;
+.legend {
+  position: absolute; bottom: 56px; left: 16px;
+  background: rgba(6, 6, 15, 0.92); backdrop-filter: blur(8px);
+  padding: 12px 16px; border-radius: 4px;
+  border: 1px solid rgba(100, 120, 255, 0.05); font-size: 10px; color: #4a4a6a;
 }
+.legend-item { display: flex; align-items: center; gap: 6px; margin: 4px 0; }
+.legend-dot { width: 8px; height: 8px; border-radius: 1px; }
+
+.btn {
+  background: rgba(100, 120, 255, 0.08); color: #7b8cff; border: 1px solid rgba(100, 120, 255, 0.1);
+  padding: 5px 14px; border-radius: 3px; font-size: 11px; cursor: pointer;
+  transition: all 0.2s; font-family: inherit; letter-spacing: 0.3px;
+}
+.btn:hover { background: rgba(100, 120, 255, 0.15); border-color: rgba(100, 120, 255, 0.2); }
+.btn-accent { background: rgba(123, 140, 255, 0.12); color: #9aa0ff; border-color: rgba(123, 140, 255, 0.2); }
+.btn-accent:hover { background: rgba(123, 140, 255, 0.25); }
+.btn-warn { color: #c9a04e; border-color: rgba(201, 160, 78, 0.15); background: rgba(201, 160, 78, 0.06); }
+.btn-warn:hover { background: rgba(201, 160, 78, 0.15); }
+.btn-danger { color: #cf6b6b; border-color: rgba(207, 107, 107, 0.15); background: rgba(207, 107, 107, 0.06); }
+.btn-danger:hover { background: rgba(207, 107, 107, 0.15); }
+.btn-green { color: #5eb88a; border-color: rgba(94, 184, 138, 0.15); background: rgba(94, 184, 138, 0.06); }
+.btn-green:hover { background: rgba(94, 184, 138, 0.15); }
+
+.input-field {
+  background: rgba(10, 10, 26, 0.8); color: #a0a0c0; border: 1px solid rgba(100, 120, 255, 0.06);
+  padding: 6px 10px; border-radius: 3px; font-size: 11px; font-family: inherit;
+  transition: border-color 0.2s; outline: none;
+}
+.input-field:focus { border-color: rgba(123, 140, 255, 0.2); }
+.input-field::placeholder { color: #2a2a4a; }
+
+.el-dialog { background: #0e0e22 !important; border: 1px solid rgba(100, 120, 255, 0.08) !important; border-radius: 6px !important; }
+.el-dialog__title { color: #7b8cff !important; }
+.el-dialog__headerbtn .el-dialog__close { color: #4a4a6a !important; }
+.el-overlay { background-color: rgba(6, 6, 15, 0.85) !important; }
+
+input[type="range"] {
+  -webkit-appearance: none; background: rgba(100, 120, 255, 0.06); height: 3px; border-radius: 2px; outline: none;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%;
+  background: #7b8cff; cursor: pointer; border: none;
+}
+textarea.input-field { resize: none; }
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+.system-pulse { animation: pulse-glow 2s ease-in-out infinite; color: #7b8cff; }
 </style>
 </head>
 <body>
 <div id="app">
 <div class="app-layout">
   <div class="top-bar">
-    <h1>Tetra<span>Mem</span>-XL <span style="font-size:12px;color:#666;margin-left:8px">四面体蜂巢记忆系统</span></h1>
+    <h1>Tetra<span>Mem</span>-XL <span class="subtitle">Honeycomb Neural Field</span></h1>
     <div class="stats-bar">
-      <span>记忆 <span class="stat-val">{{ stats.total_tetrahedra || 0 }}</span></span>
-      <span>顶点 <span class="stat-val">{{ stats.total_vertices || 0 }}</span></span>
-      <span>面 <span class="stat-val">{{ stats.total_faces || 0 }}</span></span>
-      <span>边界面 <span class="stat-val">{{ stats.boundary_faces || 0 }}</span></span>
-      <span>权重 <span class="stat-val">{{ (stats.avg_weight || 0).toFixed(1) }}</span></span>
-      <span>熵 <span class="stat-val">{{ (stats.persistent_entropy || 0).toFixed(3) }}</span></span>
+      <span><span class="stat-label">Nodes</span><span class="stat-val">{{ stats.total_nodes || 0 }}</span></span>
+      <span><span class="stat-label">Memory</span><span class="stat-val">{{ stats.occupied_nodes || 0 }}</span></span>
+      <span><span class="stat-label">Faces</span><span class="stat-val">{{ stats.face_edges || 0 }}</span></span>
+      <span><span class="stat-label">Pulses</span><span class="stat-val system-pulse">{{ stats.pulse_count || 0 }}</span></span>
     </div>
   </div>
 
   <div class="main-area">
     <div class="canvas-wrap" ref="canvasWrap">
       <div class="legend">
-        <div class="legend-item"><div class="legend-dot" style="background:#4fc3f7"></div>低权重 (1-2)</div>
-        <div class="legend-item"><div class="legend-dot" style="background:#ff9800"></div>中权重 (2-4)</div>
-        <div class="legend-item"><div class="legend-dot" style="background:#ffd700"></div>高权重 (4-7)</div>
-        <div class="legend-item"><div class="legend-dot" style="background:#ff5252"></div>极高权重 (7+)</div>
-        <div class="legend-item"><div class="legend-dot" style="background:#00e676"></div>Dream 合成</div>
-        <div class="legend-item" style="margin-top:6px">━━ 面 &nbsp; ── 边 &nbsp; ·· 顶点</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#7b8cff"></div>Memory Node</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#c9a04e"></div>High Weight</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#5eb88a"></div>Dream Synthesis</div>
+        <div class="legend-item"><div class="legend-dot" style="background:rgba(123,140,255,0.4)"></div>Neural Pulse</div>
+        <div class="legend-item" style="margin-top:4px;color:#3a3a5a;font-size:9px">BCC Lattice · Crystal Growth · Face Sharing</div>
       </div>
     </div>
 
     <div class="right-panel">
-      <div class="panel-header">{{ selectedId ? '记忆详情' : '记忆列表' }}</div>
-      <div class="panel-body">
+      <div class="panel-header">{{ selectedId ? 'Memory Detail' : 'Memory Cluster' }}</div>
+       <div class="panel-body">
         <div v-if="!selectedId">
-          <el-input v-model="filterText" placeholder="搜索记忆..." size="small" clearable style="margin-bottom:10px" />
+          <div style="font-size:10px;color:#2a2a4a;margin-bottom:8px;letter-spacing:1px">{{ memories.length }} MEMORIES</div>
+          <input v-model="filterText" placeholder="Search memory..." class="input-field" style="width:100%;margin-bottom:10px" />
           <div v-for="m in filteredMemories" :key="m.id" class="mem-card" :class="{active: hoveredId===m.id}" @click="selectMemory(m)" @mouseenter="hoveredId=m.id" @mouseleave="hoveredId=null">
-            <div class="mem-id">{{ m.id.slice(0,12) }}</div>
-            <div class="mem-content">{{ m.content.slice(0, 80) }}{{ m.content.length > 80 ? '...' : '' }}</div>
+            <div class="mem-id">{{ (m.id||'').slice(0,12) }}</div>
+            <div class="mem-content">{{ (m.content||'').slice(0, 80) }}</div>
             <div class="mem-meta">
-              <span class="weight">w={{ m.weight.toFixed(1) }}</span>
+              <span class="weight">w={{ (m.weight||0).toFixed(1) }}</span>
               <div class="tag-list">
-                <span v-for="l in m.labels.slice(0,4)" :key="l" class="tag-item" :class="{dream: l==='__dream__'}">{{ l }}</span>
+                <span v-for="l in (m.labels||[]).slice(0,4)" :key="l" class="tag-item" :class="{dream: l==='__dream__'}">{{ l }}</span>
               </div>
             </div>
           </div>
+          <div v-if="memories.length && !filteredMemories.length" style="color:#555;text-align:center;padding:20px">无匹配结果</div>
         </div>
         <div v-else>
-          <el-button size="small" @click="selectedId=null;loadList()" style="margin-bottom:10px">&larr; 返回列表</el-button>
-          <div class="detail-field"><label>ID</label><div class="val" style="font-family:monospace">{{ detail.id }}</div></div>
-          <div class="detail-field"><label>权重</label><div class="val">
-            <el-slider v-model="editWeight" :min="0.5" :max="10" :step="0.5" :show-tooltip="true" style="width:200px" />
+          <button @click="selectedId=null;loadList()" class="btn" style="margin-bottom:12px">&larr; Back</button>
+          <div class="detail-field"><label>Identity</label><div class="val" style="font-family:monospace;font-size:10px;color:#3a3a5a">{{ detail.id }}</div></div>
+          <div class="detail-field"><label>Weight</label><div class="val">
+            <input type="range" v-model.number="editWeight" min="0.5" max="10" step="0.5" style="width:160px" />
+            <span style="color:#c9a04e;margin-left:8px;font-size:12px">{{ editWeight.toFixed(1) }}</span>
           </div></div>
-          <div class="detail-field"><label>标签</label><div class="val">
+          <div class="detail-field"><label>Labels</label><div class="val">
             <div class="tag-list">
-              <span v-for="l in detail.labels" :key="l" class="tag-item" :class="{dream: l==='__dream__'}">{{ l }}</span>
+              <span v-for="l in (detail.labels||[])" :key="l" class="tag-item" :class="{dream: l==='__dream__'}">{{ l }}</span>
             </div>
           </div></div>
-          <div class="detail-field"><label>内容</label>
-            <el-input type="textarea" v-model="editContent" :rows="5" style="margin-top:4px" />
+          <div class="detail-field"><label>Content</label>
+            <textarea v-model="editContent" rows="5" class="input-field" style="width:100%;margin-top:4px"></textarea>
           </div>
-          <div class="detail-field"><label>元数据</label>
-            <div class="val" style="font-size:11px;color:#888">
-              创建: {{ formatTime(detail.creation_time) }}<br>
-              访问: {{ detail.access_count }}次 &nbsp; 集成: {{ detail.integration_count }}次<br>
-              Filtration: {{ (detail.filtration || 0).toFixed(4) }}
+          <div class="detail-field"><label>Meta</label>
+            <div class="val" style="font-size:10px;color:#3a3a5a">
+              Created: {{ formatTime(detail.creation_time) }}<br>
+              Access: {{ detail.access_count || 0 }} &nbsp; Activation: {{ (detail.activation || 0).toFixed(2) }}
             </div>
           </div>
-          <div style="display:flex;gap:8px;margin-top:12px">
-            <el-button type="primary" size="small" @click="saveEdit">保存修改</el-button>
-            <el-button type="danger" size="small" @click="deleteMemory">删除</el-button>
+          <div style="display:flex;gap:6px;margin-top:14px">
+            <button @click="saveEdit" class="btn btn-accent">Save</button>
+            <button @click="deleteMemory" class="btn btn-danger">Delete</button>
           </div>
           <div class="detail-field" style="margin-top:16px" v-if="associations.length">
             <label>拓扑邻居</label>
@@ -161,16 +203,12 @@ html, body, #app { width: 100%; height: 100%; overflow: hidden; font-family: 'Se
   </div>
 
   <div class="toolbar">
-    <el-input v-model="queryText" placeholder="查询记忆..." size="small" @keyup.enter="doQuery" style="width:180px" />
-    <el-button size="small" type="primary" @click="doQuery">查询</el-button>
-    <el-divider direction="vertical" />
-    <el-button size="small" @click="triggerDream">Dream Cycle</el-button>
-    <el-button size="small" @click="doSelfOrg">Self-Organize</el-button>
-    <el-divider direction="vertical" />
-    <el-button size="small" @click="exportData">导出</el-button>
-    <el-button size="small" @click="refreshAll">刷新</el-button>
-    <div style="flex:1"></div>
-    <span style="font-size:11px;color:#555">按住鼠标左键旋转 · 滚轮缩放 · 点击选中记忆</span>
+    <input v-model="queryText" placeholder="Query..." @keyup.enter="doQuery" class="input-field" style="width:130px" />
+    <button @click="doQuery" class="btn btn-accent">Query</button>
+    <button @click="triggerDream" class="btn btn-green">Dream</button>
+    <button @click="doSelfOrg" class="btn btn-warn">Self-Org</button>
+    <button @click="exportData" class="btn">Export</button>
+    <button @click="refreshAll" class="btn">Refresh</button>
   </div>
 </div>
 
@@ -185,12 +223,35 @@ html, body, #app { width: 100%; height: 100%; overflow: hidden; font-family: 'Se
 </el-dialog>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/vue@3.5.13/dist/vue.global.prod.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/element-plus@2.9.1/dist/index.full.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.170.0/examples/js/controls/OrbitControls.js"></script>
+<link rel="stylesheet" href="/libs/index.css">
+<script src="/libs/vue.global.prod.js"></script>
+<script src="/libs/index.full.min.js"></script>
+<script src="/libs/three.min.js"></script>
 <script>
+window.onerror = function(msg, url, line) { document.title = 'ERROR: ' + msg + ' L' + line; };
+if (!window.Vue) { document.body.innerHTML = '<h2 style="color:red;padding:40px">Vue.js 加载失败</h2>'; }
+if (!window.THREE) { document.body.innerHTML = '<h2 style="color:red;padding:40px">Three.js 加载失败</h2>'; }
+</script>
+<script>
+var s = document.createElement('script');
+s.src = '/libs/OrbitControls.js';
+s.onload = function() { initApp(); };
+s.onerror = function() { document.body.innerHTML += '<h3 style="color:red;padding:40px">OrbitControls 加载失败</h3>'; };
+document.head.appendChild(s);
+
+function initApp() {
 const API = '/api/v1';
+
+async function testApi() {
+  try {
+    const r = await fetch(API + '/health');
+    const d = await r.json();
+    console.log('API OK:', d);
+  } catch(e) {
+    console.error('API FAIL:', e);
+  }
+}
+testApi();
 
 const { createApp, ref, reactive, computed, onMounted, watch, nextTick } = Vue;
 
@@ -209,9 +270,12 @@ const app = createApp({
     const queryResults = ref([]);
     const queryDialogVisible = ref(false);
 
-    let scene, camera, renderer, controls, meshGroup, edgeGroup;
+    let scene, camera, renderer, controls, meshGroup, edgeGroup, cellGroup, pulseGroup;
     let tetraMeshMap = {};
     let raycaster, mouse;
+    let pulseParticles = [];
+    let pulseFetchTimer = 0;
+    let latticeNodes = null;
 
     const filteredMemories = computed(() => {
       if (!filterText.value) return memories.value;
@@ -237,10 +301,14 @@ const app = createApp({
     }
 
     async function refreshAll() {
-      const [s, d] = await Promise.all([api('/stats'), api('/tetrahedra')]);
-      stats.value = s;
-      memories.value = d.tetrahedra;
-      updateScene(d.tetrahedra);
+      try {
+        const [s, d] = await Promise.all([api('/stats'), api('/tetrahedra')]);
+        stats.value = s;
+        memories.value = d.tetrahedra || d.items || [];
+        updateScene(memories.value);
+      } catch(e) {
+        console.error('refreshAll error:', e);
+      }
     }
 
     async function loadList() {
@@ -326,61 +394,51 @@ const app = createApp({
     }
 
     function weightToColor(w, isDream) {
-      if (isDream) return new THREE.Color(0x00e676);
-      if (w >= 7) return new THREE.Color(0xff5252);
-      if (w >= 4) return new THREE.Color(0xffd700);
-      if (w >= 2) return new THREE.Color(0xff9800);
-      return new THREE.Color(0x4fc3f7);
-    }
-
-    function createTetraGeometry(scale) {
-      const geo = new THREE.BufferGeometry();
-      const r = scale || 0.15;
-      const a = r * 1.5;
-      const h = r * Math.sqrt(8/3);
-      const verts = new Float32Array([
-        0, h*0.75, 0,    -a, -h*0.25, a*0.5,
-        a, -h*0.25, a*0.5,  0, -h*0.25, -a
-      ]);
-      const indices = new Uint16Array([0,1,2, 0,2,3, 0,3,1, 1,3,2]);
-      geo.setAttribute('position', new THREE.BufferAttribute(verts, 3));
-      geo.setIndex(new THREE.BufferAttribute(indices, 1));
-      geo.computeVertexNormals();
-      return geo;
+      if (isDream) return new THREE.Color(0x5eb88a);
+      if (w >= 7) return new THREE.Color(0xcf6b6b);
+      if (w >= 4) return new THREE.Color(0xc9a04e);
+      if (w >= 2) return new THREE.Color(0x7b8cff);
+      return new THREE.Color(0x4a5a9a);
     }
 
     function initScene(container) {
       scene = new THREE.Scene();
-      scene.background = new THREE.Color(0x0a0a1a);
-      scene.fog = new THREE.Fog(0x0a0a1a, 8, 25);
+      scene.background = new THREE.Color(0x06060f);
+      scene.fog = new THREE.FogExp2(0x06060f, 0.03);
 
-      camera = new THREE.PerspectiveCamera(60, container.clientWidth / container.clientHeight, 0.1, 100);
-      camera.position.set(4, 3, 5);
+      camera = new THREE.PerspectiveCamera(55, container.clientWidth / container.clientHeight, 0.01, 200);
+      camera.position.set(8, 6, 10);
       camera.lookAt(0, 0, 0);
 
       renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
       renderer.setSize(container.clientWidth, container.clientHeight);
-      renderer.setPixelRatio(window.devicePixelRatio);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
       container.appendChild(renderer.domElement);
 
       controls = new THREE.OrbitControls(camera, renderer.domElement);
       controls.enableDamping = true;
-      controls.dampingFactor = 0.1;
-      controls.maxDistance = 20;
+      controls.dampingFactor = 0.08;
+      controls.maxDistance = 25;
       controls.minDistance = 1;
+      controls.autoRotate = true;
+      controls.autoRotateSpeed = 0.3;
 
-      scene.add(new THREE.AmbientLight(0x404060, 1.5));
-      const dl = new THREE.DirectionalLight(0xffffff, 0.8);
-      dl.position.set(5, 8, 5);
-      scene.add(dl);
-
-      const grid = new THREE.GridHelper(20, 40, 0x1a1a3a, 0x1a1a3a);
-      scene.add(grid);
+      scene.add(new THREE.AmbientLight(0x303060, 2.0));
+      const dl1 = new THREE.DirectionalLight(0xe0e0ff, 0.7);
+      dl1.position.set(5, 8, 5);
+      scene.add(dl1);
+      const dl2 = new THREE.DirectionalLight(0x7b8cff, 0.3);
+      dl2.position.set(-5, -3, -5);
+      scene.add(dl2);
 
       meshGroup = new THREE.Group();
       edgeGroup = new THREE.Group();
-      scene.add(meshGroup);
+      cellGroup = new THREE.Group();
+      pulseGroup = new THREE.Group();
+      scene.add(cellGroup);
       scene.add(edgeGroup);
+      scene.add(meshGroup);
+      scene.add(pulseGroup);
 
       raycaster = new THREE.Raycaster();
       mouse = new THREE.Vector2();
@@ -399,78 +457,206 @@ const app = createApp({
       requestAnimationFrame(animate);
       controls.update();
       const t = Date.now() * 0.001;
+
       Object.entries(tetraMeshMap).forEach(([id, obj]) => {
         if (obj._highlight) {
           obj.material.emissiveIntensity = 0.3 + 0.2 * Math.sin(t * 3);
         }
       });
+
+      pulseGroup.children.forEach(p => {
+        if (p.userData && p.userData.strength) {
+          p.material.opacity = Math.max(0, p.userData.strength * (0.5 + 0.5 * Math.sin(t * 4 + p.userData.phase)));
+          const s = 0.04 + p.userData.strength * 0.06;
+          p.scale.setScalar(s);
+        }
+      });
+
+      pulseFetchTimer++;
+      if (pulseFetchTimer > 60) {
+        pulseFetchTimer = 0;
+        fetchPulses();
+      }
+
       renderer.render(scene, camera);
+    }
+
+    function fetchPulses() {
+      fetch(API + '/pulse-snapshot')
+        .then(r => r.json())
+        .then(data => {
+          if (!data.pulses) return;
+          while (pulseGroup.children.length) pulseGroup.remove(pulseGroup.children[0]);
+      const sc = 0.8;
+          data.pulses.forEach(p => {
+            if (!p.centroid) return;
+            const pos = new THREE.Vector3(p.centroid[0] * sc, p.centroid[1] * sc, p.centroid[2] * sc);
+            const geo = new THREE.SphereGeometry(0.1, 6, 6);
+            const mat = new THREE.MeshBasicMaterial({
+              color: p.occupied ? 0xc9a04e : 0x7b8cff,
+              transparent: true,
+              opacity: Math.min(p.strength, 1.0) * 0.6,
+            });
+            const dot = new THREE.Mesh(geo, mat);
+            dot.position.copy(pos);
+            dot.userData = { strength: p.strength, phase: Math.random() * 6.28 };
+            pulseGroup.add(dot);
+          });
+        })
+        .catch(() => {});
     }
 
     function updateScene(tetras) {
       meshGroup.clear();
       edgeGroup.clear();
+      cellGroup.clear();
       tetraMeshMap = {};
 
-      const baseGeo = createTetraGeometry(0.15);
-
-      tetras.forEach(t => {
-        const c = t.centroid;
-        const pos = new THREE.Vector3(c[0], c[1], c[2]);
-        const isDream = t.labels && t.labels.includes('__dream__');
-        const color = weightToColor(t.weight, isDream);
-
-        const mat = new THREE.MeshPhongMaterial({
-          color: color,
-          transparent: true,
-          opacity: isDream ? 0.5 : 0.7,
-          emissive: isDream ? new THREE.Color(0x00e676) : new THREE.Color(0x000000),
-          emissiveIntensity: 0,
-          shininess: 60,
-        });
-
-        const mesh = new THREE.Mesh(baseGeo.clone(), mat);
-        mesh.position.copy(pos);
-        mesh.scale.setScalar(0.5 + t.weight * 0.08);
-        mesh.userData = { id: t.id, weight: t.weight, isDream };
-        meshGroup.add(mesh);
-        tetraMeshMap[t.id] = mesh;
-
-        const wire = new THREE.LineSegments(
-          new THREE.EdgesGeometry(baseGeo),
-          new THREE.LineBasicMaterial({ color: 0x4a4a6a, transparent: true, opacity: 0.3 })
-        );
-        wire.position.copy(pos);
-        wire.scale.copy(mesh.scale);
-        meshGroup.add(wire);
+      api('/lattice-info').then(data => {
+        buildCompleteScene(data);
+      }).catch((e) => {
+        console.error('lattice-info failed:', e);
+        buildFallbackScene(tetras);
       });
-
-      loadAndDrawEdges(tetras);
     }
 
-    async function loadAndDrawEdges(tetras) {
-      try {
-        const g = await api('/topology-graph');
-        const lineColors = { face: 0xffffff, edge: 0x888888, vertex: 0x444466 };
-        const lineOpacities = { face: 0.25, edge: 0.15, vertex: 0.08 };
+    function buildCompleteScene(data) {
+      const res = data.resolution || 5;
+      const sp = data.spacing || 1.0;
+      const memMap = {};
+      (data.memories || []).forEach(m => { memMap[m.id] = m; });
 
-        g.edges.forEach(e => {
-          const sn = g.nodes.find(n => n.id === e.source);
-          const tn = g.nodes.find(n => n.id === e.target);
-          if (!sn || !tn) return;
-          const points = [
-            new THREE.Vector3(sn.centroid[0], sn.centroid[1], sn.centroid[2]),
-            new THREE.Vector3(tn.centroid[0], tn.centroid[1], tn.centroid[2]),
-          ];
-          const geo = new THREE.BufferGeometry().setFromPoints(points);
-          const mat = new THREE.LineBasicMaterial({
-            color: lineColors[e.type] || 0x444466,
-            transparent: true,
-            opacity: lineOpacities[e.type] || 0.1,
-          });
-          edgeGroup.add(new THREE.Line(geo, mat));
+      const center = new THREE.Vector3(0, 0, 0);
+          const sc = 0.8;
+
+      const cornerPos = {};
+      for (let ix = -res; ix <= res; ix++) {
+        for (let iy = -res; iy <= res; iy++) {
+          for (let iz = -res; iz <= res; iz++) {
+            cornerPos[`${ix},${iy},${iz}`] = new THREE.Vector3(ix * sp * sc, iy * sp * sc, iz * sp * sc);
+          }
+        }
+      }
+
+      const bodyPos = {};
+      for (let ix = -res; ix < res; ix++) {
+        for (let iy = -res; iy < res; iy++) {
+          for (let iz = -res; iz < res; iz++) {
+            bodyPos[`${ix},${iy},${iz}`] = new THREE.Vector3((ix + 0.5) * sp * sc, (iy + 0.5) * sp * sc, (iz + 0.5) * sp * sc);
+          }
+        }
+      }
+
+      const edgeLineVerts = [];
+      for (let ix = -res; ix < res; ix++) {
+        for (let iy = -res; iy < res; iy++) {
+          for (let iz = -res; iz < res; iz++) {
+            const bp = bodyPos[`${ix},${iy},${iz}`];
+            const c00 = cornerPos[`${ix},${iy},${iz}`];
+            const c10 = cornerPos[`${ix+1},${iy},${iz}`];
+            const c01 = cornerPos[`${ix},${iy+1},${iz}`];
+            const c11 = cornerPos[`${ix+1},${iy+1},${iz}`];
+            const c001 = cornerPos[`${ix},${iy},${iz+1}`];
+            const c101 = cornerPos[`${ix+1},${iy},${iz+1}`];
+            const c011 = cornerPos[`${ix},${iy+1},${iz+1}`];
+            const c111 = cornerPos[`${ix+1},${iy+1},${iz+1}`];
+            const corners = [c00, c10, c01, c11, c001, c101, c011, c111];
+            for (const c of corners) {
+              if (c) {
+                edgeLineVerts.push(bp.x, bp.y, bp.z, c.x, c.y, c.z);
+              }
+            }
+          }
+        }
+      }
+
+      const latticeGeo = new THREE.BufferGeometry();
+      latticeGeo.setAttribute('position', new THREE.Float32BufferAttribute(edgeLineVerts, 3));
+      const latticeMat = new THREE.LineBasicMaterial({ color: 0x1a1a3a, transparent: true, opacity: 0.15 });
+      edgeGroup.add(new THREE.LineSegments(latticeGeo, latticeMat));
+
+      const memPositions = {};
+      for (const [id, m] of Object.entries(memMap)) {
+        const p = new THREE.Vector3(m.pos[0] * sc, m.pos[1] * sc, m.pos[2] * sc);
+        memPositions[id] = p;
+
+        const isDream = m.is_dream;
+        const color = weightToColor(m.weight || 1, isDream);
+        const s = 0.25;
+        const h = s * 1.2;
+        const a = s * 1.5;
+
+        const tGeo = new THREE.BufferGeometry();
+        const tVerts = new Float32Array([0,h*0.75,0, -a,-h*0.25,a*0.5, a,-h*0.25,a*0.5, 0,-h*0.25,-a]);
+        tGeo.setAttribute('position', new THREE.BufferAttribute(tVerts, 3));
+        tGeo.setIndex(new THREE.BufferAttribute(new Uint16Array([0,1,2,0,2,3,0,3,1,1,3,2]), 1));
+        tGeo.computeVertexNormals();
+
+        const tMat = new THREE.MeshPhongMaterial({
+          color: color,
+          transparent: true,
+          opacity: 0.9,
+          emissive: color.clone().multiplyScalar(0.4),
+          emissiveIntensity: 0.6,
+          shininess: 80,
         });
-      } catch {}
+        const tMesh = new THREE.Mesh(tGeo, tMat);
+        tMesh.position.copy(p);
+        tMesh.userData = { id: m.id, weight: m.weight || 1, isDream };
+        meshGroup.add(tMesh);
+        tetraMeshMap[m.id] = tMesh;
+
+        const wireGeo = new THREE.EdgesGeometry(tGeo);
+        const wireMat = new THREE.LineBasicMaterial({ color: isDream ? 0x5eb88a : 0x3a4a7a, transparent: true, opacity: 0.6 });
+        const wire = new THREE.LineSegments(wireGeo, wireMat);
+        wire.position.copy(p);
+        meshGroup.add(wire);
+
+        const contentText = m.content || '';
+        if (contentText) {
+          const lc = document.createElement('canvas');
+          lc.width = 512; lc.height = 64;
+          const ctx = lc.getContext('2d');
+          ctx.fillStyle = '#7b8cff';
+          ctx.font = '22px sans-serif';
+          ctx.fillText(contentText.slice(0, 20), 4, 36);
+          const tex = new THREE.CanvasTexture(lc);
+          const spriteMat = new THREE.SpriteMaterial({ map: tex, transparent: true, opacity: 0.9 });
+          const sprite = new THREE.Sprite(spriteMat);
+          sprite.position.copy(p);
+          sprite.position.y += 0.15;
+          sprite.scale.set(0.6, 0.1, 1);
+          meshGroup.add(sprite);
+        }
+      }
+
+      latticeNodes = {};
+      for (const [id, m] of Object.entries(memMap)) {
+        latticeNodes[id] = { pos: m.pos };
+      }
+    }
+
+    function buildFallbackScene(tetras) {
+      if (!tetras || !tetras.length) return;
+      const centroids = tetras.map(t => new THREE.Vector3(t.centroid[0], t.centroid[1], t.centroid[2]));
+      const center = new THREE.Vector3();
+      centroids.forEach(c => center.add(c));
+      center.divideScalar(centroids.length);
+      let maxDist = 0;
+      centroids.forEach(c => { maxDist = Math.max(maxDist, c.distanceTo(center)); });
+      const sc = 4.0 / Math.max(maxDist, 0.5);
+      tetras.forEach(t => {
+        const pos = new THREE.Vector3(t.centroid[0], t.centroid[1], t.centroid[2]).sub(center).multiplyScalar(sc);
+        const isDream = t.labels && (t.labels.includes('__dream__') || t.labels.includes('__pulse_bridge__'));
+        const color = weightToColor(t.weight || 1, isDream);
+        const geo = new THREE.SphereGeometry(0.08, 8, 8);
+        const mat = new THREE.MeshBasicMaterial({ color });
+        const dot = new THREE.Mesh(geo, mat);
+        dot.position.copy(pos);
+        dot.userData = { id: t.id, weight: t.weight || 1, isDream };
+        meshGroup.add(dot);
+        tetraMeshMap[t.id] = dot;
+      });
     }
 
     function onCanvasClick(event) {
@@ -478,7 +664,8 @@ const app = createApp({
       mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
       mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
       raycaster.setFromCamera(mouse, camera);
-      const intersects = raycaster.intersectObjects(meshGroup.children.filter(c => c.isMesh));
+      const targets = [...meshGroup.children, ...cellGroup.children].filter(c => c.isMesh && c.userData && c.userData.id);
+      const intersects = raycaster.intersectObjects(targets);
       if (intersects.length > 0) {
         const id = intersects[0].object.userData.id;
         if (id) selectById(id);
@@ -510,7 +697,12 @@ const app = createApp({
     const canvasWrap = ref(null);
     onMounted(async () => {
       await nextTick();
-      if (canvasWrap.value) initScene(canvasWrap.value);
+      try {
+        if (canvasWrap.value) initScene(canvasWrap.value);
+      } catch(e) {
+        console.error('initScene error:', e);
+        document.title = '3D ERROR: ' + e.message;
+      }
       refreshAll();
     });
 
@@ -525,6 +717,7 @@ const app = createApp({
 
 app.use(ElementPlus);
 app.mount('#app');
+} // end initApp
 </script>
 </body>
 </html>

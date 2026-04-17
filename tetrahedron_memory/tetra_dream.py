@@ -451,7 +451,7 @@ class TetraDreamCycle:
                 think_fn=llm_executor.think,
                 execute_fn=llm_executor.execute,
                 reflect_fn=llm_executor.reflect,
-                quality_threshold=0.4,
+                quality_threshold=0.5,
             )
         elif synthesis_fn is not None:
             self._protocol = DreamProtocol(execute_fn=lambda inputs, _: synthesis_fn(inputs))
@@ -476,8 +476,35 @@ class TetraDreamCycle:
             contents = [i["content"] for i in inputs]
             labels = [i["labels"] for i in inputs]
             return fn(contents, labels)
-
         return wrapper
+
+    def _is_duplicate_content(self, content: str) -> bool:
+        content_hash = hashlib.sha256(content.encode()).hexdigest()[:12]
+        for tid, t in self.mesh.tetrahedra.items():
+            existing_hash = hashlib.sha256(t.content.encode()).hexdigest()[:12]
+            if content_hash == existing_hash:
+                return True
+            if len(content) > 20 and len(t.content) > 20:
+                shorter = content if len(content) < len(t.content) else t.content
+                longer = t.content if len(content) < len(t.content) else content
+                if shorter[:40] in longer:
+                    return True
+        return False
+
+    def _content_is_just_rewrite(self, synthesized: str, source_contents: list) -> bool:
+        if not synthesized or not source_contents:
+            return False
+        syn_words = set(synthesized)
+        for src in source_contents:
+            if not src:
+                continue
+            src_words = set(src)
+            if len(syn_words) == 0 or len(src_words) == 0:
+                continue
+            overlap = len(syn_words & src_words) / max(len(syn_words | src_words), 1)
+            if overlap > 0.75:
+                return True
+        return False
 
     def _default_deep_synthesis(self, inputs: List[DreamSynthesisInput]) -> Optional[str]:
         if not inputs or len(inputs) < 2:
@@ -896,6 +923,13 @@ class TetraDreamCycle:
                 if synthesized is None or not protocol_result.get("accepted", False):
                     continue
 
+                if self._is_duplicate_content(synthesized):
+                    continue
+
+                source_contents = [inp.get("content", "") for inp in all_inputs]
+                if self._content_is_just_rewrite(synthesized, source_contents):
+                    continue
+
                 centroids_a = [np.array(inp["centroid"]) for inp in inputs_a if inp.get("centroid")]
                 centroids_b = [np.array(inp["centroid"]) for inp in inputs_b if inp.get("centroid")]
 
@@ -930,6 +964,7 @@ class TetraDreamCycle:
                 quality = protocol_result.get("quality", 0.0)
                 confidence = "high" if quality >= 0.5 else "low"
                 dream_weight = self.dream_weight * quality if quality > 0 else self.dream_weight * 0.1
+                dream_weight = max(dream_weight, self.dream_weight)
                 dream_labels = list(bridge_labels) + ["__dream__"]
                 if confidence == "low":
                     dream_labels.append("low_confidence")

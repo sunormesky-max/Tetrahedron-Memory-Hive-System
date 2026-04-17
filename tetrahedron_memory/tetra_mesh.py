@@ -28,46 +28,56 @@ except ImportError:
 
 
 def text_to_geometry(text: str, labels=None) -> np.ndarray:
-    """Deterministic text-to-3D-point mapping using multi-scale hash.
+    """Deterministic text-to-3D-point mapping with honeycomb-grade spatial distribution.
 
-    Layer 1 (SHA-256): Base spatial position — deterministic hash
-    Layer 2 (Label geometry): Labels rotate the point toward label-specific attractors
-    Layer 3 (Content structure): Sentence length and punctuation shift the position
+    Three-layer mapping for geometric diversity:
+      Layer 1: SHA-256 → wide-range base position (spread across ±5.0 in each axis)
+      Layer 2: Label attractors → same-label memories cluster in shared regions
+      Layer 3: Content structure → fine-grained position offset
 
-    This creates a 3D space where:
-    - Similar labels cluster memories together
-    - Similar content lengths/structures occupy nearby regions
-    - SHA-256 ensures uniqueness while preserving topology
+    Ensures points are well-distributed in 3D space for rich Delaunay connectivity.
     """
     h = hashlib.sha256(text.encode()).digest()
-    vals = np.frombuffer(h[:12], dtype=np.uint32).copy().astype(np.float32)
-    base_max = float(np.abs(vals).max())
-    if base_max < 1e-8:
-        base_max = 1.0
-    base = vals / base_max * 3.0
+
+    x = (int.from_bytes(h[0:4], 'big') % 10000) / 10000.0
+    y = (int.from_bytes(h[4:8], 'big') % 10000) / 10000.0
+    z = (int.from_bytes(h[8:12], 'big') % 10000) / 10000.0
+
+    base = np.array([
+        (x - 0.5) * 10.0,
+        (y - 0.5) * 10.0,
+        (z - 0.5) * 10.0,
+    ], dtype=np.float32)
 
     if labels and len(labels) > 0:
         label_h = hashlib.sha256("|".join(sorted(labels)).encode()).digest()
-        label_vals = np.frombuffer(label_h[:12], dtype=np.uint32).copy().astype(np.float32)
-        label_max = float(np.abs(label_vals).max())
-        if label_max < 1e-8:
-            label_max = 1.0
-        label_point = label_vals / label_max * 3.0
+        lx = (int.from_bytes(label_h[0:4], 'big') % 10000) / 10000.0
+        ly = (int.from_bytes(label_h[4:8], 'big') % 10000) / 10000.0
+        lz = (int.from_bytes(label_h[8:12], 'big') % 10000) / 10000.0
+        label_point = np.array([
+            (lx - 0.5) * 10.0,
+            (ly - 0.5) * 10.0,
+            (lz - 0.5) * 10.0,
+        ], dtype=np.float32)
 
         n_labels = min(len(labels), 5)
-        blend = 0.15 + 0.05 * n_labels
+        blend = 0.20 + 0.06 * n_labels
         base = base * (1.0 - blend) + label_point * blend
 
     content_len = len(text)
-    n_sentences = text.count("。") + text.count("！") + text.count("？") + text.count(".") + text.count("!") + text.count("?")
-    n_sentences = max(n_sentences, 1)
-
+    n_sentences = max(
+        text.count("。") + text.count("！") + text.count("？") +
+        text.count(".") + text.count("!") + text.count("?"),
+        1
+    )
+    h2 = hashlib.sha256((text + "::struct").encode()).digest()
+    s1 = (int.from_bytes(h2[0:4], 'big') % 1000) / 1000.0 - 0.5
+    s2 = (int.from_bytes(h2[4:8], 'big') % 1000) / 1000.0 - 0.5
     structure_shift = np.array([
-        (content_len % 200) / 200.0 * 0.3 - 0.15,
-        (n_sentences % 10) / 10.0 * 0.2 - 0.1,
-        0.0,
+        s1 * 0.5,
+        s2 * 0.5,
+        (content_len % 100) / 100.0 * 0.3 - 0.15,
     ], dtype=np.float32)
-
     base = base + structure_shift
 
     result = base[:3]
@@ -1069,26 +1079,6 @@ class TetraMesh:
         if self._boundary_dirty and not self._boundary_face_keys:
             self._rebuild_boundary_cache()
 
-        last_id = self._last_tetra_id
-        if last_id is not None and last_id in self._tetrahedra:
-            best_face = None
-            best_dist = float("inf")
-            sx, sy, sz = float(seed_point[0]), float(seed_point[1]), float(seed_point[2])
-            for fk in self._faces_of_tetra(self._tetrahedra[last_id].vertex_indices):
-                face = self._faces.get(fk)
-                if face is not None and face.is_boundary:
-                    va, vb, vc = (self._vertices[v] for v in fk)
-                    cx = (float(va[0]) + float(vb[0]) + float(vc[0])) / 3.0
-                    cy = (float(va[1]) + float(vb[1]) + float(vc[1])) / 3.0
-                    cz = (float(va[2]) + float(vb[2]) + float(vc[2])) / 3.0
-                    d = (cx - sx) ** 2 + (cy - sy) ** 2 + (cz - sz) ** 2
-                    if d < best_dist:
-                        best_dist = d
-                        best_face = fk
-            if best_face is not None:
-                new_vi = self._add_vertex(seed_point)
-                return (best_face[0], best_face[1], best_face[2], new_vi)
-
         bf_keys = self._boundary_face_keys
         if not bf_keys:
             return self._create_seed_tetrahedron(seed_point)
@@ -1098,28 +1088,39 @@ class TetraMesh:
             return self._create_seed_tetrahedron(seed_point)
 
         n = len(bf_keys)
+        best_face = None
+        best_score = float("inf")
+
+        sample_size = min(128, n)
         if n > 128:
-            sample_size = min(128, n)
             indices = np.random.choice(n, size=sample_size, replace=False)
-            best_idx = indices[0]
-            best_dist = float("inf")
-            for si in indices:
-                c = bf_centroids[si]
-                d = float(np.sum((c - seed_point) ** 2))
-                if d < best_dist:
-                    best_dist = d
-                    best_idx = si
-            best_face = bf_keys[best_idx]
         else:
-            best_idx = 0
-            best_dist = float("inf")
-            for i in range(n):
-                c = bf_centroids[i]
-                d = float(np.sum((c - seed_point) ** 2))
-                if d < best_dist:
-                    best_dist = d
-                    best_idx = i
-            best_face = bf_keys[best_idx]
+            indices = range(n)
+
+        for si in indices:
+            fk = bf_keys[si]
+            face = self._faces.get(fk)
+            if face is None or not face.is_boundary:
+                continue
+
+            c = bf_centroids[si]
+            dist = float(np.sum((c - seed_point) ** 2))
+
+            neighbor_bonus = 0.0
+            for tid in face.tetrahedra:
+                t = self._tetrahedra.get(tid)
+                if t:
+                    n_faces = len(list(self._faces_of_tetra(t.vertex_indices)))
+                    neighbor_bonus += n_faces * 0.01
+
+            score = dist - neighbor_bonus
+
+            if score < best_score:
+                best_score = score
+                best_face = fk
+
+        if best_face is None:
+            return self._create_seed_tetrahedron(seed_point)
 
         new_vi = self._add_vertex(seed_point)
         return (best_face[0], best_face[1], best_face[2], new_vi)
@@ -1394,13 +1395,13 @@ class TetraMeshStore:
                 json.dumps(t.centroid.tolist() if hasattr(t.centroid, 'tolist') else list(t.centroid)),
                 json.dumps(t.labels),
                 json.dumps(t.metadata, default=str),
-                t.weight,
-                t.creation_time,
-                t.last_access_time,
-                t.init_weight,
-                t._spatial_alpha,
-                t.integration_count,
-                t.access_count,
+                float(t.weight),
+                float(t.creation_time),
+                float(t.last_access_time),
+                float(t.init_weight),
+                float(t._spatial_alpha),
+                int(t.integration_count),
+                int(t.access_count),
             ),
         )
         conn.commit()
@@ -1459,13 +1460,13 @@ class TetraMeshStore:
                             json.dumps(t.centroid.tolist() if hasattr(t.centroid, 'tolist') else list(t.centroid)),
                             json.dumps(t.labels),
                             json.dumps(t.metadata, default=str),
-                            t.weight,
-                            t.creation_time,
-                            t.last_access_time,
-                            t.init_weight,
-                            t._spatial_alpha,
-                            t.integration_count,
-                            t.access_count,
+                            float(t.weight),
+                            float(t.creation_time),
+                            float(t.last_access_time),
+                            float(t.init_weight),
+                            float(t._spatial_alpha),
+                            int(t.integration_count),
+                            int(t.access_count),
                         ),
                     )
 
@@ -1514,9 +1515,9 @@ class TetraMeshStore:
                 creation_time=r["creation_time"],
                 last_access_time=r["last_access_time"],
                 init_weight=r["init_weight"],
-                _spatial_alpha=r["spatial_alpha"],
-                integration_count=r["integration_count"],
-                access_count=r["access_count"],
+                _spatial_alpha=float(r["spatial_alpha"]) if isinstance(r["spatial_alpha"], (int, float)) else 0.0,
+                integration_count=int(r["integration_count"]),
+                access_count=int(r["access_count"]),
             )
             mesh._tetrahedra[r["id"]] = t
             for lbl in t.labels:
@@ -1561,13 +1562,13 @@ class TetraMeshStore:
                         json.dumps(t.centroid.tolist() if hasattr(t.centroid, 'tolist') else list(t.centroid)),
                         json.dumps(t.labels),
                         json.dumps(t.metadata, default=str),
-                        t.weight,
-                        t.creation_time,
-                        t.last_access_time,
-                        t.init_weight,
-                        t._spatial_alpha,
-                        t.integration_count,
-                        t.access_count,
+                        float(t.weight),
+                        float(t.creation_time),
+                        float(t.last_access_time),
+                        float(t.init_weight),
+                        float(t._spatial_alpha),
+                        int(t.integration_count),
+                        int(t.access_count),
                     ),
                 )
             conn.commit()
