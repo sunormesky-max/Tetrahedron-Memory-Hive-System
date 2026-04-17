@@ -23,6 +23,7 @@ import random
 import threading
 import time
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from tetrahedron_memory.phase_transition import PhaseTransitionDetector
 
 import numpy as np
 
@@ -470,6 +471,7 @@ class TetraDreamCycle:
         self._last_stats: Dict[str, Any] = {}
         self._entropy_tracker = EntropyTracker()
         self._dream_store = DreamStore()
+        self._phase_detector = phase_detector or PhaseTransitionDetector()
 
     def _wrap_legacy_fn(self, fn):
         def wrapper(inputs):
@@ -669,7 +671,16 @@ class TetraDreamCycle:
 
         dream_count = sum(1 for t in tetrahedra.values() if "__dream__" in t.labels)
 
-        tensions = self._compute_topological_tension(regular)
+        global_tension, tensions = self._phase_detector.compute_global_tension(self.mesh)
+        stats["global_tension"] = global_tension
+
+        if self._phase_detector.should_trigger(global_tension):
+            clusters = self._phase_detector.identify_tension_clusters(tensions, self.mesh)
+            if clusters:
+                pt_result = self._phase_detector.execute_transition(self.mesh, tensions, clusters)
+                stats["phase_transition"] = pt_result
+                logger.info("Phase transition triggered: tension=%.2f clusters=%d", global_tension, len(clusters))
+
         if tensions and max(tensions.values()) > 1.0:
             path, path_types = self._tension_guided_walk(regular, tensions)
         else:
