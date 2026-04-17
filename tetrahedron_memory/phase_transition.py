@@ -55,41 +55,62 @@ class PhaseTransitionDetector:
     def compute_global_tension(self, mesh) -> Tuple[float, Dict[str, float]]:
         tensions = {}
         tetrahedra = mesh.tetrahedra
+        time_lambda = getattr(mesh, '_time_lambda', 0.001)
 
         for tid, tetra in tetrahedra.items():
             if "__system__" in tetra.labels:
                 continue
             t_score = 0.0
-            neighbors_all = []
-            for method in (mesh._face_neighbors, mesh._edge_neighbors):
-                neighbors_all.extend(method(tid))
 
-            if not neighbors_all:
+            face_nbs = mesh._face_neighbors(tid)
+            edge_nbs = mesh._edge_neighbors(tid)
+            vertex_nbs = mesh._vertex_neighbors(tid) if hasattr(mesh, '_vertex_neighbors') else []
+            total_nbs = len(face_nbs) + len(edge_nbs) + len(vertex_nbs)
+
+            if total_nbs == 0:
                 continue
 
-            seen = set()
-            n_weights = []
-            shared_labels = 0
-            for nid in neighbors_all:
-                if nid in seen:
-                    continue
-                seen.add(nid)
-                nt = mesh.get_tetrahedron(nid)
-                if nt is None:
-                    continue
-                n_weights.append(nt.weight)
-                if set(tetra.labels) & set(nt.labels):
-                    shared_labels += 1
+            face_ratio = len(face_nbs) / max(total_nbs, 1)
 
-            if n_weights:
-                avg_nw = sum(n_weights) / len(n_weights)
+            nb_weights = []
+            nb_centroids = []
+            for nid in set(face_nbs + edge_nbs):
+                nt = mesh.get_tetrahedron(nid)
+                if nt is not None:
+                    nb_weights.append(nt.weight)
+                    nb_centroids.append(nt.centroid)
+
+            if nb_weights:
+                avg_nw = sum(nb_weights) / len(nb_weights)
                 if avg_nw > 1.0 and tetra.weight < avg_nw * 0.5:
                     t_score += 2.0 * (avg_nw - tetra.weight)
-                weight_var = sum((w - avg_nw) ** 2 for w in n_weights) / len(n_weights)
+                weight_var = sum((w - avg_nw) ** 2 for w in nb_weights) / len(nb_weights)
                 t_score += weight_var * 0.5
+                density_imbalance = abs(len(nb_weights) - 6.0) / 6.0
+                t_score += density_imbalance * 1.5
 
-            isolation = 1.0 - (shared_labels / max(len(seen), 1))
-            t_score += isolation * 0.8
+            if face_ratio < 0.3:
+                t_score += (0.3 - face_ratio) * 3.0
+
+            own_fil = tetra.filtration(time_lambda)
+            if nb_centroids:
+                own_c = tetra.centroid
+                dists = [np.linalg.norm(own_c - nc) for nc in nb_centroids]
+                avg_dist = sum(dists) / len(dists)
+                dist_var = sum((d - avg_dist) ** 2 for d in dists) / len(dists)
+                t_score += dist_var * 2.0
+                spatial_isolation = avg_dist / max(dists) if dists else 0
+                t_score += (1.0 - spatial_isolation) * 0.5
+
+            nb_fils = []
+            for nid in set(face_nbs + edge_nbs):
+                nt = mesh.get_tetrahedron(nid)
+                if nt is not None:
+                    nb_fils.append(nt.filtration(time_lambda))
+            if nb_fils:
+                fil_gradient = abs(own_fil - sum(nb_fils) / len(nb_fils))
+                t_score += fil_gradient * 0.3
+
             tensions[tid] = t_score
 
         global_tension = sum(tensions.values()) if tensions else 0.0
