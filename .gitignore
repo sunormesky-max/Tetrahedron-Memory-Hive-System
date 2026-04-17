@@ -189,3 +189,13 @@ docs/PHASE_*.md
 docs/TetraMem-XL-Final-Merge-Design.md
 
 tetramem_data_v2/
+
+# Privacy — user memory data (never push)
+tetramem_export.md
+*.tar.gz
+push_log.txt
+
+# Tokens and secrets
+**/token*
+**/*secret*
+**/*credential*
