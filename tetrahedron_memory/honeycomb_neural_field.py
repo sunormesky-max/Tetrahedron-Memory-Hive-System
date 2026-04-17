@@ -63,12 +63,14 @@ class HoneycombNode:
 
     def decay(self, dt: float):
         if self.is_occupied:
-            self.activation = max(self.base_activation, self.activation - self.decay_rate * dt)
+            rate = self.decay_rate / max(self.weight, 0.5)
+            self.activation = max(self.base_activation, self.activation - rate * dt)
         else:
             self.pulse_accumulator *= 0.95
 
     def reinforce(self, amount: float):
-        self.activation = min(10.0, self.activation + amount)
+        boost = amount * max(self.weight, 0.5) * 0.3
+        self.activation = min(10.0, self.activation + amount + boost)
 
 
 class NeuralPulse:
@@ -426,7 +428,7 @@ class HoneycombNeuralField:
                 return
 
             if random.random() < 0.7:
-                weighted = [(nid, n.activation) for nid, n in occupied]
+                weighted = [(nid, n.activation * max(n.weight, 0.5)) for nid, n in occupied]
                 total = sum(w for _, w in weighted)
                 if total <= 0:
                     nid = random.choice(occupied)[0]
@@ -439,7 +441,9 @@ class HoneycombNeuralField:
                 else:
                     nid = random.choice(occupied)[0]
 
-            strength = random.uniform(0.1, 0.4)
+            node = self._nodes[nid]
+            strength = 0.1 + min(node.weight, 8.0) * 0.05
+            strength = min(strength, 0.6) * random.uniform(0.8, 1.2)
             self._emit_pulse(nid, strength)
             self._pulse_count += 1
 
