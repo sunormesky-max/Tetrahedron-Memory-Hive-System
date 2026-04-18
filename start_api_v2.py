@@ -1,5 +1,5 @@
 """
-TetraMem-XL API v4.1 — PCNN Self-Check + Empty Detection + Duplicate Detection
+TetraMem-XL API v5.0 — Structural Cascade + Lattice Integrity + Crystallized Pathways
 Drop-in replacement for start_api_v2.py — same endpoints, PCNN engine underneath.
 """
 import os, time, hashlib, threading, json
@@ -10,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from typing import Any, Dict, List, Optional
 
+from fastapi import FastAPI, HTTPException, Query
 from tetrahedron_memory.honeycomb_neural_field import HoneycombNeuralField
 from tetrahedron_memory.phase_transition_honeycomb import HoneycombPhaseTransition
 
@@ -39,14 +40,14 @@ def init_state():
                 weight=item.get("weight", 1.0),
                 metadata=item.get("metadata"),
             )
-        print(f"[TetraMem v4.1] Migrated {len(data.get('tetrahedra', []))} memories to honeycomb")
+        print(f"[TetraMem v5.0] Migrated {len(data.get('tetrahedra', []))} memories to honeycomb")
     else:
-        print("[TetraMem v4.1] Fresh start")
+        print("[TetraMem v5.0] Fresh start")
 
     _phase_detector = HoneycombPhaseTransition()
     _field.start_pulse_engine()
     stats = _field.stats()
-    print(f"[TetraMem v4.1] Honeycomb: {stats['total_nodes']} nodes, {stats['face_edges']} face edges, PCNN pulse engine running")
+    print(f"[TetraMem v5.0] Honeycomb: {stats['total_nodes']} nodes, {stats['face_edges']} face edges, PCNN pulse engine running")
 
 
 @asynccontextmanager
@@ -54,10 +55,10 @@ async def lifespan(application):
     init_state()
     yield
     _field.stop_pulse_engine()
-    print("[TetraMem v4.1] Shutdown complete, PCNN pulse engine stopped")
+    print("[TetraMem v5.0] Shutdown complete, PCNN pulse engine stopped")
 
 
-app = FastAPI(title="TetraMem-XL v4.1", version="4.1.0", lifespan=lifespan)
+app = FastAPI(title="TetraMem-XL v5.0", version="5.0.0", lifespan=lifespan)
 
 
 class StoreReq(BaseModel):
@@ -245,7 +246,7 @@ def stats():
 
 @app.get("/api/v1/health")
 def health():
-    return {"status": "ok", "version": "4.1.0", "uptime_seconds": time.time() - _start_time}
+    return {"status": "ok", "version": "5.0.0", "uptime_seconds": time.time() - _start_time}
 
 
 @app.get("/api/v1/tetrahedra")
@@ -481,6 +482,53 @@ def detect_isolated():
     with _state_lock:
         isolated = _field.detect_isolated()
     return {"isolated": isolated, "count": len(isolated)}
+
+
+@app.get("/api/v1/lattice-integrity/check")
+def lattice_integrity_check():
+    with _state_lock:
+        return _field.run_lattice_check()
+
+
+@app.get("/api/v1/lattice-integrity/status")
+def lattice_integrity_status():
+    with _state_lock:
+        return _field.lattice_check_status()
+
+
+@app.get("/api/v1/lattice-integrity/history")
+def lattice_integrity_history(n: int = 10):
+    with _state_lock:
+        return {"history": _field.lattice_check_history(n)}
+
+
+@app.get("/api/v1/crystallized/status")
+def crystallized_status():
+    with _state_lock:
+        return _field.crystallized_status()
+
+
+@app.post("/api/v1/cascade/trigger")
+def cascade_trigger(request: dict = None):
+    req = request or {}
+    strength = req.get("strength", 0.5)
+    source_id = req.get("source_id")
+    with _state_lock:
+        return _field.trigger_cascade(source_id=source_id, strength=strength)
+
+
+@app.post("/api/v1/structure-pulse/trigger")
+def structure_pulse_trigger(request: dict = None):
+    req = request or {}
+    source_id = req.get("source_id")
+    with _state_lock:
+        return _field.trigger_structure_pulse(source_id=source_id)
+
+
+@app.post("/api/v1/crystallized/force")
+def force_crystallize():
+    with _state_lock:
+        return _field.force_crystallize()
 
 
 static_dir = Path(__file__).parent / "static"
