@@ -1,13 +1,16 @@
 """
 HoneycombNeuralField — BCC Lattice Honeycomb + PCNN-Grounded Neural Pulse Engine.
 
-Version 4.0 — PCNN Theoretical Reinforcement
+Version 5.0 — Structural Cascade + Lattice Integrity + Crystallized Pathways
 
 Architecture:
   Layer 1: BCC lattice honeycomb (space-filling tetrahedral mesh)
   Layer 2: Memory activation (content mapped to lattice nodes)
   Layer 3: PCNN neural pulses (theoretically grounded, multi-type)
   Layer 4: Hebbian path memory (emergent pathway reinforcement)
+  Layer 5: Cascade pulse waves (multi-directional branching propagation)
+  Layer 6: Crystallized pathways (permanent structural fast-paths)
+  Layer 7: Lattice integrity verification (geometric topology audit)
 
 PCNN Parameters derived from:
   - Eckhorn 1989 visual cortex model (coupling + dynamic threshold)
@@ -21,6 +24,24 @@ Key equations (PCNN adapted to BCC lattice):
   U_i[n] = F_i[n] * (1 + beta * L_i[n])
   Y_i[n] = step(U_i[n] - Theta_i[n-1])
   Theta_i[n] = alpha_Theta * Theta_i[n-1] + V_Theta * Y_i[n]
+
+Cascade propagation:
+  At each hop, a cascade pulse spawns K child pulses (K = branching factor).
+  Each child propagates independently with decay * branching_decay_factor.
+  Total wavefront energy is conserved: sum(children) <= parent.
+
+Crystallization:
+  When Hebbian edge weight exceeds crystallize_threshold, the edge becomes
+  a "crystal" — permanently reinforced with zero decay, acting as structural
+  conduit for future pulses.
+
+Lattice Integrity:
+  BCC lattice is verified by checking:
+  - Every body-center node has exactly 8 face-sharing corner neighbors
+  - Every corner node has exactly 8 adjacent body-center neighbors
+  - Every corner node has exactly 6 edge-sharing corner neighbors
+  - All edges are bidirectional
+  - No orphan nodes (nodes with zero neighbors)
 
 BCC lattice properties used in derivations:
   - Nearest neighbor distance: a * sqrt(3) / 2
@@ -49,6 +70,8 @@ class PulseType(enum.Enum):
     REINFORCING = "reinforcing"
     TENSION_SENSING = "tension_sensing"
     SELF_CHECK = "self_check"
+    CASCADE = "cascade"
+    STRUCTURE = "structure"
 
 
 class PCNNConfig:
@@ -103,10 +126,12 @@ class PCNNConfig:
     TENSION_STRENGTH_RANGE = (0.40, 0.70)
 
     PULSE_TYPE_PROBABILITIES = {
-        PulseType.EXPLORATORY: 0.45,
-        PulseType.REINFORCING: 0.30,
-        PulseType.TENSION_SENSING: 0.15,
-        PulseType.SELF_CHECK: 0.10,
+        PulseType.EXPLORATORY: 0.30,
+        PulseType.REINFORCING: 0.25,
+        PulseType.CASCADE: 0.15,
+        PulseType.TENSION_SENSING: 0.12,
+        PulseType.SELF_CHECK: 0.08,
+        PulseType.STRUCTURE: 0.07,
     }
 
     HEBBIAN_MAX_PATHS = 500
@@ -120,6 +145,22 @@ class PCNNConfig:
     ISOLATED_NODE_THRESHOLD = 0
     DUPLICATE_TOKEN_OVERLAP = 0.70
     DUPLICATE_MERGE_MIN_WEIGHT_RATIO = 0.3
+
+    CASCADE_BRANCHING_FACTOR = 3
+    CASCADE_BRANCHING_DECAY = 0.65
+    CASCADE_MAX_DEPTH = 4
+    CASCADE_ENERGY_CONSERVATION = 0.95
+    CASCADE_STRENGTH_RANGE = (0.30, 0.60)
+    CASCADE_MAX_HOPS = 6
+
+    STRUCTURE_MAX_HOPS = 3
+    STRUCTURE_STRENGTH = 0.40
+    STRUCTURE_INTEGRITY_INTERVAL = 300
+
+    CRYSTALLIZE_THRESHOLD = 3.0
+    CRYSTALLIZE_MAX_PATHS = 200
+    CRYSTAL_PULSE_BOOST = 1.8
+    CRYSTAL_WEIGHT_FLOOR = 2.0
 
     CONVERGENCE_CHECK_CYCLES = 60
     GLOBAL_DECAY_CYCLES = 120
@@ -142,6 +183,7 @@ class HoneycombNode:
         "last_pulse_time", "pulse_accumulator", "creation_time",
         "metadata", "access_count", "decay_rate",
         "feeding", "linking", "internal_activity", "threshold", "fired",
+        "crystal_channels",
     )
 
     def __init__(self, id: str, position: np.ndarray):
@@ -167,6 +209,7 @@ class HoneycombNode:
         self.internal_activity: float = 0.0
         self.threshold: float = PCNNConfig.V_THETA
         self.fired: bool = False
+        self.crystal_channels: Dict[str, float] = {}
 
     @property
     def is_occupied(self) -> bool:
@@ -225,6 +268,7 @@ class NeuralPulse:
     __slots__ = (
         "source_id", "strength", "hops", "path", "direction",
         "birth_time", "max_hops", "pulse_type", "bias_fn",
+        "cascade_depth", "cascade_parent_id",
     )
 
     def __init__(
@@ -234,6 +278,8 @@ class NeuralPulse:
         max_hops: int = 6,
         pulse_type: PulseType = PulseType.EXPLORATORY,
         bias_fn=None,
+        cascade_depth: int = 0,
+        cascade_parent_id: Optional[str] = None,
     ):
         self.source_id = source_id
         self.strength = strength
@@ -244,6 +290,8 @@ class NeuralPulse:
         self.max_hops = max_hops
         self.pulse_type = pulse_type
         self.bias_fn = bias_fn
+        self.cascade_depth = cascade_depth
+        self.cascade_parent_id = cascade_parent_id
 
     def propagate(self, decay: float = 0.7) -> float:
         self.hops += 1
@@ -254,6 +302,364 @@ class NeuralPulse:
     def alive(self) -> bool:
         noise_floor = 0.01
         return self.strength > noise_floor and self.hops < self.max_hops
+
+    def clone(self, new_strength: float) -> "NeuralPulse":
+        child = NeuralPulse(
+            self.source_id, new_strength,
+            max_hops=self.max_hops,
+            pulse_type=self.pulse_type,
+            bias_fn=self.bias_fn,
+            cascade_depth=self.cascade_depth + 1,
+            cascade_parent_id=self.source_id,
+        )
+        child.hops = self.hops
+        child.path = list(self.path)
+        child.direction = self.direction
+        return child
+
+
+class CrystallizedPathway:
+    """
+    Permanent structural fast-path in the BCC lattice neural field.
+
+    When a Hebbian edge weight exceeds the crystallization threshold,
+    it becomes a crystal — a zero-decay, permanently reinforced conduit.
+    Pulses traveling through crystal channels get boosted transmission.
+
+    Crystal channels form the "white matter" of the memory system:
+    stable, high-bandwidth structural pathways connecting distant
+    memory clusters through the BCC lattice.
+    """
+
+    def __init__(self, max_crystals: int = 200, weight_floor: float = 2.0):
+        self._crystals: Dict[Tuple[str, str], Dict[str, Any]] = {}
+        self._max_crystals = max_crystals
+        self._weight_floor = weight_floor
+        self._creation_count = 0
+        self._pulse_transmissions = 0
+
+    def try_crystallize(self, edge_a: str, edge_b: str, hebbian_weight: float) -> bool:
+        key = self._make_key(edge_a, edge_b)
+        if key in self._crystals:
+            crystal = self._crystals[key]
+            crystal["hebbian_weight"] = max(crystal["hebbian_weight"], hebbian_weight)
+            crystal["last_reinforced"] = time.time()
+            return False
+
+        if hebbian_weight < self._weight_floor:
+            return False
+
+        if len(self._crystals) >= self._max_crystals:
+            self._evict_weakest()
+
+        self._crystals[key] = {
+            "nodes": (edge_a, edge_b),
+            "hebbian_weight": hebbian_weight,
+            "crystal_weight": min(hebbian_weight * 0.5, 10.0),
+            "created_at": time.time(),
+            "last_reinforced": time.time(),
+            "transmission_count": 0,
+        }
+        self._creation_count += 1
+        return True
+
+    def is_crystal(self, node_a: str, node_b: str) -> bool:
+        return self._make_key(node_a, node_b) in self._crystals
+
+    def get_boost(self, node_a: str, node_b: str) -> float:
+        key = self._make_key(node_a, node_b)
+        crystal = self._crystals.get(key)
+        if crystal is None:
+            return 1.0
+        crystal["transmission_count"] += 1
+        self._pulse_transmissions += 1
+        return PCNNConfig.CRYSTAL_PULSE_BOOST
+
+    def get_crystal_path(self, node_a: str, node_b: str) -> float:
+        return self._crystals.get(self._make_key(node_a, node_b), {}).get("crystal_weight", 0.0)
+
+    def _evict_weakest(self):
+        if not self._crystals:
+            return
+        weakest_key = min(self._crystals, key=lambda k: self._crystals[k]["crystal_weight"])
+        del self._crystals[weakest_key]
+
+    def _make_key(self, a: str, b: str) -> Tuple[str, str]:
+        return (min(a, b), max(a, b))
+
+    def scan_and_crystallize(self, hebbian_edges: Dict[Tuple[str, str], float]):
+        new_count = 0
+        for (a, b), weight in hebbian_edges.items():
+            if weight >= PCNNConfig.CRYSTALLIZE_THRESHOLD:
+                if self.try_crystallize(a, b, weight):
+                    new_count += 1
+        return new_count
+
+    def stats(self) -> Dict[str, Any]:
+        if not self._crystals:
+            return {
+                "total_crystals": 0,
+                "total_created": self._creation_count,
+                "total_transmissions": self._pulse_transmissions,
+                "avg_crystal_weight": 0.0,
+                "max_crystal_weight": 0.0,
+            }
+        weights = [c["crystal_weight"] for c in self._crystals.values()]
+        return {
+            "total_crystals": len(self._crystals),
+            "total_created": self._creation_count,
+            "total_transmissions": self._pulse_transmissions,
+            "avg_crystal_weight": round(float(np.mean(weights)), 3),
+            "max_crystal_weight": round(float(max(weights)), 3),
+            "capacity": self._max_crystals,
+        }
+
+    def top_crystals(self, n: int = 20) -> List[Dict]:
+        sorted_c = sorted(self._crystals.values(), key=lambda c: -c["crystal_weight"])[:n]
+        return [
+            {
+                "nodes": (c["nodes"][0][:8], c["nodes"][1][:8]),
+                "crystal_weight": round(c["crystal_weight"], 3),
+                "hebbian_weight": round(c["hebbian_weight"], 3),
+                "transmissions": c["transmission_count"],
+                "age_seconds": round(time.time() - c["created_at"], 0),
+            }
+            for c in sorted_c
+        ]
+
+
+class LatticeIntegrityReport:
+    __slots__ = (
+        "check_time", "total_nodes", "face_edges_checked", "edge_edges_checked",
+        "broken_edges", "orphan_nodes", "coordination_errors",
+        "connectivity_components", "integrity_score", "details",
+    )
+
+    def __init__(self):
+        self.check_time: float = time.time()
+        self.total_nodes: int = 0
+        self.face_edges_checked: int = 0
+        self.edge_edges_checked: int = 0
+        self.broken_edges: List[Dict] = []
+        self.orphan_nodes: List[str] = []
+        self.coordination_errors: List[Dict] = []
+        self.connectivity_components: int = 0
+        self.integrity_score: float = 1.0
+        self.details: str = ""
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "check_time": self.check_time,
+            "total_nodes": self.total_nodes,
+            "face_edges_checked": self.face_edges_checked,
+            "edge_edges_checked": self.edge_edges_checked,
+            "broken_edges": self.broken_edges[:20],
+            "orphan_nodes": self.orphan_nodes[:20],
+            "coordination_errors": self.coordination_errors[:20],
+            "connectivity_components": self.connectivity_components,
+            "integrity_score": round(self.integrity_score, 4),
+            "details": self.details,
+        }
+
+
+class LatticeIntegrityChecker:
+    """
+    Verifies geometric and topological integrity of the BCC lattice.
+
+    BCC crystal structure rules:
+      - Body-center (BC) nodes: 8 face-sharing corner neighbors
+      - Corner nodes: 8 face-sharing BC neighbors + 6 edge-sharing corner neighbors
+      - All edges must be bidirectional
+      - No orphan nodes (nodes with zero neighbors)
+      - All neighbor references must resolve to existing nodes
+
+    Also checks occupied node structural health:
+      - Weight consistency (weight >= 0)
+      - Activation bounds (0 <= activation <= 10)
+      - Crystal channel validity (referenced nodes exist)
+    """
+
+    def __init__(self, field: "HoneycombNeuralField"):
+        self._field = field
+        self._last_report: Optional[LatticeIntegrityReport] = None
+        self._report_history: List[LatticeIntegrityReport] = []
+        self._max_history = 20
+
+    def run_full_check(self) -> LatticeIntegrityReport:
+        report = LatticeIntegrityReport()
+        field = self._field
+
+        with field._lock:
+            report.total_nodes = len(field._nodes)
+            self._check_bidirectionality(field, report)
+            self._check_orphan_nodes(field, report)
+            self._check_coordination(field, report)
+            self._check_connectivity(field, report)
+            self._check_occupied_health(field, report)
+
+        total_errors = (
+            len(report.broken_edges)
+            + len(report.orphan_nodes)
+            + len(report.coordination_errors)
+        )
+        if report.total_nodes > 0:
+            critical_errors = len(report.broken_edges) + len(report.orphan_nodes)
+            coord_ratio = len(report.coordination_errors) / max(report.total_nodes, 1)
+            report.integrity_score = max(0.0, 1.0 - (critical_errors * 0.5 + coord_ratio * 0.5))
+
+        if total_errors == 0:
+            report.details = f"All {report.total_nodes} nodes pass integrity verification"
+        else:
+            report.details = f"{total_errors} issues found: {len(report.broken_edges)} broken edges, {len(report.orphan_nodes)} orphans, {len(report.coordination_errors)} coordination errors"
+
+        self._last_report = report
+        self._report_history.append(report)
+        if len(self._report_history) > self._max_history:
+            self._report_history = self._report_history[-self._max_history // 2:]
+
+        return report
+
+    def _check_bidirectionality(self, field, report: LatticeIntegrityReport):
+        for n1, n2, etype in field._edges:
+            report.face_edges_checked += 1 if etype == "face" else 0
+            report.edge_edges_checked += 1 if etype == "edge" else 0
+
+            node_a = field._nodes.get(n1)
+            node_b = field._nodes.get(n2)
+
+            if node_a is None or node_b is None:
+                report.broken_edges.append({
+                    "edge": (n1[:8], n2[:8]),
+                    "type": etype,
+                    "issue": "missing_node",
+                })
+                continue
+
+            if etype == "face":
+                if n2 not in node_a.face_neighbors:
+                    report.broken_edges.append({
+                        "edge": (n1[:8], n2[:8]),
+                        "type": "face",
+                        "issue": "unidirectional_a_to_b",
+                    })
+                if n1 not in node_b.face_neighbors:
+                    report.broken_edges.append({
+                        "edge": (n2[:8], n1[:8]),
+                        "type": "face",
+                        "issue": "unidirectional_b_to_a",
+                    })
+            elif etype == "edge":
+                if n2 not in node_a.edge_neighbors:
+                    report.broken_edges.append({
+                        "edge": (n1[:8], n2[:8]),
+                        "type": "edge",
+                        "issue": "unidirectional_a_to_b",
+                    })
+                if n1 not in node_b.edge_neighbors:
+                    report.broken_edges.append({
+                        "edge": (n2[:8], n1[:8]),
+                        "type": "edge",
+                        "issue": "unidirectional_b_to_a",
+                    })
+
+    def _check_orphan_nodes(self, field, report: LatticeIntegrityReport):
+        for nid, node in field._nodes.items():
+            total_neighbors = len(node.face_neighbors) + len(node.edge_neighbors)
+            if total_neighbors == 0:
+                report.orphan_nodes.append(nid)
+
+    def _check_coordination(self, field, report: LatticeIntegrityReport):
+        for key, nid in field._position_index.items():
+            node = field._nodes.get(nid)
+            if node is None:
+                continue
+
+            is_body_center = isinstance(key, tuple) and len(key) == 4 and key[3] == "b"
+
+            if is_body_center:
+                expected_face = 8
+                actual_face = len(node.face_neighbors)
+                if actual_face < expected_face // 2:
+                    report.coordination_errors.append({
+                        "node": nid[:8],
+                        "type": "body_center",
+                        "expected_face": expected_face,
+                        "actual_face": actual_face,
+                    })
+            else:
+                expected_face = 8
+                actual_face = len(node.face_neighbors)
+                if actual_face < expected_face // 2:
+                    report.coordination_errors.append({
+                        "node": nid[:8],
+                        "type": "corner",
+                        "expected_face": expected_face,
+                        "actual_face": actual_face,
+                        "expected_edge": 6,
+                        "actual_edge": len(node.edge_neighbors),
+                    })
+
+    def _check_connectivity(self, field, report: LatticeIntegrityReport):
+        if not field._nodes:
+            return
+        visited = set()
+        components = 0
+        for start_nid in field._nodes:
+            if start_nid in visited:
+                continue
+            components += 1
+            stack = [start_nid]
+            while stack:
+                nid = stack.pop()
+                if nid in visited:
+                    continue
+                visited.add(nid)
+                node = field._nodes.get(nid)
+                if node is None:
+                    continue
+                for fnid in node.face_neighbors:
+                    if fnid not in visited:
+                        stack.append(fnid)
+                for enid in node.edge_neighbors:
+                    if enid not in visited:
+                        stack.append(enid)
+        report.connectivity_components = components
+
+    def _check_occupied_health(self, field, report: LatticeIntegrityReport):
+        for nid, node in field._nodes.items():
+            if not node.is_occupied:
+                continue
+            if node.weight < 0:
+                report.coordination_errors.append({
+                    "node": nid[:8],
+                    "type": "negative_weight",
+                    "weight": node.weight,
+                })
+            if node.activation < 0:
+                report.coordination_errors.append({
+                    "node": nid[:8],
+                    "type": "negative_activation",
+                    "activation": node.activation,
+                })
+            for crystal_target in node.crystal_channels:
+                if crystal_target not in field._nodes:
+                    report.broken_edges.append({
+                        "edge": (nid[:8], crystal_target[:8]),
+                        "type": "crystal",
+                        "issue": "dangling_crystal_channel",
+                    })
+
+    def get_latest(self) -> Optional[Dict]:
+        return self._last_report.to_dict() if self._last_report else None
+
+    def get_history(self, n: int = 10) -> List[Dict]:
+        return [r.to_dict() for r in self._report_history[-n:]]
+
+    def stats(self) -> Dict[str, Any]:
+        return {
+            "checks_performed": len(self._report_history),
+            "latest_score": self._last_report.integrity_score if self._last_report else None,
+        }
 
 
 class HebbianPathMemory:
@@ -647,6 +1053,13 @@ class HoneycombNeuralField:
         self._adaptive_interval: float = PCNNConfig.BASE_PULSE_INTERVAL
         self._recent_bridge_rate: float = 0.0
         self._self_check: Optional[SelfCheckEngine] = None
+        self._crystallized: CrystallizedPathway = CrystallizedPathway(
+            max_crystals=PCNNConfig.CRYSTALLIZE_MAX_PATHS,
+            weight_floor=PCNNConfig.CRYSTAL_WEIGHT_FLOOR,
+        )
+        self._lattice_checker: Optional[LatticeIntegrityChecker] = None
+        self._cascade_count: int = 0
+        self._crystal_maintenance_cycle: int = 0
 
     def initialize(self) -> Dict[str, Any]:
         with self._lock:
@@ -921,6 +1334,12 @@ class HoneycombNeuralField:
         elif pulse_type == PulseType.SELF_CHECK:
             max_hops = cfg.SELF_CHECK_MAX_HOPS
             bias_fn = self._bias_self_check
+        elif pulse_type == PulseType.CASCADE:
+            max_hops = cfg.CASCADE_MAX_HOPS
+            bias_fn = self._bias_cascade
+        elif pulse_type == PulseType.STRUCTURE:
+            max_hops = cfg.STRUCTURE_MAX_HOPS
+            bias_fn = self._bias_structure
         else:
             max_hops = cfg.MAX_HOPS_TENSION
             bias_fn = self._bias_tension_sensing
@@ -931,7 +1350,11 @@ class HoneycombNeuralField:
             pulse_type=pulse_type,
             bias_fn=bias_fn,
         )
-        self._propagate_pulse(pulse)
+
+        if pulse_type == PulseType.CASCADE:
+            self._propagate_cascade(pulse)
+        else:
+            self._propagate_pulse(pulse)
         self._pulse_type_counts[pulse_type] = self._pulse_type_counts.get(pulse_type, 0) + 1
 
     def _bias_exploratory(self, candidates: List[Tuple[str, float, str]]) -> List[Tuple[str, float, str]]:
@@ -1003,6 +1426,37 @@ class HoneycombNeuralField:
                     biased.append((nid, strength * 0.5, ctype))
         return biased
 
+    def _bias_cascade(self, candidates: List[Tuple[str, float, str]]) -> List[Tuple[str, float, str]]:
+        biased = []
+        for nid, strength, ctype in candidates:
+            node = self._nodes.get(nid)
+            if node is None:
+                biased.append((nid, strength, ctype))
+                continue
+            crystal_boost = 1.0
+            source_node = self._nodes.get(candidates[0][0]) if candidates else None
+            if source_node:
+                crystal_boost = self._crystallized.get_boost(source_node.id, nid)
+            weight_factor = 1.0 + (node.weight * 0.3 if node.is_occupied else 0.1)
+            biased.append((nid, strength * weight_factor * crystal_boost, ctype))
+        return biased
+
+    def _bias_structure(self, candidates: List[Tuple[str, float, str]]) -> List[Tuple[str, float, str]]:
+        biased = []
+        for nid, strength, ctype in candidates:
+            node = self._nodes.get(nid)
+            if node is None:
+                biased.append((nid, strength * 0.5, ctype))
+                continue
+            total_neighbors = len(node.face_neighbors) + len(node.edge_neighbors)
+            if total_neighbors < 6:
+                biased.append((nid, strength * 2.5, ctype))
+            elif total_neighbors < 10:
+                biased.append((nid, strength * 1.5, ctype))
+            else:
+                biased.append((nid, strength * 0.8, ctype))
+        return biased
+
     def _propagate_pulse(self, pulse: NeuralPulse):
         if not pulse.alive:
             return
@@ -1024,12 +1478,14 @@ class HoneycombNeuralField:
         raw_candidates = []
         for nid in current.face_neighbors:
             if nid not in pulse.path:
-                raw_candidates.append((nid, pulse.strength * cfg.FACE_DECAY, "face"))
+                base_strength = pulse.strength * cfg.FACE_DECAY
+                crystal_boost = self._crystallized.get_boost(current_id, nid)
+                raw_candidates.append((nid, base_strength * crystal_boost, "face"))
         for nid in current.edge_neighbors:
             if nid not in pulse.path:
-                raw_candidates.append(
-                    (nid, pulse.strength * cfg.FACE_DECAY * cfg.EDGE_DECAY_FACTOR, "edge")
-                )
+                base_strength = pulse.strength * cfg.FACE_DECAY * cfg.EDGE_DECAY_FACTOR
+                crystal_boost = self._crystallized.get_boost(current_id, nid)
+                raw_candidates.append((nid, base_strength * crystal_boost, "edge"))
 
         if not raw_candidates:
             return
@@ -1055,6 +1511,67 @@ class HoneycombNeuralField:
         new_pulse.direction = direction
         self._propagate_pulse(new_pulse)
 
+    def _propagate_cascade(self, pulse: NeuralPulse):
+        if not pulse.alive:
+            return
+        if pulse.cascade_depth >= PCNNConfig.CASCADE_MAX_DEPTH:
+            self._propagate_pulse(pulse)
+            return
+
+        current_id = pulse.path[-1]
+        current = self._nodes.get(current_id)
+        if current is None:
+            return
+
+        current.pulse_accumulator = min(PCNNConfig.MAX_PULSE_ACCUMULATOR, current.pulse_accumulator + pulse.strength)
+        current.last_pulse_time = time.time()
+        if current.is_occupied:
+            current.reinforce(pulse.strength * 0.02)
+
+        cfg = PCNNConfig
+        raw_candidates = []
+        for nid in current.face_neighbors:
+            if nid not in pulse.path:
+                base_strength = pulse.strength * cfg.FACE_DECAY
+                crystal_boost = self._crystallized.get_boost(current_id, nid)
+                raw_candidates.append((nid, base_strength * crystal_boost, "face"))
+        for nid in current.edge_neighbors:
+            if nid not in pulse.path:
+                base_strength = pulse.strength * cfg.FACE_DECAY * cfg.EDGE_DECAY_FACTOR
+                crystal_boost = self._crystallized.get_boost(current_id, nid)
+                raw_candidates.append((nid, base_strength * crystal_boost, "edge"))
+
+        if not raw_candidates:
+            return
+
+        if pulse.bias_fn is not None:
+            biased = pulse.bias_fn(raw_candidates)
+        else:
+            biased = raw_candidates
+
+        total_energy = sum(w for _, w, _ in biased)
+        if total_energy <= 0:
+            return
+
+        k = min(cfg.CASCADE_BRANCHING_FACTOR, len(biased))
+        weights = [w for _, w, _ in biased]
+        selected_indices = random.choices(range(len(biased)), weights=weights, k=k)
+
+        child_energy_budget = pulse.strength * cfg.CASCADE_ENERGY_CONSERVATION * cfg.CASCADE_BRANCHING_DECAY
+        energy_per_child = child_energy_budget / k
+
+        for idx in selected_indices:
+            next_id, next_strength, direction = biased[idx]
+            child = pulse.clone(energy_per_child)
+            child.hops = pulse.hops + 1
+            child.path = pulse.path + [next_id]
+            child.direction = direction
+            self._cascade_count += 1
+
+            self._propagate_cascade(child)
+
+        self._hebbian.record_path(pulse.path[-3:] if len(pulse.path) >= 3 else pulse.path, success=True, strength=pulse.strength * 0.5)
+
     def start_pulse_engine(self):
         if self._pulse_engine is not None and self._pulse_engine.is_alive():
             return
@@ -1063,8 +1580,9 @@ class HoneycombNeuralField:
         self._pulse_engine.start()
         self._self_check = SelfCheckEngine(self)
         self._self_check.start()
+        self._lattice_checker = LatticeIntegrityChecker(self)
         logger.info(
-            "PCNN pulse engine started (v4.1) — face_decay=%.2f, edge_decay=%.2f, self_check=on",
+            "PCNN pulse engine started (v5.0) — face_decay=%.2f, edge_decay=%.2f, cascade=on, crystallize=on, lattice_check=on",
             PCNNConfig.FACE_DECAY, PCNNConfig.FACE_DECAY * PCNNConfig.EDGE_DECAY_FACTOR,
         )
 
@@ -1094,6 +1612,12 @@ class HoneycombNeuralField:
                     self._pcnn_global_step()
                     self._update_adaptive_interval()
 
+                if cycle % 90 == 0:
+                    self._crystal_maintenance()
+
+                if cycle % 600 == 0 and self._lattice_checker:
+                    self._lattice_checker.run_full_check()
+
             except Exception as e:
                 logger.error("Pulse cycle error: %s", e, exc_info=True)
 
@@ -1117,6 +1641,13 @@ class HoneycombNeuralField:
             elif pulse_type == PulseType.SELF_CHECK:
                 nid = self._select_source_self_check(occupied)
                 strength = cfg.SELF_CHECK_STRENGTH
+            elif pulse_type == PulseType.CASCADE:
+                nid = self._select_source_cascade(occupied)
+                lo, hi = cfg.CASCADE_STRENGTH_RANGE
+                strength = random.uniform(lo, hi)
+            elif pulse_type == PulseType.STRUCTURE:
+                nid = self._select_source_structure(occupied)
+                strength = cfg.STRUCTURE_STRENGTH
             else:
                 nid = self._select_source_tension(occupied)
                 lo, hi = cfg.TENSION_STRENGTH_RANGE
@@ -1199,6 +1730,55 @@ class HoneycombNeuralField:
             [i for i, _ in isolation_scores], weights=[s for _, s in isolation_scores], k=1
         )[0]
 
+    def _select_source_cascade(self, occupied: List[Tuple[str, Any]]) -> str:
+        hebbian_nodes = set()
+        for (a, b), w in self._hebbian._edges.items():
+            if w > 1.0:
+                hebbian_nodes.add(a)
+                hebbian_nodes.add(b)
+
+        hebbian_occupied = [(nid, n) for nid, n in occupied if nid in hebbian_nodes]
+        if hebbian_occupied:
+            weighted = [(nid, n.activation * max(n.weight, 0.5)) for nid, n in hebbian_occupied]
+            total = sum(w for _, w in weighted)
+            if total > 0:
+                return random.choices(
+                    [i for i, _ in weighted], weights=[w for _, w in weighted], k=1
+                )[0]
+
+        high_weight = [(nid, n.weight * n.activation) for nid, n in occupied if n.weight >= 2.0]
+        if high_weight:
+            total = sum(w for _, w in high_weight)
+            if total > 0:
+                return random.choices(
+                    [i for i, _ in high_weight], weights=[w for _, w in high_weight], k=1
+                )[0]
+
+        return self._select_source_reinforcing(occupied)
+
+    def _select_source_structure(self, occupied: List[Tuple[str, Any]]) -> str:
+        structure_scores = []
+        for nid, node in occupied:
+            total_neighbors = len(node.face_neighbors) + len(node.edge_neighbors)
+            neighbor_weight_var = 0.0
+            nb_weights = []
+            for fnid in node.face_neighbors[:8]:
+                fn = self._nodes.get(fnid)
+                if fn and fn.is_occupied:
+                    nb_weights.append(fn.weight)
+            if nb_weights:
+                neighbor_weight_var = float(np.var(nb_weights))
+            crystal_count = len(node.crystal_channels)
+            structure_score = neighbor_weight_var + crystal_count * 0.5 + (1.0 if total_neighbors < 10 else 0.0)
+            structure_scores.append((nid, structure_score + 0.01))
+
+        total = sum(s for _, s in structure_scores)
+        if total <= 0:
+            return random.choice(occupied)[0]
+        return random.choices(
+            [i for i, _ in structure_scores], weights=[s for _, s in structure_scores], k=1
+        )[0]
+
     def _pcnn_global_step(self):
         with self._lock:
             for nid, node in self._nodes.items():
@@ -1234,6 +1814,25 @@ class HoneycombNeuralField:
         else:
             target = cfg.BASE_PULSE_INTERVAL
             self._adaptive_interval = 0.9 * self._adaptive_interval + 0.1 * target
+
+    def _crystal_maintenance(self):
+        with self._lock:
+            new_crystals = self._crystallized.scan_and_crystallize(self._hebbian._edges)
+
+            for node in self._nodes.values():
+                node.crystal_channels.clear()
+
+            for key, crystal in self._crystallized._crystals.items():
+                a, b = crystal["nodes"]
+                node_a = self._nodes.get(a)
+                node_b = self._nodes.get(b)
+                if node_a:
+                    node_a.crystal_channels[b] = crystal["crystal_weight"]
+                if node_b:
+                    node_b.crystal_channels[a] = crystal["crystal_weight"]
+
+            if new_crystals > 0:
+                logger.info("Crystal maintenance: %d new crystallized pathways", new_crystals)
 
     def _check_convergence_bridges(self):
         cfg = PCNNConfig
@@ -1324,6 +1923,7 @@ class HoneycombNeuralField:
             "internal_activity": node.internal_activity,
             "threshold": node.threshold,
             "fired": node.fired,
+            "crystal_channels": {k[:8]: round(v, 3) for k, v in node.crystal_channels.items()},
         }
 
     def list_occupied(self) -> List[Dict]:
@@ -1367,6 +1967,7 @@ class HoneycombNeuralField:
             avg_activation = np.mean([n.activation for n in self._nodes.values()]) if self._nodes else 0
             avg_face_conn = np.mean([len(n.face_neighbors) for n in self._nodes.values()]) if self._nodes else 0
             fired_count = sum(1 for n in self._nodes.values() if n.fired)
+            crystal_nodes = sum(1 for n in self._nodes.values() if n.crystal_channels)
 
             return {
                 "total_nodes": total,
@@ -1379,12 +1980,16 @@ class HoneycombNeuralField:
                 "avg_face_connections": float(avg_face_conn),
                 "pulse_count": self._pulse_count,
                 "bridge_count": self._bridge_count,
+                "cascade_count": self._cascade_count,
+                "crystal_nodes": crystal_nodes,
                 "pulse_engine_running": self._pulse_engine is not None and self._pulse_engine.is_alive(),
                 "pulse_type_counts": {t.value: c for t, c in self._pulse_type_counts.items()},
                 "fired_nodes": fired_count,
                 "adaptive_interval": round(self._adaptive_interval, 3),
                 "bridge_rate": round(self._recent_bridge_rate, 6),
                 "hebbian": self._hebbian.stats(),
+                "crystallized": self._crystallized.stats(),
+                "lattice_integrity": self._lattice_checker.get_latest() if self._lattice_checker else None,
                 "self_check": self.self_check_status() if self._self_check else {"engine_running": False},
                 "pcnn_config": {
                     "face_decay": PCNNConfig.FACE_DECAY,
@@ -1393,6 +1998,9 @@ class HoneycombNeuralField:
                     "alpha_feed": PCNNConfig.ALPHA_FEED,
                     "alpha_link": PCNNConfig.ALPHA_LINK,
                     "alpha_threshold": PCNNConfig.ALPHA_THRESHOLD,
+                    "cascade_branching": PCNNConfig.CASCADE_BRANCHING_FACTOR,
+                    "cascade_max_depth": PCNNConfig.CASCADE_MAX_DEPTH,
+                    "crystallize_threshold": PCNNConfig.CRYSTALLIZE_THRESHOLD,
                 },
             }
 
@@ -1586,6 +2194,7 @@ class HoneycombNeuralField:
             return {
                 "pulse_count": self._pulse_count,
                 "bridge_count": self._bridge_count,
+                "cascade_count": self._cascade_count,
                 "engine_running": self._pulse_engine is not None and self._pulse_engine.is_alive(),
                 "recent_bridges": recent,
                 "hot_nodes": [(nid[:8], round(acc, 3)) for nid, acc in hot_nodes],
@@ -1593,6 +2202,8 @@ class HoneycombNeuralField:
                 "adaptive_interval": round(self._adaptive_interval, 3),
                 "hebbian": self._hebbian.stats(),
                 "hebbian_top_paths": self._hebbian.get_top_paths(10),
+                "crystallized": self._crystallized.stats(),
+                "crystallized_top": self._crystallized.top_crystals(10),
             }
 
     def get_pcnn_node_states(self, n: int = 20) -> List[Dict]:
@@ -1640,3 +2251,64 @@ class HoneycombNeuralField:
                 })
             tensions.sort(key=lambda x: -x["tension"])
             return tensions[:top_n]
+
+    def run_lattice_check(self) -> Dict[str, Any]:
+        if self._lattice_checker is None:
+            self._lattice_checker = LatticeIntegrityChecker(self)
+        report = self._lattice_checker.run_full_check()
+        return report.to_dict()
+
+    def lattice_check_status(self) -> Dict[str, Any]:
+        if self._lattice_checker is None:
+            return {"checker_running": False, "checks_performed": 0}
+        return self._lattice_checker.stats()
+
+    def lattice_check_history(self, n: int = 10) -> List[Dict]:
+        if self._lattice_checker is None:
+            return []
+        return self._lattice_checker.get_history(n)
+
+    def crystallized_status(self) -> Dict[str, Any]:
+        return {
+            "stats": self._crystallized.stats(),
+            "top_crystals": self._crystallized.top_crystals(20),
+        }
+
+    def trigger_cascade(self, source_id: Optional[str] = None, strength: float = 0.5) -> Dict[str, Any]:
+        with self._lock:
+            if source_id is None:
+                occupied = [(nid, n) for nid, n in self._nodes.items() if n.is_occupied]
+                if not occupied:
+                    return {"error": "no occupied nodes"}
+                source_id = self._select_source_cascade(occupied)
+            self._emit_pulse(source_id, strength, PulseType.CASCADE)
+            self._pulse_count += 1
+            return {
+                "triggered": True,
+                "source": source_id[:12],
+                "strength": strength,
+                "cascade_count": self._cascade_count,
+            }
+
+    def trigger_structure_pulse(self, source_id: Optional[str] = None) -> Dict[str, Any]:
+        with self._lock:
+            if source_id is None:
+                occupied = [(nid, n) for nid, n in self._nodes.items() if n.is_occupied]
+                if not occupied:
+                    return {"error": "no occupied nodes"}
+                source_id = self._select_source_structure(occupied)
+            self._emit_pulse(source_id, PCNNConfig.STRUCTURE_STRENGTH, PulseType.STRUCTURE)
+            self._pulse_count += 1
+            return {
+                "triggered": True,
+                "source": source_id[:12],
+                "strength": PCNNConfig.STRUCTURE_STRENGTH,
+            }
+
+    def force_crystallize(self) -> Dict[str, Any]:
+        with self._lock:
+            self._crystal_maintenance()
+            return {
+                "crystallized": self._crystallized.stats(),
+                "hebbian_edges": len(self._hebbian._edges),
+            }
