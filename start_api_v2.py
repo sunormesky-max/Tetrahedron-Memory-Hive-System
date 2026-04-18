@@ -1,6 +1,5 @@
 """
-TetraMem-XL API v5.0 — Structural Cascade + Lattice Integrity + Crystallized Pathways
-Drop-in replacement for start_api_v2.py — same endpoints, PCNN engine underneath.
+TetraMem-XL API v5.1 — Self-Organization Engine + Cluster Detection + Entropy Balance + Consolidation + Shortcuts
 """
 import os, time, hashlib, threading, json
 from contextlib import asynccontextmanager
@@ -40,14 +39,14 @@ def init_state():
                 weight=item.get("weight", 1.0),
                 metadata=item.get("metadata"),
             )
-        print(f"[TetraMem v5.0] Migrated {len(data.get('tetrahedra', []))} memories to honeycomb")
+        print(f"[TetraMem v5.1] Migrated {len(data.get('tetrahedra', []))} memories to honeycomb")
     else:
-        print("[TetraMem v5.0] Fresh start")
+        print("[TetraMem v5.1] Fresh start")
 
     _phase_detector = HoneycombPhaseTransition()
     _field.start_pulse_engine()
     stats = _field.stats()
-    print(f"[TetraMem v5.0] Honeycomb: {stats['total_nodes']} nodes, {stats['face_edges']} face edges, PCNN pulse engine running")
+    print(f"[TetraMem v5.1] Honeycomb: {stats['total_nodes']} nodes, {stats['face_edges']} face edges, PCNN pulse engine running")
 
 
 @asynccontextmanager
@@ -55,10 +54,10 @@ async def lifespan(application):
     init_state()
     yield
     _field.stop_pulse_engine()
-    print("[TetraMem v5.0] Shutdown complete, PCNN pulse engine stopped")
+    print("[TetraMem v5.1] Shutdown complete, PCNN pulse engine stopped")
 
 
-app = FastAPI(title="TetraMem-XL v5.0", version="5.0.0", lifespan=lifespan)
+app = FastAPI(title="TetraMem-XL v5.1", version="5.1.0", lifespan=lifespan)
 
 
 class StoreReq(BaseModel):
@@ -246,7 +245,7 @@ def stats():
 
 @app.get("/api/v1/health")
 def health():
-    return {"status": "ok", "version": "5.0.0", "uptime_seconds": time.time() - _start_time}
+    return {"status": "ok", "version": "5.1.0", "uptime_seconds": time.time() - _start_time}
 
 
 @app.get("/api/v1/tetrahedra")
@@ -529,6 +528,36 @@ def structure_pulse_trigger(request: dict = None):
 def force_crystallize():
     with _state_lock:
         return _field.force_crystallize()
+
+
+@app.post("/api/v1/self-organize/run")
+def self_organize_run():
+    with _state_lock:
+        return _field.run_self_organize()
+
+
+@app.get("/api/v1/self-organize/status")
+def self_organize_status():
+    with _state_lock:
+        return _field.self_organize_status()
+
+
+@app.get("/api/v1/self-organize/history")
+def self_organize_history(n: int = 10):
+    with _state_lock:
+        return {"history": _field.self_organize_history(n)}
+
+
+@app.get("/api/v1/clusters")
+def get_clusters():
+    with _state_lock:
+        return {"clusters": _field.get_clusters()}
+
+
+@app.get("/api/v1/shortcuts")
+def get_shortcuts(n: int = 20):
+    with _state_lock:
+        return {"shortcuts": _field.get_shortcuts(n), "count": len(_field.get_shortcuts(n))}
 
 
 static_dir = Path(__file__).parent / "static"
