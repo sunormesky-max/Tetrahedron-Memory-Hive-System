@@ -2,6 +2,86 @@
 
 All notable changes to TetraMem-XL are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [4.1.0] - 2026-04-18
+
+### Added — Self-Check Pulse Engine + Duplicate & Isolated Detection
+
+#### Self-Check Pulse Engine
+- `SelfCheckEngine` — periodic autonomous inspection engine (60s cycle)
+- Detects orphan nodes, duplicate memories, low-vitality nodes
+- Auto-repair: trigger reinforcement pulses for isolated memories
+- `PulseType.SELF_CHECK` — new pulse type with dedicated bias function and source selector
+- 6 new API endpoints: `/self-check/status`, `/self-check/run`, `/self-check/history`, `/duplicates`, `/isolated`, `/self-check/trigger`
+
+#### Duplicate Detection
+- `detect_duplicates()` — Jaccard similarity >= 70% memory pair discovery
+- Lower-weight duplicate auto-annotated with `__duplicate_of__` metadata
+- Memory integrity preserved (no deletion, only annotation)
+
+#### Isolated Memory Detection
+- `detect_isolated()` — real-time detection of memories with no face/edge neighbors
+- Empty association detection during SELF_CHECK pulse propagation
+
+#### MCP Tool Server v4.1.0
+- Expanded from 12 to 28 tools covering all v4.0/v4.1 API endpoints
+- Tool descriptions updated to BCC lattice / PCNN terminology
+
+#### Visualization UI
+- New "Self-Check Pulse" panel with status display and manual trigger
+- Self-check pulse type badge in pulse monitor
+
+## [4.0.1] - 2026-04-17
+
+### Fixed
+- Pulse accumulator four-channel clamping fix — prevents overflow in high-frequency pulse trains
+
+## [4.0.0] - 2026-04-16
+
+### Added — PCNN Pulse Engine + BCC Honeycomb Architecture
+
+#### PCNN Pulse-Coupled Neural Network Engine
+- `PulseType` enum: EXPLORATORY, REINFORCEMENT, TENSION, SELF_CHECK
+- Pulse emission, propagation, and Hebbian path recording
+- Multi-type pulse bias functions and source selectors
+- Face decay=0.72, edge decay=0.36, beta=0.4 parameters
+- 4 PCNN API endpoints: `/pulse/emit`, `/pulse/status`, `/pulse/history`, `/hebbian/stats`
+
+#### Hebbian Path Memory
+- Path recording with success/failure tracking
+- Synaptic strength modulation based on path history
+
+#### Phase Transition Detection
+- `phase_transition_honeycomb.py` — Honeycomb-compatible phase transition analysis
+- BCC lattice-specific topological feature extraction
+
+### Changed
+- Core architecture migrated from TetraMesh to BCC Lattice Honeycomb (`HoneycombNeuralField`)
+- API backend upgraded to v4.0 with PCNN-integrated endpoints
+
+## [3.0.0] - 2026-04-14
+
+### Added — BCC Lattice Honeycomb Neural Field Foundation
+
+#### BCC Crystal Lattice
+- Body-Centered Cubic lattice generation with configurable resolution and spacing
+- Face-sharing and edge-sharing neighbor topology
+- `HoneycombNeuralField` — new core class replacing TetraMesh for memory operations
+
+#### Neural Field Core
+- `store()`, `query()`, `browse_timeline()`, `stats()` — full memory lifecycle
+- Label-based filtering and weight-based ranking
+- JSON persistence (`mesh_index.json`)
+
+#### FastAPI Backend v2
+- `start_api_v2.py` — new FastAPI application with RESTful endpoints
+- Memory CRUD, timeline browsing, statistics, export/import
+- Nginx reverse proxy integration (port 8082)
+
+#### Visualization UI
+- Web-based 3D topology visualization
+- Login authentication (tetramem / Hive@2026)
+- Chinese-localized interface (only "TetraMem-XL" in English)
+
 ## [2.2.0] - 2026-04-12
 
 ### Added — Theoretical Innovation: Mapping Cone + Adaptive Feedback + Eternity Audit
