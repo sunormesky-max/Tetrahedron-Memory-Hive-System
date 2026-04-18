@@ -180,6 +180,11 @@ class PCNNConfig:
     SHORTCUT_MAX_PER_CYCLE = 3
     SHORTCUT_VIRTUAL_STRENGTH = 0.8
 
+    TETRA_QUALITY_THRESHOLD = 0.3
+    TETRA_IDEAL_VOLUME_FACTOR = 0.1178
+    TETRA_MAX_CELLS_PER_ANALYSIS = 500
+    TETRA_DENSITY_PENALTY = 0.5
+
     MAX_PULSE_ACCUMULATOR = 5.0
     MAX_INTERNAL_ACTIVITY = 50.0
     MAX_FEEDING = 20.0
@@ -1038,6 +1043,319 @@ class SelfCheckEngine:
             }
 
 
+class TetrahedralCell:
+    """
+    A single tetrahedral cell within the BCC lattice honeycomb.
+
+    In BCC, each cubic unit cell decomposes into 8 tetrahedra:
+    each formed by the body-center + 3 adjacent corner nodes
+    sharing a face of the cube.
+
+    Quality metrics:
+    - Volume: |det(v1-v0, v2-v0, v3-v0)| / 6
+    - Regularity: ratio of inscribed sphere radius to circumscribed
+      sphere radius, compared to ideal regular tetrahedron
+    - Skewness: deviation from equilateral tetrahedron (0=perfect, 1=degenerate)
+    - Jacobian: minimum scaled Jacobian (positive=valid, zero/negative=inverted)
+    """
+
+    __slots__ = (
+        "cell_id", "vertex_ids", "vertex_positions", "body_center_id",
+        "volume", "quality", "skewness", "jacobian",
+        "centroid", "memory_count", "total_weight", "density",
+    )
+
+    def __init__(self, cell_id: str, vertex_ids: List[str],
+                 vertex_positions: List[np.ndarray], body_center_id: str):
+        self.cell_id = cell_id
+        self.vertex_ids = vertex_ids
+        self.vertex_positions = vertex_positions
+        self.body_center_id = body_center_id
+        self.volume: float = 0.0
+        self.quality: float = 0.0
+        self.skewness: float = 0.0
+        self.jacobian: float = 0.0
+        self.centroid: np.ndarray = np.zeros(3, dtype=np.float32)
+        self.memory_count: int = 0
+        self.total_weight: float = 0.0
+        self.density: float = 0.0
+        self._compute_metrics()
+
+    def _compute_metrics(self):
+        if len(self.vertex_positions) != 4:
+            return
+        v0, v1, v2, v3 = self.vertex_positions
+        self.centroid = ((v0 + v1 + v2 + v3) / 4.0).astype(np.float32)
+
+        e1 = v1 - v0
+        e2 = v2 - v0
+        e3 = v3 - v0
+
+        cross = np.cross(e1, e2)
+        det = float(np.dot(cross, e3))
+        self.volume = abs(det) / 6.0
+
+        if self.volume < 1e-10:
+            self.quality = 0.0
+            self.skewness = 1.0
+            self.jacobian = 0.0
+            return
+
+        edges = [
+            float(np.linalg.norm(v1 - v0)),
+            float(np.linalg.norm(v2 - v0)),
+            float(np.linalg.norm(v3 - v0)),
+            float(np.linalg.norm(v2 - v1)),
+            float(np.linalg.norm(v3 - v1)),
+            float(np.linalg.norm(v3 - v2)),
+        ]
+        avg_edge = np.mean(edges)
+        max_edge = max(edges)
+        min_edge = min(edges)
+
+        if max_edge < 1e-10:
+            self.skewness = 1.0
+        else:
+            edge_ratio = min_edge / max_edge
+            self.skewness = 1.0 - edge_ratio
+
+        s = avg_edge
+        ideal_volume = s ** 3 / (6.0 * math.sqrt(2))
+        if ideal_volume > 1e-10:
+            self.quality = min(1.0, self.volume / ideal_volume)
+        else:
+            self.quality = 0.0
+
+        edge_sq = [e ** 2 for e in edges]
+        cayley_menger = np.array([
+            [0, 1, 1, 1, 1],
+            [1, 0, edge_sq[0], edge_sq[1], edge_sq[3]],
+            [1, edge_sq[0], 0, edge_sq[2], edge_sq[4]],
+            [1, edge_sq[1], edge_sq[2], 0, edge_sq[5]],
+            [1, edge_sq[3], edge_sq[4], edge_sq[5], 0],
+        ], dtype=np.float64)
+        cm_det = abs(np.linalg.det(cayley_menger))
+        if cm_det > 1e-20:
+            inradius = math.sqrt(cm_det) / (288.0 * self.volume ** 2 + 1e-10)
+        else:
+            inradius = 0.0
+
+        circumradius_sq = 0.0
+        for i in range(4):
+            for j in range(i + 1, 4):
+                d = float(np.sum((self.vertex_positions[i] - self.vertex_positions[j]) ** 2))
+                circumradius_sq = max(circumradius_sq, d)
+        circumradius = math.sqrt(circumradius_sq) / 2.0
+
+        if circumradius > 1e-10:
+            ideal_ratio = math.sqrt(6.0) / 12.0
+            actual_ratio = inradius / circumradius
+            self.jacobian = min(1.0, actual_ratio / ideal_ratio) if ideal_ratio > 0 else 0.0
+        else:
+            self.jacobian = 0.0
+
+    def update_density(self, nodes: Dict[str, Any]):
+        count = 0
+        total_w = 0.0
+        for vid in self.vertex_ids:
+            node = nodes.get(vid)
+            if node and node.is_occupied:
+                count += 1
+                total_w += node.weight
+        bc_node = nodes.get(self.body_center_id)
+        if bc_node and bc_node.is_occupied:
+            count += 1
+            total_w += bc_node.weight
+        self.memory_count = count
+        self.total_weight = total_w
+        self.density = count / 5.0 if self.volume > 1e-10 else 0.0
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "cell_id": self.cell_id,
+            "vertex_ids": [vid[:8] for vid in self.vertex_ids],
+            "body_center": self.body_center_id[:8],
+            "centroid": self.centroid.tolist(),
+            "volume": round(self.volume, 4),
+            "quality": round(self.quality, 4),
+            "skewness": round(self.skewness, 4),
+            "jacobian": round(self.jacobian, 4),
+            "memory_count": self.memory_count,
+            "total_weight": round(self.total_weight, 3),
+            "density": round(self.density, 3),
+        }
+
+
+class HoneycombCellMap:
+    """
+    Decomposes the BCC lattice into tetrahedral cells and provides
+    cell-level operations for structural analysis and memory placement.
+
+    BCC Tetrahedral Decomposition:
+    Each BCC unit cell (body-center + 8 corners) decomposes into 8 tetrahedra.
+    The 8 tetrahedra are formed by selecting 3 of the 8 corners that share
+    a cube face, combined with the body-center node.
+
+    The 8 tetrahedra correspond to the 8 corners of the cube:
+      For corner (dx, dy, dz) where dx,dy,dz in {0,1}:
+        tetrahedron = [body_center, corner(dx,dy,dz),
+                       corner(dx^1,dy,dz), corner(dx,dy^1,dz), corner(dx,dy,dz^1)]
+        where ^1 means flip the bit (0↔1)
+
+    This ensures each tetrahedron fills exactly 1/8 of the cube volume.
+    """
+
+    def __init__(self):
+        self._cells: Dict[str, TetrahedralCell] = {}
+        self._node_to_cells: Dict[str, List[str]] = defaultdict(list)
+        self._bcc_cell_index: Dict[Tuple, List[str]] = {}
+
+    def build(self, nodes: Dict[str, Any], position_index: Dict[Tuple, str], spacing: float):
+        self._cells.clear()
+        self._node_to_cells.clear()
+        self._bcc_cell_index.clear()
+
+        for key, bid in position_index.items():
+            if not (isinstance(key, tuple) and len(key) == 4 and key[3] == "b"):
+                continue
+            ix, iy, iz = key[0], key[1], key[2]
+
+            bc_node = nodes.get(bid)
+            if bc_node is None:
+                continue
+
+            cell_ids = []
+            for dx in (0, 1):
+                for dy in (0, 1):
+                    for dz in (0, 1):
+                        c0 = position_index.get((ix + dx, iy + dy, iz + dz))
+                        c1 = position_index.get((ix + (1 - dx), iy + dy, iz + dz))
+                        c2 = position_index.get((ix + dx, iy + (1 - dy), iz + dz))
+                        c3 = position_index.get((ix + dx, iy + dy, iz + (1 - dz)))
+
+                        if not all([c0, c1, c2, c3]):
+                            continue
+
+                        n0, n1, n2, n3 = nodes.get(c0), nodes.get(c1), nodes.get(c2), nodes.get(c3)
+                        if not all([n0, n1, n2, n3]):
+                            continue
+
+                        cell_id = hashlib.sha256(
+                            f"{bid}:{c0}:{c1}:{c2}:{c3}".encode()
+                        ).hexdigest()[:12]
+
+                        cell = TetrahedralCell(
+                            cell_id=cell_id,
+                            vertex_ids=[bid, c0, c1, c2],
+                            vertex_positions=[bc_node.position, n0.position, n1.position, n2.position],
+                            body_center_id=bid,
+                        )
+
+                        self._cells[cell_id] = cell
+                        cell_ids.append(cell_id)
+
+                        for nid in [bid, c0, c1, c2]:
+                            self._node_to_cells[nid].append(cell_id)
+
+            if cell_ids:
+                self._bcc_cell_index[(ix, iy, iz)] = cell_ids
+
+    def get_cell(self, cell_id: str) -> Optional[TetrahedralCell]:
+        return self._cells.get(cell_id)
+
+    def get_cells_for_node(self, node_id: str) -> List[TetrahedralCell]:
+        cell_ids = self._node_to_cells.get(node_id, [])
+        return [self._cells[cid] for cid in cell_ids if cid in self._cells]
+
+    def update_all_densities(self, nodes: Dict[str, Any]):
+        for cell in self._cells.values():
+            cell.update_density(nodes)
+
+    def get_best_cells(self, n: int = 20) -> List[TetrahedralCell]:
+        sorted_cells = sorted(self._cells.values(), key=lambda c: -c.quality)
+        return sorted_cells[:n]
+
+    def get_cells_by_density(self, n: int = 20) -> List[TetrahedralCell]:
+        sorted_cells = sorted(self._cells.values(), key=lambda c: -c.density)
+        return sorted_cells[:n]
+
+    def find_optimal_placement_cells(self, nodes: Dict, label_set: Set[str],
+                                      label_index: Dict, count: int = 10) -> List[TetrahedralCell]:
+        related_nodes = set()
+        for lbl in label_set:
+            related_nodes.update(label_index.get(lbl, set()))
+
+        scored_cells = []
+        for cell in self._cells.values():
+            if cell.memory_count >= 4:
+                continue
+            label_overlap = 0
+            for vid in cell.vertex_ids:
+                if vid in related_nodes:
+                    label_overlap += 1
+            bc = nodes.get(cell.body_center_id)
+            if bc and bc.id in related_nodes:
+                label_overlap += 2
+
+            quality_bonus = cell.quality * 3.0
+            density_penalty = cell.density * PCNNConfig.TETRA_DENSITY_PENALTY
+            score = label_overlap * 2.0 + quality_bonus - density_penalty
+            if score > 0:
+                scored_cells.append((cell, score))
+
+        scored_cells.sort(key=lambda x: -x[1])
+        return [c for c, _ in scored_cells[:count]]
+
+    def structural_analysis(self) -> Dict[str, Any]:
+        if not self._cells:
+            return {"total_cells": 0}
+
+        qualities = [c.quality for c in self._cells.values()]
+        volumes = [c.volume for c in self._cells.values()]
+        skews = [c.skewness for c in self._cells.values()]
+        jacobians = [c.jacobian for c in self._cells.values()]
+        densities = [c.density for c in self._cells.values()]
+
+        high_quality = sum(1 for q in qualities if q > 0.8)
+        low_quality = sum(1 for q in qualities if q < 0.3)
+
+        return {
+            "total_cells": len(self._cells),
+            "total_bcc_units": len(self._bcc_cell_index),
+            "quality": {
+                "mean": round(float(np.mean(qualities)), 4),
+                "min": round(float(min(qualities)), 4),
+                "max": round(float(max(qualities)), 4),
+                "std": round(float(np.std(qualities)), 4),
+                "high_quality_count": high_quality,
+                "low_quality_count": low_quality,
+            },
+            "volume": {
+                "mean": round(float(np.mean(volumes)), 6),
+                "total": round(float(sum(volumes)), 4),
+            },
+            "skewness": {
+                "mean": round(float(np.mean(skews)), 4),
+                "max": round(float(max(skews)), 4),
+            },
+            "jacobian": {
+                "mean": round(float(np.mean(jacobians)), 4),
+                "min": round(float(min(jacobians)), 4),
+            },
+            "density": {
+                "mean": round(float(np.mean(densities)), 4),
+                "max": round(float(max(densities)), 4),
+                "occupied_cells": sum(1 for d in densities if d > 0),
+            },
+        }
+
+    def stats(self) -> Dict[str, Any]:
+        return {
+            "total_cells": len(self._cells),
+            "total_bcc_units": len(self._bcc_cell_index),
+        }
+
+
 class SemanticCluster:
     __slots__ = ("cluster_id", "labels", "node_ids", "centroid", "avg_weight", "total_activation")
 
@@ -1454,11 +1772,17 @@ class HoneycombNeuralField:
         self._cascade_count: int = 0
         self._crystal_maintenance_cycle: int = 0
         self._self_organize: Optional[SelfOrganizeEngine] = None
+        self._cell_map: HoneycombCellMap = HoneycombCellMap()
 
     def initialize(self) -> Dict[str, Any]:
         with self._lock:
             self._build_bcc_lattice()
             self._build_connectivity()
+            self._cell_map.build(self._nodes, self._position_index, self._spacing)
+            logger.info(
+                "Honeycomb cells: %d tetrahedral cells in %d BCC units",
+                len(self._cell_map._cells), len(self._cell_map._bcc_cell_index),
+            )
             return self.stats()
 
     def _build_bcc_lattice(self):
@@ -1581,6 +1905,31 @@ class HoneycombNeuralField:
             return best_id
 
         label_set = set(labels or [])
+
+        optimal_cells = self._cell_map.find_optimal_placement_cells(
+            self._nodes, label_set, self._label_index, count=20
+        )
+        if optimal_cells:
+            cell_candidates = []
+            for cell in optimal_cells:
+                for vid in cell.vertex_ids:
+                    vnode = self._nodes.get(vid)
+                    if vnode and not vnode.is_occupied:
+                        quality_bonus = cell.quality * 5.0
+                        label_overlap = len(label_set & set(vnode.labels)) if vnode.labels else 0
+                        score = quality_bonus + label_overlap * 2.0
+                        cell_candidates.append((vid, score))
+                bc_node = self._nodes.get(cell.body_center_id)
+                if bc_node and not bc_node.is_occupied:
+                    quality_bonus = cell.quality * 5.0
+                    score = quality_bonus + 3.0
+                    cell_candidates.append((cell.body_center_id, score))
+            if cell_candidates:
+                cell_candidates.sort(key=lambda x: -x[1])
+                top_score = cell_candidates[0][1]
+                top_tier = [c for c in cell_candidates if c[1] >= top_score * 0.8]
+                return random.choice(top_tier)[0]
+
         related_occ = []
         for on in occupied_nodes:
             overlap = len(label_set & set(on.labels))
@@ -1594,7 +1943,11 @@ class HoneycombNeuralField:
             for fnid in on.face_neighbors:
                 fn = self._nodes.get(fnid)
                 if fn and not fn.is_occupied:
-                    face_candidates.append((fnid, fn, bonus + 10))
+                    cell_quality = 1.0
+                    cells = self._cell_map.get_cells_for_node(fnid)
+                    if cells:
+                        cell_quality = max(c.quality for c in cells)
+                    face_candidates.append((fnid, fn, bonus + 10 + cell_quality * 3))
 
         if face_candidates:
             face_candidates.sort(key=lambda x: -x[2])
@@ -2390,6 +2743,7 @@ class HoneycombNeuralField:
                 "lattice_integrity": self._lattice_checker.get_latest() if self._lattice_checker else None,
                 "self_check": self.self_check_status() if self._self_check else {"engine_running": False},
                 "self_organize": self._self_organize.stats() if self._self_organize else {"engine_active": False},
+                "honeycomb_cells": self._cell_map.structural_analysis(),
                 "pcnn_config": {
                     "face_decay": PCNNConfig.FACE_DECAY,
                     "edge_decay": round(PCNNConfig.FACE_DECAY * PCNNConfig.EDGE_DECAY_FACTOR, 3),
@@ -2740,3 +3094,29 @@ class HoneycombNeuralField:
         if self._self_organize is None:
             return []
         return self._self_organize.get_shortcuts(n)
+
+    def honeycomb_analysis(self) -> Dict[str, Any]:
+        with self._lock:
+            self._cell_map.update_all_densities(self._nodes)
+            analysis = self._cell_map.structural_analysis()
+            best_cells = self._cell_map.get_best_cells(10)
+            dense_cells = self._cell_map.get_cells_by_density(10)
+            analysis["best_quality_cells"] = [c.to_dict() for c in best_cells]
+            analysis["highest_density_cells"] = [c.to_dict() for c in dense_cells]
+            return analysis
+
+    def get_tetrahedral_cells(self, n: int = 20, sort_by: str = "quality") -> List[Dict]:
+        with self._lock:
+            self._cell_map.update_all_densities(self._nodes)
+            if sort_by == "density":
+                cells = self._cell_map.get_cells_by_density(n)
+            else:
+                cells = self._cell_map.get_best_cells(n)
+            return [c.to_dict() for c in cells]
+
+    def get_cell_for_node(self, node_id: str) -> List[Dict]:
+        cells = self._cell_map.get_cells_for_node(node_id)
+        with self._lock:
+            for c in cells:
+                c.update_density(self._nodes)
+            return [c.to_dict() for c in cells]
