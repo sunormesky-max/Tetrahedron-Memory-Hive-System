@@ -1,5 +1,5 @@
 """
-TetraMem-XL API v5.2 �?Tetrahedral Cell Decomposition + Honeycomb Structural Analysis + Enhanced Memory Placement
+TetraMem-XL API v5.3 �?Tetrahedral Cell Decomposition + Honeycomb Structural Analysis + Enhanced Memory Placement
 """
 import os, time, hashlib, threading, json
 from contextlib import asynccontextmanager
@@ -39,14 +39,14 @@ def init_state():
                 weight=item.get("weight", 1.0),
                 metadata=item.get("metadata"),
             )
-        print(f"[TetraMem v5.2] Migrated {len(data.get('tetrahedra', []))} memories to honeycomb")
+        print(f"[TetraMem v5.3] Migrated {len(data.get('tetrahedra', []))} memories to honeycomb")
     else:
-        print("[TetraMem v5.2] Fresh start")
+        print("[TetraMem v5.3] Fresh start")
 
     _phase_detector = HoneycombPhaseTransition()
     _field.start_pulse_engine()
     stats = _field.stats()
-    print(f"[TetraMem v5.2] Honeycomb: {stats['total_nodes']} nodes, {stats['face_edges']} face edges, PCNN pulse engine running")
+    print(f"[TetraMem v5.3] Honeycomb: {stats['total_nodes']} nodes, {stats['face_edges']} face edges, PCNN pulse engine running")
 
 
 @asynccontextmanager
@@ -54,10 +54,10 @@ async def lifespan(application):
     init_state()
     yield
     _field.stop_pulse_engine()
-    print("[TetraMem v5.2] Shutdown complete, PCNN pulse engine stopped")
+    print("[TetraMem v5.3] Shutdown complete, PCNN pulse engine stopped")
 
 
-app = FastAPI(title="TetraMem-XL v5.2", version="5.2.0", lifespan=lifespan)
+app = FastAPI(title="TetraMem-XL v5.3", version="5.3.0", lifespan=lifespan)
 
 
 class StoreReq(BaseModel):
@@ -145,8 +145,8 @@ def associate(req: AssociateReq):
 @app.post("/api/v1/dream")
 def dream():
     with _state_lock:
-        status = _field.pulse_status()
-    return {"result": {"phase": "continuous", "pulse_count": status["pulse_count"], "bridge_count": status["bridge_count"]}}
+        result = _field.run_dream_cycle()
+    return {"result": result}
 
 
 
@@ -245,7 +245,7 @@ def stats():
 
 @app.get("/api/v1/health")
 def health():
-    return {"status": "ok", "version": "5.2.0", "uptime_seconds": time.time() - _start_time}
+    return {"status": "ok", "version": "5.3.0", "uptime_seconds": time.time() - _start_time}
 
 
 @app.get("/api/v1/tetrahedra")
@@ -396,13 +396,69 @@ def abstract_reorganize():
 
 
 @app.post("/api/v1/navigate")
-def navigate():
-    return {"path": []}
+def navigate(request: dict = None):
+    req = request or {}
+    source = req.get("source_id", "")
+    target = req.get("target_id", "")
+    if not source or not target:
+        return {"path": [], "error": "source_id and target_id required"}
+    with _state_lock:
+        return _field.agent_navigate(source, target)
 
 
 @app.post("/api/v1/seed-by-label")
-def seed_by_label():
-    return {"id": None}
+def seed_by_label(request: dict = None):
+    req = request or {}
+    labels = req.get("labels", [])
+    if not labels:
+        return {"id": None}
+    with _state_lock:
+        results = _field.query(" ".join(labels), k=1, labels=labels)
+        if results:
+            return {"id": results[0]["id"]}
+        return {"id": None}
+
+
+@app.get("/api/v1/dream/status")
+def dream_status():
+    with _state_lock:
+        return _field.dream_status()
+
+
+@app.get("/api/v1/dream/history")
+def dream_history(n: int = 10):
+    with _state_lock:
+        return {"history": _field.dream_history(n)}
+
+
+@app.post("/api/v1/agent/context")
+def agent_context(request: dict = None):
+    req = request or {}
+    topic = req.get("topic", "")
+    max_mem = req.get("max_memories", 15)
+    if not topic:
+        raise HTTPException(400, "topic is required")
+    with _state_lock:
+        return _field.agent_get_context(topic, max_mem)
+
+
+@app.post("/api/v1/agent/reasoning")
+def agent_reasoning(request: dict = None):
+    req = request or {}
+    source_id = req.get("source_id", "")
+    target_query = req.get("target_query", "")
+    if not source_id or not target_query:
+        return {"chain": [], "error": "source_id and target_query are required"}
+    with _state_lock:
+        return _field.agent_reasoning_chain(source_id, target_query, req.get("max_hops", 5))
+
+
+@app.post("/api/v1/agent/suggest")
+def agent_suggest(request: dict = None):
+    req = request or {}
+    context = req.get("context", "")
+    with _state_lock:
+        return _field.agent_suggest(context)
 
 
 @app.get("/api/v1/topology-health")
