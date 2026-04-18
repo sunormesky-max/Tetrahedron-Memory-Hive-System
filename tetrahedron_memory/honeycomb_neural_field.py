@@ -185,6 +185,16 @@ class PCNNConfig:
     TETRA_MAX_CELLS_PER_ANALYSIS = 500
     TETRA_DENSITY_PENALTY = 0.5
 
+    DREAM_CYCLE_INTERVAL = 300
+    DREAM_MAX_RECOMBINATIONS = 5
+    DREAM_MIN_SOURCE_WEIGHT = 1.0
+    DREAM_INSIGHT_WEIGHT = 1.5
+    DREAM_CROSS_DOMAIN_BONUS = 2.0
+
+    AGENT_CONTEXT_MAX_MEMORIES = 15
+    AGENT_REASONING_MAX_HOPS = 5
+    AGENT_SUGGESTION_TOP_N = 5
+
     MAX_PULSE_ACCUMULATOR = 5.0
     MAX_INTERNAL_ACTIVITY = 50.0
     MAX_FEEDING = 20.0
@@ -1734,6 +1744,485 @@ class SelfOrganizeEngine:
             }
 
 
+class DreamCycleResult:
+    __slots__ = ("cycle_time", "sources_used", "dreams_created", "cross_domain", "insights")
+
+    def __init__(self):
+        self.cycle_time: float = time.time()
+        self.sources_used: int = 0
+        self.dreams_created: int = 0
+        self.cross_domain: int = 0
+        self.insights: List[Dict] = []
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "cycle_time": self.cycle_time,
+            "sources_used": self.sources_used,
+            "dreams_created": self.dreams_created,
+            "cross_domain": self.cross_domain,
+            "insights": self.insights[:10],
+        }
+
+
+class DreamEngine:
+    """
+    Autonomous creative memory recombination engine.
+
+    Dream Cycle:
+    1. Select 2-3 high-weight memory clusters (different label domains)
+    2. Extract key elements from each cluster
+    3. Recombine into new dream memories (cross-domain synthesis)
+    4. Score dream creativity: label distance * weight product * activation resonance
+    5. Store high-scoring dreams as __dream__ memories
+    6. Emit cascade pulses from dream nodes to propagate insights
+
+    This mirrors human REM sleep creativity: disparate neural patterns
+    recombine during dream states to produce novel associations.
+    """
+
+    def __init__(self, field: "HoneycombNeuralField"):
+        self._field = field
+        self._history: List[DreamCycleResult] = []
+        self._max_history = 30
+        self._total_dreams = 0
+        self._lock = threading.Lock()
+
+    def run_dream_cycle(self) -> DreamCycleResult:
+        result = DreamCycleResult()
+        field = self._field
+        cfg = PCNNConfig
+
+        with field._lock:
+            occupied = [
+                (nid, n) for nid, n in field._nodes.items()
+                if n.is_occupied and n.weight >= cfg.DREAM_MIN_SOURCE_WEIGHT
+                and "__dream__" not in n.labels
+                and "__pulse_bridge__" not in n.labels
+                and "__consolidated__" not in n.labels
+            ]
+            if len(occupied) < 4:
+                result.insights = [{"note": "insufficient source memories for dreaming"}]
+                return result
+
+            label_domains: Dict[str, List[Tuple[str, Any]]] = defaultdict(list)
+            for nid, node in occupied:
+                for lbl in node.labels:
+                    if not lbl.startswith("__"):
+                        label_domains[lbl].append((nid, node))
+
+            top_domains = sorted(
+                label_domains.items(),
+                key=lambda x: -sum(n.weight for _, n in x[1])
+            )[:8]
+
+            if len(top_domains) < 2:
+                result.insights = [{"note": "insufficient label diversity for dreaming"}]
+                return result
+
+            result.sources_used = len(occupied)
+
+            for _ in range(cfg.DREAM_MAX_RECOMBINATIONS):
+                if len(top_domains) < 2:
+                    break
+                d1_idx = random.randint(0, len(top_domains) - 1)
+                d2_idx = random.randint(0, len(top_domains) - 1)
+                if d1_idx == d2_idx:
+                    continue
+
+                domain_a_name, domain_a_nodes = top_domains[d1_idx]
+                domain_b_name, domain_b_nodes = top_domains[d2_idx]
+
+                src_a = random.choice(domain_a_nodes)
+                src_b = random.choice(domain_b_nodes)
+                nid_a, node_a = src_a
+                nid_b, node_b = src_b
+
+                creativity = self._score_creativity(node_a, node_b, domain_a_name, domain_b_name)
+
+                if creativity < 0.3:
+                    continue
+
+                dream_parts = []
+                tokens_a = field._extract_tokens(node_a.content)
+                tokens_b = field._extract_tokens(node_b.content)
+
+                if tokens_a:
+                    sample_a = random.sample(list(tokens_a), min(3, len(tokens_a)))
+                    dream_parts.append(f"{domain_a_name}: {' '.join(sample_a)}")
+                if tokens_b:
+                    sample_b = random.sample(list(tokens_b), min(3, len(tokens_b)))
+                    dream_parts.append(f"{domain_b_name}: {' '.join(sample_b)}")
+
+                if not dream_parts:
+                    continue
+
+                dream_content = "[dream] " + " | ".join(dream_parts)
+                dream_labels = list(set([
+                    domain_a_name, domain_b_name, "__dream__",
+                ]))
+                dream_weight = min(
+                    cfg.DREAM_INSIGHT_WEIGHT * creativity,
+                    max(node_a.weight, node_b.weight) * 0.8,
+                )
+
+                try:
+                    dream_id = field.store(
+                        content=dream_content,
+                        labels=dream_labels,
+                        weight=dream_weight,
+                        metadata={
+                            "dream_source_a": nid_a[:12],
+                            "dream_source_b": nid_b[:12],
+                            "creativity_score": round(creativity, 3),
+                            "dream_type": "cross_domain" if domain_a_name != domain_b_name else "intra_domain",
+                        },
+                    )
+                    result.dreams_created += 1
+                    self._total_dreams += 1
+
+                    is_cross = domain_a_name != domain_b_name
+                    if is_cross:
+                        result.cross_domain += 1
+
+                    result.insights.append({
+                        "dream_id": dream_id[:12],
+                        "domains": [domain_a_name, domain_b_name],
+                        "creativity": round(creativity, 3),
+                        "weight": round(dream_weight, 3),
+                        "cross_domain": is_cross,
+                    })
+
+                    field._emit_pulse(
+                        dream_id, strength=dream_weight * 0.6,
+                        pulse_type=PulseType.CASCADE,
+                    )
+                except Exception:
+                    pass
+
+        with self._lock:
+            self._history.append(result)
+            if len(self._history) > self._max_history:
+                self._history = self._history[-self._max_history // 2:]
+
+        return result
+
+    def _score_creativity(self, node_a, node_b, domain_a: str, domain_b: str) -> float:
+        cfg = PCNNConfig
+        cross_bonus = cfg.DREAM_CROSS_DOMAIN_BONUS if domain_a != domain_b else 1.0
+        weight_factor = (node_a.weight * node_b.weight) / 25.0
+        activation_factor = (node_a.activation + node_b.activation) / 10.0
+        creativity = (cross_bonus * weight_factor * activation_factor) / (cross_bonus + 1)
+        return min(1.0, creativity)
+
+    def get_history(self, n: int = 10) -> List[Dict]:
+        return [r.to_dict() for r in self._history[-n:]]
+
+    def stats(self) -> Dict[str, Any]:
+        return {
+            "total_dreams_created": self._total_dreams,
+            "dream_cycles_run": len(self._history),
+            "latest_dreams": sum(r.dreams_created for r in self._history[-3:]),
+        }
+
+
+class AgentMemoryDriver:
+    """
+    Memory-driven agent capability layer.
+
+    Provides the interface between TetraMem's neural memory and agent actions:
+    - Context injection: assemble relevant memories for current task context
+    - Reasoning chains: multi-hop paths from source memory to target insight
+    - Proactive suggestions: memory pattern-based action recommendations
+    - Navigate: path-finding through the memory topology graph
+    """
+
+    def __init__(self, field: "HoneycombNeuralField"):
+        self._field = field
+
+    def get_context(self, topic: str, max_memories: int = 15) -> Dict[str, Any]:
+        field = self._field
+        cfg = PCNNConfig
+        n = min(max_memories, cfg.AGENT_CONTEXT_MAX_MEMORIES)
+
+        memories = field.query(topic, k=n * 2)
+        if not memories:
+            return {"topic": topic, "context": [], "reasoning": "no relevant memories found"}
+
+        core = [m for m in memories if "__dream__" not in m.get("labels", [])][:n // 2]
+        dreams = [m for m in memories if "__dream__" in m.get("labels", [])][:n // 4]
+        bridges = [m for m in memories if "__pulse_bridge__" in m.get("labels", [])][:n // 4]
+
+        context_memories = core + dreams + bridges
+        context_memories.sort(key=lambda m: -m.get("distance", 0))
+
+        labels_encountered = set()
+        for m in context_memories:
+            for l in m.get("labels", []):
+                if not l.startswith("__"):
+                    labels_encountered.add(l)
+
+        associations = []
+        if core:
+            top_id = core[0]["id"]
+            assoc = field.associate(top_id, max_depth=2)
+            for a in assoc[:5]:
+                if "__dream__" not in a.get("labels", []) and "__pulse_bridge__" not in a.get("labels", []):
+                    associations.append({
+                        "content": a["content"][:80],
+                        "weight": a["weight"],
+                        "connection": a["type"],
+                    })
+
+        reasoning = self._build_reasoning(topic, context_memories)
+
+        return {
+            "topic": topic,
+            "context_count": len(context_memories),
+            "context": [
+                {
+                    "id": m["id"][:12],
+                    "content": m["content"][:120],
+                    "weight": m.get("weight", 0),
+                    "relevance": round(m.get("distance", 0), 3),
+                    "labels": [l for l in m.get("labels", []) if not l.startswith("__")],
+                    "is_dream": "__dream__" in m.get("labels", []),
+                }
+                for m in context_memories[:n]
+            ],
+            "related_labels": list(labels_encountered),
+            "associations": associations,
+            "reasoning": reasoning,
+        }
+
+    def reasoning_chain(self, source_id: str, target_query: str, max_hops: int = 5) -> Dict[str, Any]:
+        field = self._field
+        cfg = PCNNConfig
+        hops = min(max_hops, cfg.AGENT_REASONING_MAX_HOPS)
+
+        source = field.get_node(source_id)
+        if source is None:
+            return {"error": "source node not found"}
+
+        targets = field.query(target_query, k=3)
+        if not targets:
+            return {"source": source_id[:12], "chain": [], "conclusion": "no target found"}
+
+        target_ids = {t["id"] for t in targets}
+
+        visited = {source_id}
+        frontier = [(source_id, [source_id])]
+        found_path = None
+
+        for depth in range(hops):
+            next_frontier = []
+            for nid, path in frontier:
+                node = field._nodes.get(nid)
+                if node is None:
+                    continue
+                neighbors = []
+                for fnid in node.face_neighbors:
+                    fn = field._nodes.get(fnid)
+                    if fn and fn.is_occupied and fnid not in visited:
+                        score = fn.weight * fn.activation
+                        if fnid in target_ids:
+                            score += 100.0
+                        neighbors.append((fnid, score))
+                for enid in node.edge_neighbors[:6]:
+                    en = field._nodes.get(enid)
+                    if en and en.is_occupied and enid not in visited:
+                        score = en.weight * en.activation * 0.5
+                        if enid in target_ids:
+                            score += 100.0
+                        neighbors.append((enid, score))
+
+                neighbors.sort(key=lambda x: -x[1])
+
+                for nnid, score in neighbors[:3]:
+                    visited.add(nnid)
+                    new_path = path + [nnid]
+                    if nnid in target_ids:
+                        found_path = new_path
+                        break
+                    next_frontier.append((nnid, new_path))
+
+                if found_path:
+                    break
+            frontier = next_frontier
+            if found_path:
+                break
+
+        if not found_path:
+            return {
+                "source": source_id[:12],
+                "target_query": target_query,
+                "chain": [],
+                "conclusion": "no path found within hop limit",
+            }
+
+        chain_nodes = []
+        for nid in found_path:
+            node = field._nodes.get(nid)
+            if node:
+                chain_nodes.append({
+                    "id": nid[:12],
+                    "content": node.content[:80],
+                    "weight": round(node.weight, 2),
+                    "labels": [l for l in node.labels if not l.startswith("__")],
+                })
+
+        return {
+            "source": source_id[:12],
+            "target_query": target_query,
+            "chain_length": len(chain_nodes),
+            "chain": chain_nodes,
+            "conclusion": chain_nodes[-1]["content"][:100] if chain_nodes else "",
+        }
+
+    def suggest_actions(self, context: str = "") -> Dict[str, Any]:
+        field = self._field
+        cfg = PCNNConfig
+
+        suggestions = []
+
+        isolated = field.detect_isolated()
+        if isolated:
+            suggestions.append({
+                "action": "connect_isolated_memories",
+                "priority": "high",
+                "description": f"{len(isolated)} memories have no occupied neighbors. Consider adding bridging memories or triggering cascade pulses.",
+                "affected_count": len(isolated),
+            })
+
+        stats = field.stats()
+        if stats.get("bridge_rate", 0) < 0.001:
+            suggestions.append({
+                "action": "increase_pulse_activity",
+                "priority": "medium",
+                "description": "Bridge rate is very low. The neural field may benefit from more exploration pulses or manual memory additions.",
+                "current_bridge_rate": round(stats.get("bridge_rate", 0), 6),
+            })
+
+        so_stats = stats.get("self_organize", {})
+        if so_stats.get("active_clusters", 0) > 0:
+            suggestions.append({
+                "action": "leverage_clusters",
+                "priority": "medium",
+                "description": f"{so_stats['active_clusters']} semantic clusters detected. Use cluster-aware queries for better recall.",
+                "cluster_count": so_stats["active_clusters"],
+            })
+
+        hc = stats.get("honeycomb_cells", {})
+        if hc and hc.get("density", {}).get("occupied_cells", 0) > 0:
+            avg_density = hc["density"].get("mean", 0)
+            if avg_density > 0.5:
+                suggestions.append({
+                    "action": "expand_memory_space",
+                    "priority": "low",
+                    "description": f"Average tetrahedral cell density is {avg_density:.2f}. Consider storing memories in new areas.",
+                    "avg_density": round(avg_density, 3),
+                })
+
+        if context:
+            relevant = field.query(context, k=3)
+            if relevant:
+                top = relevant[0]
+                suggestions.append({
+                    "action": "deepen_context",
+                    "priority": "medium",
+                    "description": f"Most relevant memory (weight={top['weight']:.1f}): {top['content'][:80]}",
+                    "memory_id": top["id"][:12],
+                })
+
+        return {
+            "context": context or "general",
+            "suggestion_count": len(suggestions),
+            "suggestions": suggestions[:cfg.AGENT_SUGGESTION_TOP_N],
+        }
+
+    def navigate(self, source_id: str, target_id: str, max_hops: int = 6) -> Dict[str, Any]:
+        field = self._field
+
+        src_node = field._nodes.get(source_id)
+        tgt_node = field._nodes.get(target_id)
+        if not src_node or not tgt_node:
+            return {"path": [], "length": 0, "error": "source or target not found"}
+
+        visited = {source_id}
+        frontier = [(source_id, [source_id], 0.0)]
+        best_path = None
+        best_score = float('inf')
+
+        for depth in range(max_hops):
+            next_frontier = []
+            for nid, path, cost in frontier:
+                node = field._nodes.get(nid)
+                if node is None:
+                    continue
+                neighbors = list(node.face_neighbors) + list(node.edge_neighbors[:4])
+                for nnid in neighbors:
+                    if nnid in visited:
+                        continue
+                    visited.add(nnid)
+                    nn = field._nodes.get(nnid)
+                    step_cost = 1.0
+                    if nn:
+                        if nn.is_occupied:
+                            step_cost = 1.0 / (nn.weight + 0.1)
+                        else:
+                            step_cost = 2.0
+                        crystal_boost = field._crystallized.get_boost(nid, nnid)
+                        if crystal_boost > 1.0:
+                            step_cost /= crystal_boost
+                    new_cost = cost + step_cost
+                    new_path = path + [nnid]
+                    if nnid == target_id:
+                        if new_cost < best_score:
+                            best_path = new_path
+                            best_score = new_cost
+                    else:
+                        next_frontier.append((nnid, new_path, new_cost))
+            frontier = next_frontier
+            if not frontier:
+                break
+
+        if not best_path:
+            return {"path": [], "length": 0, "source": source_id[:12], "target": target_id[:12]}
+
+        path_data = []
+        for nid in best_path:
+            node = field._nodes.get(nid)
+            if node:
+                path_data.append({
+                    "id": nid[:12],
+                    "content": node.content[:60] if node.content else "",
+                    "weight": round(node.weight, 2),
+                    "occupied": node.is_occupied,
+                })
+
+        return {
+            "source": source_id[:12],
+            "target": target_id[:12],
+            "path": path_data,
+            "length": len(best_path) - 1,
+            "cost": round(best_score, 3),
+        }
+
+    def _build_reasoning(self, topic: str, memories: List[Dict]) -> str:
+        if not memories:
+            return f"No memories related to '{topic}'."
+        top = memories[0]
+        labels = [l for l in top.get("labels", []) if not l.startswith("__")]
+        parts = [f"Regarding '{topic}':"]
+        parts.append(f"- Primary recall: {top.get('content', '')[:80]} (relevance: {top.get('distance', 0):.2f})")
+        if labels:
+            parts.append(f"- Related domains: {', '.join(labels[:5])}")
+        dream_count = sum(1 for m in memories if "__dream__" in m.get("labels", []))
+        if dream_count > 0:
+            parts.append(f"- {dream_count} dream insights available")
+        parts.append(f"- Total context: {len(memories)} memories")
+        return "\n".join(parts)
+
+
 class HoneycombNeuralField:
     """BCC Lattice Honeycomb with PCNN-grounded neural pulse engine."""
 
@@ -1773,6 +2262,8 @@ class HoneycombNeuralField:
         self._crystal_maintenance_cycle: int = 0
         self._self_organize: Optional[SelfOrganizeEngine] = None
         self._cell_map: HoneycombCellMap = HoneycombCellMap()
+        self._dream_engine: Optional[DreamEngine] = None
+        self._agent_driver: Optional[AgentMemoryDriver] = None
 
     def initialize(self) -> Dict[str, Any]:
         with self._lock:
@@ -2329,8 +2820,10 @@ class HoneycombNeuralField:
         self._self_check.start()
         self._lattice_checker = LatticeIntegrityChecker(self)
         self._self_organize = SelfOrganizeEngine(self)
+        self._dream_engine = DreamEngine(self)
+        self._agent_driver = AgentMemoryDriver(self)
         logger.info(
-            "PCNN pulse engine started (v5.1) — face_decay=%.2f, edge_decay=%.2f, cascade=on, crystallize=on, self_organize=on",
+            "PCNN pulse engine started (v5.3) — face_decay=%.2f, edge_decay=%.2f, cascade=on, dream=on, agent=on",
             PCNNConfig.FACE_DECAY, PCNNConfig.FACE_DECAY * PCNNConfig.EDGE_DECAY_FACTOR,
         )
 
@@ -2368,6 +2861,9 @@ class HoneycombNeuralField:
 
                 if cycle % PCNNConfig.SELF_ORGANIZE_INTERVAL == 0 and self._self_organize:
                     self._self_organize.run_cycle()
+
+                if cycle % PCNNConfig.DREAM_CYCLE_INTERVAL == 0 and self._dream_engine:
+                    self._dream_engine.run_dream_cycle()
 
             except Exception as e:
                 logger.error("Pulse cycle error: %s", e, exc_info=True)
@@ -3120,3 +3616,39 @@ class HoneycombNeuralField:
             for c in cells:
                 c.update_density(self._nodes)
             return [c.to_dict() for c in cells]
+
+    def run_dream_cycle(self) -> Dict[str, Any]:
+        if self._dream_engine is None:
+            self._dream_engine = DreamEngine(self)
+        result = self._dream_engine.run_dream_cycle()
+        return result.to_dict()
+
+    def dream_status(self) -> Dict[str, Any]:
+        if self._dream_engine is None:
+            return {"engine_active": False}
+        return self._dream_engine.stats()
+
+    def dream_history(self, n: int = 10) -> List[Dict]:
+        if self._dream_engine is None:
+            return []
+        return self._dream_engine.get_history(n)
+
+    def agent_get_context(self, topic: str, max_memories: int = 15) -> Dict[str, Any]:
+        if self._agent_driver is None:
+            self._agent_driver = AgentMemoryDriver(self)
+        return self._agent_driver.get_context(topic, max_memories)
+
+    def agent_reasoning_chain(self, source_id: str, target_query: str, max_hops: int = 5) -> Dict[str, Any]:
+        if self._agent_driver is None:
+            self._agent_driver = AgentMemoryDriver(self)
+        return self._agent_driver.reasoning_chain(source_id, target_query, max_hops)
+
+    def agent_suggest(self, context: str = "") -> Dict[str, Any]:
+        if self._agent_driver is None:
+            self._agent_driver = AgentMemoryDriver(self)
+        return self._agent_driver.suggest_actions(context)
+
+    def agent_navigate(self, source_id: str, target_id: str, max_hops: int = 6) -> Dict[str, Any]:
+        if self._agent_driver is None:
+            self._agent_driver = AgentMemoryDriver(self)
+        return self._agent_driver.navigate(source_id, target_id, max_hops)
