@@ -2,6 +2,72 @@
 
 All notable changes to TetraMem-XL are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [5.0.0] - 2026-04-18
+
+### Added — Structural Cascade + Lattice Integrity + Crystallized Pathways
+
+#### Cascade Pulse Engine
+- `PulseType.CASCADE` — multi-directional branching propagation
+- At each hop, cascade spawns K child pulses (K = branching factor = 3)
+- Energy conservation: total child energy ≤ parent * conservation_factor * branching_decay
+- Max cascade depth = 4 levels before falling back to single-path propagation
+- `trigger_cascade()` API for manual cascade triggering
+- `_propagate_cascade()` recursive multi-path propagation
+- Crystal channel boost during cascade (1.8x transmission through crystallized paths)
+- `_bias_cascade()` — biased toward high-weight nodes and crystallized paths
+
+#### Lattice Integrity Verification
+- `LatticeIntegrityChecker` — BCC crystal structure verification engine
+- Bidirectionality check: all edges verified as bidirectional
+- Orphan node detection: nodes with zero neighbors
+- Coordination number verification: body-center = 8 face neighbors, corner = 8 face + 6 edge
+- Connectivity analysis: BFS-based connected component counting
+- Occupied node health check: weight/activation bounds, crystal channel validity
+- `LatticeIntegrityReport` — detailed report with integrity score (0-1)
+- Integrity score formula: 1.0 - (critical_errors * 0.5 + coord_ratio * 0.5)
+- Automatic periodic check every 600 pulse cycles
+- `PulseType.STRUCTURE` — structure pulse biased toward low-connectivity regions
+
+#### Crystallized Pathways
+- `CrystallizedPathway` — permanent structural fast-path management
+- When Hebbian edge weight exceeds threshold (3.0), edge crystallizes
+- Crystal channels: zero-decay, permanently reinforced pulse conduits
+- Max 200 crystals with LRU eviction when capacity exceeded
+- Crystal boost factor: 1.8x pulse transmission through crystal channels
+- `crystal_channels` per-node index for fast crystal lookup
+- Automatic crystallization maintenance every 90 pulse cycles
+- `force_crystallize()` for manual crystallization scan
+
+#### New Pulse Types
+- `PulseType.CASCADE` (15% probability) — multi-directional branching wave
+- `PulseType.STRUCTURE` (7% probability) — lattice structure reinforcement
+
+#### New API Endpoints (7)
+- `GET /api/v1/lattice-integrity/check` — run full BCC lattice integrity verification
+- `GET /api/v1/lattice-integrity/status` — checker status and history
+- `GET /api/v1/lattice-integrity/history` — previous integrity reports
+- `GET /api/v1/crystallized/status` — crystallized pathway stats and top crystals
+- `POST /api/v1/cascade/trigger` — trigger cascade pulse wave
+- `POST /api/v1/structure-pulse/trigger` — trigger structure reinforcement pulse
+- `POST /api/v1/crystallized/force` — force crystallization maintenance scan
+
+#### MCP Tool Server v5.0.0
+- 7 new tools: lattice_check, lattice_status, lattice_history, cascade_trigger, structure_pulse, crystallized_status, force_crystallize
+- Total: 35 tools covering all v5.0 endpoints
+
+#### Visualization UI
+- New "级联脉冲" (Cascade Pulse) panel with trigger and crystal display
+- New "晶格完整性" (Lattice Integrity) panel with score and error details
+- New "结晶通路" (Crystallized Pathways) panel with top crystals table
+- Pulse type display updated: cascade (blue), structure (green) badges
+
+### Changed
+- `HoneycombNode` gains `crystal_channels` slot for per-node crystal index
+- `NeuralPulse` gains `cascade_depth` and `cascade_parent_id` for cascade tracking
+- `pulse_status()` now includes cascade_count and crystallized stats
+- `stats()` now includes cascade_count, crystal_nodes, lattice_integrity, crystallized stats
+- PCNN pulse engine startup log updated to v5.0
+
 ## [4.1.0] - 2026-04-18
 
 ### Added — Self-Check Pulse Engine + Duplicate & Isolated Detection
