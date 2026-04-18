@@ -2,6 +2,55 @@
 
 All notable changes to TetraMem-XL are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [5.3.0] - 2026-04-19
+
+### Added — Dream Engine + Agent Memory Driver
+
+#### DreamEngine — Creative Memory Recombination
+- Autonomous dream cycle: selects high-weight memories from different label domains
+- Cross-domain synthesis: recombines disparate knowledge clusters into novel dream memories
+- Creativity scoring: label_distance × weight_product × activation_resonance
+- Dream memories tagged `__dream__` with metadata (source_a, source_b, creativity_score, dream_type)
+- Cascade pulse emission from dream nodes to propagate insights through lattice
+- Configurable: DREAM_CYCLE_INTERVAL=300 cycles, DREAM_MAX_RECOMBINATIONS=5
+- Production result: 231 source memories → 4 dream insights in first cycle
+
+#### AgentMemoryDriver — Memory-Driven Agent Capabilities
+- `get_context()` — assemble relevant memories for current task context
+  - Returns: core memories + dream insights + bridge memories + associations + reasoning summary
+  - Label extraction and reasoning chain construction
+- `reasoning_chain()` — multi-hop path from source memory to target insight
+  - Weighted BFS through topology graph with crystal channel boost
+- `suggest_actions()` — memory pattern-based agent action recommendations
+  - Detects: isolated memories, low bridge rate, cluster opportunities, density issues
+  - Priority-ranked: high/medium/low
+- `navigate()` — A*-like pathfinding through memory topology
+  - Crystal channel bonus, weight-based cost, occupied node preference
+
+#### New API Endpoints (5)
+- `POST /api/v1/dream` — now triggers full dream cycle (was stub)
+- `GET /api/v1/dream/status` — dream engine statistics
+- `GET /api/v1/dream/history` — dream cycle history
+- `POST /api/v1/agent/context` — context injection for agent (topic → memories + reasoning)
+- `POST /api/v1/agent/reasoning` — reasoning chain from source to target
+- `POST /api/v1/agent/suggest` — action suggestions for agent
+- `POST /api/v1/navigate` — now functional pathfinding (was stub returning empty)
+- `POST /api/v1/seed-by-label` — now functional (was stub returning null)
+
+#### MCP Tool Server v5.3.0
+- 4 new tools: dream_cycle, dream_status, agent_context, agent_suggest
+- Total: 46 tools
+
+#### Visualization UI
+- New "梦境引擎" (Dream Engine) panel with trigger and history
+- New "Agent驱动" (Agent Driver) panel with context injection and suggestions
+
+### Changed
+- `/api/v1/dream` now triggers real DreamEngine cycle (was returning pulse status)
+- `/api/v1/navigate` now does real pathfinding (was returning empty path)
+- `/api/v1/seed-by-label` now queries by labels (was returning null)
+- Pulse loop includes dream cycle every 300 cycles
+
 ## [5.2.0] - 2026-04-18
 
 ### Added — Tetrahedral Cell Decomposition + Honeycomb Structural Analysis + Enhanced Memory Placement
