@@ -115,6 +115,11 @@ class PCNNConfig:
     CONVERGENCE_CHECK_CYCLES = 60
     GLOBAL_DECAY_CYCLES = 120
 
+    MAX_PULSE_ACCUMULATOR = 5.0
+    MAX_INTERNAL_ACTIVITY = 50.0
+    MAX_FEEDING = 20.0
+    MAX_LINKING = 10.0
+
     @classmethod
     @property
     def EDGE_DECAY(cls) -> float:
@@ -194,15 +199,15 @@ class HoneycombNode:
             linking_sum += w_link * strength
             feeding_sum += w_feed * strength
 
-        self.feeding = cfg.ALPHA_FEED * self.feeding + s_input + cfg.V_F * feeding_sum
-        self.linking = cfg.ALPHA_LINK * self.linking + cfg.V_L * linking_sum
-        self.internal_activity = self.feeding * (1.0 + cfg.BETA * self.linking)
+        self.feeding = min(cfg.MAX_FEEDING, cfg.ALPHA_FEED * self.feeding + s_input + cfg.V_F * feeding_sum)
+        self.linking = min(cfg.MAX_LINKING, cfg.ALPHA_LINK * self.linking + cfg.V_L * linking_sum)
+        self.internal_activity = min(cfg.MAX_INTERNAL_ACTIVITY, self.feeding * (1.0 + cfg.BETA * self.linking))
 
         self.fired = self.internal_activity > self.threshold
 
         if self.fired:
             self.threshold = cfg.ALPHA_THRESHOLD * self.threshold + cfg.V_THETA
-            self.pulse_accumulator += self.internal_activity * 0.1
+            self.pulse_accumulator = min(cfg.MAX_PULSE_ACCUMULATOR, self.pulse_accumulator + self.internal_activity * 0.02)
         else:
             self.threshold = cfg.ALPHA_THRESHOLD * self.threshold
 
@@ -698,7 +703,7 @@ class HoneycombNeuralField:
         if current is None:
             return
 
-        current.pulse_accumulator += pulse.strength
+        current.pulse_accumulator = min(PCNNConfig.MAX_PULSE_ACCUMULATOR, current.pulse_accumulator + pulse.strength)
         current.last_pulse_time = time.time()
 
         if current.is_occupied:
