@@ -48,6 +48,7 @@ class PulseType(enum.Enum):
     EXPLORATORY = "exploratory"
     REINFORCING = "reinforcing"
     TENSION_SENSING = "tension_sensing"
+    SELF_CHECK = "self_check"
 
 
 class PCNNConfig:
@@ -102,15 +103,23 @@ class PCNNConfig:
     TENSION_STRENGTH_RANGE = (0.40, 0.70)
 
     PULSE_TYPE_PROBABILITIES = {
-        PulseType.EXPLORATORY: 0.50,
-        PulseType.REINFORCING: 0.35,
+        PulseType.EXPLORATORY: 0.45,
+        PulseType.REINFORCING: 0.30,
         PulseType.TENSION_SENSING: 0.15,
+        PulseType.SELF_CHECK: 0.10,
     }
 
     HEBBIAN_MAX_PATHS = 500
     HEBBIAN_DECAY = 0.98
     HEBBIAN_REINFORCE = 1.15
     HEBBIAN_MIN_WEIGHT = 0.01
+
+    SELF_CHECK_INTERVAL = 60.0
+    SELF_CHECK_MAX_HOPS = 4
+    SELF_CHECK_STRENGTH = 0.55
+    ISOLATED_NODE_THRESHOLD = 0
+    DUPLICATE_TOKEN_OVERLAP = 0.70
+    DUPLICATE_MERGE_MIN_WEIGHT_RATIO = 0.3
 
     CONVERGENCE_CHECK_CYCLES = 60
     GLOBAL_DECAY_CYCLES = 120
@@ -333,6 +342,281 @@ class HebbianPathMemory:
         }
 
 
+class SelfCheckResult:
+    __slots__ = (
+        "check_time", "anomalies_found", "isolated_nodes", "duplicate_pairs",
+        "orphan_nodes", "low_activation_nodes", "repairs_attempted",
+        "repairs_succeeded", "pulse_triggered", "details",
+    )
+
+    def __init__(self):
+        self.check_time: float = time.time()
+        self.anomalies_found: int = 0
+        self.isolated_nodes: List[str] = []
+        self.duplicate_pairs: List[Dict[str, Any]] = []
+        self.orphan_nodes: List[str] = []
+        self.low_activation_nodes: List[str] = []
+        self.repairs_attempted: int = 0
+        self.repairs_succeeded: int = 0
+        self.pulse_triggered: bool = False
+        self.details: str = ""
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "check_time": self.check_time,
+            "anomalies_found": self.anomalies_found,
+            "isolated_nodes": self.isolated_nodes[:20],
+            "duplicate_pairs": self.duplicate_pairs[:10],
+            "orphan_nodes": self.orphan_nodes[:20],
+            "low_activation_nodes": self.low_activation_nodes[:20],
+            "repairs_attempted": self.repairs_attempted,
+            "repairs_succeeded": self.repairs_succeeded,
+            "pulse_triggered": self.pulse_triggered,
+            "details": self.details,
+        }
+
+
+class SelfCheckEngine:
+    """
+    Proactive awareness system — periodic self-diagnosis via self-check pulses.
+
+    Runs three diagnostic passes:
+      1. Isolation scan: find occupied nodes with no occupied neighbors
+      2. Duplicate scan: find memory pairs with high content similarity
+      3. Vitality scan: find nodes with critically low activation despite high weight
+
+    Auto-repair actions:
+      - Isolated nodes → emit reinforcing pulse to re-integrate
+      - Duplicates → annotate with __duplicate_of__ label, merge labels/weight
+      - Low-activation → boost base_activation, emit reinforcing pulse
+    """
+
+    def __init__(self, field: "HoneycombNeuralField"):
+        self._field = field
+        self._check_thread: Optional[threading.Thread] = None
+        self._stop_event = threading.Event()
+        self._history: List[SelfCheckResult] = []
+        self._max_history = 50
+        self._lock = threading.RLock()
+
+    def start(self):
+        if self._check_thread is not None and self._check_thread.is_alive():
+            return
+        self._stop_event.clear()
+        self._check_thread = threading.Thread(
+            target=self._check_loop, name="self-check", daemon=True
+        )
+        self._check_thread.start()
+        logger.info("SelfCheck engine started — interval=%.0fs", PCNNConfig.SELF_CHECK_INTERVAL)
+
+    def stop(self):
+        self._stop_event.set()
+        if self._check_thread:
+            self._check_thread.join(timeout=5)
+            self._check_thread = None
+
+    def _check_loop(self):
+        while not self._stop_event.wait(timeout=PCNNConfig.SELF_CHECK_INTERVAL):
+            try:
+                result = self.run_full_check()
+                with self._lock:
+                    self._history.append(result)
+                    if len(self._history) > self._max_history:
+                        self._history = self._history[-self._max_history // 2:]
+                if result.anomalies_found > 0:
+                    logger.info(
+                        "SelfCheck: %d anomalies (%d isolated, %d duplicates, %d low-activation)",
+                        result.anomalies_found, len(result.isolated_nodes),
+                        len(result.duplicate_pairs), len(result.low_activation_nodes),
+                    )
+            except Exception as e:
+                logger.error("SelfCheck error: %s", e, exc_info=True)
+
+    def run_full_check(self) -> SelfCheckResult:
+        result = SelfCheckResult()
+        field = self._field
+
+        with field._lock:
+            occupied = [(nid, n) for nid, n in field._nodes.items() if n.is_occupied]
+            if not occupied:
+                result.details = "no occupied nodes"
+                return result
+
+            self._scan_isolated(field, occupied, result)
+            self._scan_duplicates(field, occupied, result)
+            self._scan_vitality(field, occupied, result)
+            self._auto_repair(field, result)
+
+        result.anomalies_found = (
+            len(result.isolated_nodes)
+            + len(result.duplicate_pairs)
+            + len(result.orphan_nodes)
+            + len(result.low_activation_nodes)
+        )
+
+        if result.anomalies_found > 0:
+            self._emit_self_check_pulse(field, result)
+
+        return result
+
+    def _scan_isolated(self, field, occupied, result: SelfCheckResult):
+        for nid, node in occupied:
+            occupied_neighbor_count = 0
+            for fnid in node.face_neighbors[:8]:
+                fn = field._nodes.get(fnid)
+                if fn and fn.is_occupied:
+                    occupied_neighbor_count += 1
+                    break
+            if occupied_neighbor_count == 0:
+                for enid in node.edge_neighbors[:6]:
+                    en = field._nodes.get(enid)
+                    if en and en.is_occupied:
+                        occupied_neighbor_count += 1
+                        break
+            if occupied_neighbor_count == 0:
+                result.isolated_nodes.append(nid)
+
+    def _scan_duplicates(self, field, occupied, result: SelfCheckResult):
+        threshold = PCNNConfig.DUPLICATE_TOKEN_OVERLAP
+        contents_tokens = {}
+        for nid, node in occupied:
+            contents_tokens[nid] = field._extract_tokens(node.content)
+
+        checked = set()
+        for i, (nid_a, node_a) in enumerate(occupied):
+            for j in range(i + 1, min(i + 30, len(occupied))):
+                nid_b, node_b = occupied[j]
+                pair_key = (min(nid_a, nid_b), max(nid_a, nid_b))
+                if pair_key in checked:
+                    continue
+                checked.add(pair_key)
+
+                tokens_a = contents_tokens.get(nid_a, set())
+                tokens_b = contents_tokens.get(nid_b, set())
+                if not tokens_a or not tokens_b:
+                    continue
+
+                intersection = len(tokens_a & tokens_b)
+                union = len(tokens_a | tokens_b)
+                if union == 0:
+                    continue
+                jaccard = intersection / union
+
+                if jaccard >= threshold:
+                    result.duplicate_pairs.append({
+                        "node_a": nid_a[:12],
+                        "node_b": nid_b[:12],
+                        "similarity": round(jaccard, 3),
+                        "content_a": node_a.content[:50],
+                        "content_b": node_b.content[:50],
+                        "weight_a": node_a.weight,
+                        "weight_b": node_b.weight,
+                    })
+
+    def _scan_vitality(self, field, occupied, result: SelfCheckResult):
+        for nid, node in occupied:
+            if node.weight >= 2.0 and node.activation < 0.05:
+                result.low_activation_nodes.append(nid)
+            elif node.weight >= 1.0 and node.activation < node.base_activation * 0.5:
+                result.low_activation_nodes.append(nid)
+
+    def _auto_repair(self, field, result: SelfCheckResult):
+        for nid in result.isolated_nodes[:5]:
+            node = field._nodes.get(nid)
+            if node and node.is_occupied:
+                node.base_activation = max(node.base_activation, 0.05)
+                field._emit_pulse(
+                    nid,
+                    strength=PCNNConfig.SELF_CHECK_STRENGTH,
+                    pulse_type=PulseType.SELF_CHECK,
+                )
+                result.repairs_attempted += 1
+                result.repairs_succeeded += 1
+
+        for dup in result.duplicate_pairs[:3]:
+            nid_a_full = None
+            nid_b_full = None
+            for nid, n in field._nodes.items():
+                if nid.startswith(dup["node_a"]) and n.is_occupied:
+                    nid_a_full = nid
+                if nid.startswith(dup["node_b"]) and n.is_occupied:
+                    nid_b_full = nid
+                if nid_a_full and nid_b_full:
+                    break
+
+            if not nid_a_full or not nid_b_full:
+                continue
+
+            node_a = field._nodes.get(nid_a_full)
+            node_b = field._nodes.get(nid_b_full)
+            if not node_a or not node_b:
+                continue
+
+            weight_ratio = min(node_a.weight, node_b.weight) / max(node_a.weight, node_b.weight, 0.1)
+
+            if weight_ratio < PCNNConfig.DUPLICATE_MERGE_MIN_WEIGHT_RATIO:
+                if node_a.weight >= node_b.weight:
+                    node_a.labels = list(set(node_a.labels) | set(node_b.labels))
+                    node_a.weight = max(node_a.weight, node_b.weight * 0.5)
+                    node_b.labels.append("__duplicate_of__")
+                    node_b.metadata["duplicate_of"] = nid_a_full[:12]
+                else:
+                    node_b.labels = list(set(node_a.labels) | set(node_b.labels))
+                    node_b.weight = max(node_b.weight, node_a.weight * 0.5)
+                    node_a.labels.append("__duplicate_of__")
+                    node_a.metadata["duplicate_of"] = nid_b_full[:12]
+                result.repairs_attempted += 1
+                result.repairs_succeeded += 1
+
+        for nid in result.low_activation_nodes[:5]:
+            node = field._nodes.get(nid)
+            if node and node.is_occupied:
+                boost = node.weight * 0.3
+                node.activation = min(10.0, node.activation + boost)
+                node.base_activation = max(node.base_activation, 0.05)
+                field._emit_pulse(nid, strength=0.3, pulse_type=PulseType.REINFORCING)
+                result.repairs_attempted += 1
+                result.repairs_succeeded += 1
+
+    def _emit_self_check_pulse(self, field, result: SelfCheckResult):
+        all_anomaly_ids = (
+            result.isolated_nodes[:3]
+            + result.low_activation_nodes[:3]
+        )
+        for nid in all_anomaly_ids:
+            node = field._nodes.get(nid)
+            if node and node.is_occupied:
+                field._emit_pulse(
+                    nid,
+                    strength=PCNNConfig.SELF_CHECK_STRENGTH,
+                    pulse_type=PulseType.SELF_CHECK,
+                )
+        result.pulse_triggered = True
+
+    def get_history(self, n: int = 10) -> List[Dict]:
+        with self._lock:
+            return [r.to_dict() for r in self._history[-n:]]
+
+    def get_latest(self) -> Optional[Dict]:
+        with self._lock:
+            return self._history[-1].to_dict() if self._history else None
+
+    def stats(self) -> Dict[str, Any]:
+        with self._lock:
+            total_checks = len(self._history)
+            total_anomalies = sum(r.anomalies_found for r in self._history)
+            total_repairs = sum(r.repairs_succeeded for r in self._history)
+            last_time = self._history[-1].check_time if self._history else 0
+            return {
+                "total_checks": total_checks,
+                "total_anomalies_found": total_anomalies,
+                "total_repairs_done": total_repairs,
+                "last_check_time": last_time,
+                "engine_running": self._check_thread is not None and self._check_thread.is_alive(),
+                "check_interval": PCNNConfig.SELF_CHECK_INTERVAL,
+            }
+
+
 class HoneycombNeuralField:
     """BCC Lattice Honeycomb with PCNN-grounded neural pulse engine."""
 
@@ -362,6 +646,7 @@ class HoneycombNeuralField:
         )
         self._adaptive_interval: float = PCNNConfig.BASE_PULSE_INTERVAL
         self._recent_bridge_rate: float = 0.0
+        self._self_check: Optional[SelfCheckEngine] = None
 
     def initialize(self) -> Dict[str, Any]:
         with self._lock:
@@ -633,6 +918,9 @@ class HoneycombNeuralField:
         elif pulse_type == PulseType.REINFORCING:
             max_hops = cfg.MAX_HOPS_REINFORCING
             bias_fn = self._bias_reinforcing
+        elif pulse_type == PulseType.SELF_CHECK:
+            max_hops = cfg.SELF_CHECK_MAX_HOPS
+            bias_fn = self._bias_self_check
         else:
             max_hops = cfg.MAX_HOPS_TENSION
             bias_fn = self._bias_tension_sensing
@@ -694,6 +982,27 @@ class HoneycombNeuralField:
             biased.append((nid, strength * tension_factor, ctype))
         return biased
 
+    def _bias_self_check(self, candidates: List[Tuple[str, float, str]]) -> List[Tuple[str, float, str]]:
+        biased = []
+        for nid, strength, ctype in candidates:
+            node = self._nodes.get(nid)
+            if node is None:
+                biased.append((nid, strength, ctype))
+                continue
+            if not node.is_occupied:
+                biased.append((nid, strength * 1.5, ctype))
+            else:
+                occupied_neighbors = 0
+                for fnid in node.face_neighbors[:8]:
+                    fn = self._nodes.get(fnid)
+                    if fn and fn.is_occupied:
+                        occupied_neighbors += 1
+                if occupied_neighbors == 0:
+                    biased.append((nid, strength * 2.0, ctype))
+                else:
+                    biased.append((nid, strength * 0.5, ctype))
+        return biased
+
     def _propagate_pulse(self, pulse: NeuralPulse):
         if not pulse.alive:
             return
@@ -708,6 +1017,8 @@ class HoneycombNeuralField:
 
         if current.is_occupied:
             current.reinforce(pulse.strength * 0.01)
+            if pulse.pulse_type == PulseType.SELF_CHECK:
+                self._detect_empty_associations(current_id, current)
 
         cfg = PCNNConfig
         raw_candidates = []
@@ -750,12 +1061,16 @@ class HoneycombNeuralField:
         self._stop_event.clear()
         self._pulse_engine = threading.Thread(target=self._pulse_loop, name="neural-pulse", daemon=True)
         self._pulse_engine.start()
+        self._self_check = SelfCheckEngine(self)
+        self._self_check.start()
         logger.info(
-            "PCNN pulse engine started (v4.0) — face_decay=%.2f, edge_decay=%.2f",
+            "PCNN pulse engine started (v4.1) — face_decay=%.2f, edge_decay=%.2f, self_check=on",
             PCNNConfig.FACE_DECAY, PCNNConfig.FACE_DECAY * PCNNConfig.EDGE_DECAY_FACTOR,
         )
 
     def stop_pulse_engine(self):
+        if self._self_check:
+            self._self_check.stop()
         self._stop_event.set()
         if self._pulse_engine:
             self._pulse_engine.join(timeout=5)
@@ -799,6 +1114,9 @@ class HoneycombNeuralField:
                 nid = self._select_source_reinforcing(occupied)
                 lo, hi = cfg.REINFORCING_STRENGTH_RANGE
                 strength = random.uniform(lo, hi)
+            elif pulse_type == PulseType.SELF_CHECK:
+                nid = self._select_source_self_check(occupied)
+                strength = cfg.SELF_CHECK_STRENGTH
             else:
                 nid = self._select_source_tension(occupied)
                 lo, hi = cfg.TENSION_STRENGTH_RANGE
@@ -854,6 +1172,31 @@ class HoneycombNeuralField:
             return random.choice(occupied)[0]
         return random.choices(
             [i for i, _ in tension_scores], weights=[t for _, t in tension_scores], k=1
+        )[0]
+
+    def _select_source_self_check(self, occupied: List[Tuple[str, Any]]) -> str:
+        isolation_scores = []
+        for nid, node in occupied:
+            occupied_neighbors = 0
+            for fnid in node.face_neighbors[:8]:
+                fn = self._nodes.get(fnid)
+                if fn and fn.is_occupied:
+                    occupied_neighbors += 1
+            for enid in node.edge_neighbors[:4]:
+                en = self._nodes.get(enid)
+                if en and en.is_occupied:
+                    occupied_neighbors += 1
+            isolation = 1.0 / (occupied_neighbors + 1)
+            vitality_penalty = 0.0
+            if node.weight >= 2.0 and node.activation < 0.1:
+                vitality_penalty = 2.0
+            isolation_scores.append((nid, isolation + vitality_penalty + 0.01))
+
+        total = sum(s for _, s in isolation_scores)
+        if total <= 0:
+            return random.choice(occupied)[0]
+        return random.choices(
+            [i for i, _ in isolation_scores], weights=[s for _, s in isolation_scores], k=1
         )[0]
 
     def _pcnn_global_step(self):
@@ -1042,6 +1385,7 @@ class HoneycombNeuralField:
                 "adaptive_interval": round(self._adaptive_interval, 3),
                 "bridge_rate": round(self._recent_bridge_rate, 6),
                 "hebbian": self._hebbian.stats(),
+                "self_check": self.self_check_status() if self._self_check else {"engine_running": False},
                 "pcnn_config": {
                     "face_decay": PCNNConfig.FACE_DECAY,
                     "edge_decay": round(PCNNConfig.FACE_DECAY * PCNNConfig.EDGE_DECAY_FACTOR, 3),
@@ -1051,6 +1395,128 @@ class HoneycombNeuralField:
                     "alpha_threshold": PCNNConfig.ALPHA_THRESHOLD,
                 },
             }
+
+    def _detect_empty_associations(self, nid: str, node: "HoneycombNode"):
+        all_neighbors = node.face_neighbors + node.edge_neighbors
+        occupied_count = 0
+        empty_count = 0
+        for nnid in all_neighbors:
+            nn = self._nodes.get(nnid)
+            if nn is None:
+                empty_count += 1
+            elif not nn.is_occupied:
+                empty_count += 1
+            else:
+                occupied_count += 1
+
+        total = occupied_count + empty_count
+        if total > 0 and occupied_count == 0:
+            if "__isolated__" not in node.labels:
+                node.labels.append("__isolated__")
+                node.metadata["isolation_detected"] = time.time()
+                logger.debug("Empty association detected at node %s", nid[:8])
+
+    def run_self_check(self) -> Dict[str, Any]:
+        if self._self_check is None:
+            return {"error": "self_check engine not initialized"}
+        result = self._self_check.run_full_check()
+        with self._lock:
+            self._self_check._history.append(result)
+            if len(self._self_check._history) > self._self_check._max_history:
+                self._self_check._history = self._self_check._history[-self._self_check._max_history // 2:]
+        return result.to_dict()
+
+    def self_check_status(self) -> Dict[str, Any]:
+        if self._self_check is None:
+            return {"engine_running": False}
+        status = self._self_check.stats()
+        latest = self._self_check.get_latest()
+        status["latest_check"] = latest
+        return status
+
+    def self_check_history(self, n: int = 10) -> List[Dict]:
+        if self._self_check is None:
+            return []
+        return self._self_check.get_history(n)
+
+    def detect_duplicates(self) -> List[Dict[str, Any]]:
+        with self._lock:
+            occupied = [(nid, n) for nid, n in self._nodes.items() if n.is_occupied]
+            if len(occupied) < 2:
+                return []
+
+            contents_tokens = {}
+            for nid, node in occupied:
+                contents_tokens[nid] = self._extract_tokens(node.content)
+
+            duplicates = []
+            checked = set()
+            threshold = PCNNConfig.DUPLICATE_TOKEN_OVERLAP
+
+            for i, (nid_a, node_a) in enumerate(occupied):
+                tokens_a = contents_tokens[nid_a]
+                if not tokens_a:
+                    continue
+                for j in range(i + 1, min(i + 50, len(occupied))):
+                    nid_b, node_b = occupied[j]
+                    pair_key = (min(nid_a, nid_b), max(nid_a, nid_b))
+                    if pair_key in checked:
+                        continue
+                    checked.add(pair_key)
+
+                    tokens_b = contents_tokens.get(nid_b, set())
+                    if not tokens_b:
+                        continue
+
+                    intersection = len(tokens_a & tokens_b)
+                    union = len(tokens_a | tokens_b)
+                    if union == 0:
+                        continue
+                    jaccard = intersection / union
+
+                    if jaccard >= threshold:
+                        duplicates.append({
+                            "node_a": nid_a[:12],
+                            "node_b": nid_b[:12],
+                            "similarity": round(jaccard, 3),
+                            "content_a": node_a.content[:80],
+                            "content_b": node_b.content[:80],
+                            "weight_a": node_a.weight,
+                            "weight_b": node_b.weight,
+                            "labels_a": list(node_a.labels),
+                            "labels_b": list(node_b.labels),
+                        })
+            return duplicates
+
+    def detect_isolated(self) -> List[Dict[str, Any]]:
+        with self._lock:
+            isolated = []
+            for nid, node in self._nodes.items():
+                if not node.is_occupied:
+                    continue
+                occupied_neighbors = 0
+                total_neighbors = 0
+                for fnid in node.face_neighbors:
+                    fn = self._nodes.get(fnid)
+                    total_neighbors += 1
+                    if fn and fn.is_occupied:
+                        occupied_neighbors += 1
+                for enid in node.edge_neighbors:
+                    en = self._nodes.get(enid)
+                    total_neighbors += 1
+                    if en and en.is_occupied:
+                        occupied_neighbors += 1
+
+                if occupied_neighbors == 0:
+                    isolated.append({
+                        "id": nid[:12],
+                        "content": node.content[:60],
+                        "weight": node.weight,
+                        "activation": round(node.activation, 4),
+                        "total_neighbors": total_neighbors,
+                        "labels": list(node.labels),
+                    })
+            return isolated
 
     def browse_timeline(self, direction: str = "newest", limit: int = 20,
                         label_filter=None, min_weight: float = 0.0) -> List[Dict]:
