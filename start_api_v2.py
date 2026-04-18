@@ -1,5 +1,5 @@
 """
-TetraMem-XL API v5.1 — Self-Organization Engine + Cluster Detection + Entropy Balance + Consolidation + Shortcuts
+TetraMem-XL API v5.2 �?Tetrahedral Cell Decomposition + Honeycomb Structural Analysis + Enhanced Memory Placement
 """
 import os, time, hashlib, threading, json
 from contextlib import asynccontextmanager
@@ -39,14 +39,14 @@ def init_state():
                 weight=item.get("weight", 1.0),
                 metadata=item.get("metadata"),
             )
-        print(f"[TetraMem v5.1] Migrated {len(data.get('tetrahedra', []))} memories to honeycomb")
+        print(f"[TetraMem v5.2] Migrated {len(data.get('tetrahedra', []))} memories to honeycomb")
     else:
-        print("[TetraMem v5.1] Fresh start")
+        print("[TetraMem v5.2] Fresh start")
 
     _phase_detector = HoneycombPhaseTransition()
     _field.start_pulse_engine()
     stats = _field.stats()
-    print(f"[TetraMem v5.1] Honeycomb: {stats['total_nodes']} nodes, {stats['face_edges']} face edges, PCNN pulse engine running")
+    print(f"[TetraMem v5.2] Honeycomb: {stats['total_nodes']} nodes, {stats['face_edges']} face edges, PCNN pulse engine running")
 
 
 @asynccontextmanager
@@ -54,10 +54,10 @@ async def lifespan(application):
     init_state()
     yield
     _field.stop_pulse_engine()
-    print("[TetraMem v5.1] Shutdown complete, PCNN pulse engine stopped")
+    print("[TetraMem v5.2] Shutdown complete, PCNN pulse engine stopped")
 
 
-app = FastAPI(title="TetraMem-XL v5.1", version="5.1.0", lifespan=lifespan)
+app = FastAPI(title="TetraMem-XL v5.2", version="5.2.0", lifespan=lifespan)
 
 
 class StoreReq(BaseModel):
@@ -245,7 +245,7 @@ def stats():
 
 @app.get("/api/v1/health")
 def health():
-    return {"status": "ok", "version": "5.1.0", "uptime_seconds": time.time() - _start_time}
+    return {"status": "ok", "version": "5.2.0", "uptime_seconds": time.time() - _start_time}
 
 
 @app.get("/api/v1/tetrahedra")
@@ -558,6 +558,25 @@ def get_clusters():
 def get_shortcuts(n: int = 20):
     with _state_lock:
         return {"shortcuts": _field.get_shortcuts(n), "count": len(_field.get_shortcuts(n))}
+
+
+@app.get("/api/v1/honeycomb/analysis")
+def honeycomb_analysis():
+    with _state_lock:
+        return _field.honeycomb_analysis()
+
+
+@app.get("/api/v1/honeycomb/cells")
+def honeycomb_cells(n: int = 20, sort_by: str = "quality"):
+    with _state_lock:
+        return {"cells": _field.get_tetrahedral_cells(n, sort_by), "count": n}
+
+
+@app.get("/api/v1/honeycomb/cells/{node_id}")
+def honeycomb_cells_for_node(node_id: str):
+    with _state_lock:
+        cells = _field.get_cell_for_node(node_id)
+        return {"node_id": node_id, "cells": cells, "count": len(cells)}
 
 
 static_dir = Path(__file__).parent / "static"
