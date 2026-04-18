@@ -4,74 +4,42 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tetrahedron-memory"
-version = "2.3.0"
-description = "Pure geometric-driven AI memory system using GUDHI Alpha Complex and Persistent Homology"
+version = "4.1.0"
+description = "BCC Lattice Honeycomb Neural Field with PCNN — Topology-aware Eternal Memory System"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 license = {text = "CC BY-NC 4.0"}
 authors = [
     {name = "Liu Qihang", email = "sunormesky@gmail.com"}
 ]
-keywords = ["memory", "ai", "tetrahedron", "geometry", "topology", "gudhi", "persistent-homology"]
+keywords = ["memory", "ai", "pcnn", "bcc-lattice", "honeycomb", "neural-network", "hebbian", "topology"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
-    "Topic :: Scientific/Engineering :: Mathematics",
+    "Programming Language :: Python :: 3.12",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 
 dependencies = [
     "numpy>=1.20.0",
-    "gudhi>=3.7.0",
-    "scipy>=1.7.0",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0.0",
-    "pytest-cov>=4.0.0",
-    "black>=23.0.0",
-    "mypy>=1.0.0",
     "ruff>=0.1.0",
-]
-visualization = [
-    "pyvista>=0.38.0",
-    "pyvistaqt>=0.11.0",
-    "matplotlib>=3.5.0",
-]
-test = [
-    "pytest>=7.0.0",
-    "pytest-cov>=4.0.0",
-]
-distributed = [
-    "ray>=2.0.0",
-]
-persistence = [
-    "pandas>=1.5.0",
-    "pyarrow>=10.0.0",
 ]
 api = [
     "fastapi>=0.100.0",
     "uvicorn>=0.20.0",
-    "prometheus-client>=0.16.0",
-]
-cloud = [
-    "boto3>=1.26.0",
 ]
 all = [
-    "tetrahedron-memory[dev,test,visualization,distributed,persistence,api,cloud]",
+    "tetrahedron-memory[dev,api]",
 ]
-
-[project.scripts]
-tetramem = "tetrahedron_memory.cli:main"
-
-[project.entry-points]
-tetrahedron.memory = "tetrahedron_memory:GeoMemoryBody"
 
 [tool.setuptools]
 packages = ["tetrahedron_memory"]
@@ -79,23 +47,16 @@ packages = ["tetrahedron_memory"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = "test_*.py"
-python_classes = "Test*"
-python_functions = "test_*"
-addopts = "-v --strict-markers --tb=short"
-markers = [
-    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
-    "benchmark: performance benchmark tests",
-]
-
-[tool.black]
-line-length = 100
+addopts = "-v --tb=short"
 
 [tool.ruff]
-line-length = 100
-select = ["E", "W", "F", "I"]
-ignore = ["E501"]
+line-length = 120
+target-version = "py39"
 
-[tool.mypy]
-python_version = "3.8"
-warn_return_any = true
-ignore_missing_imports = true
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = ["E501", "E741", "F401", "F841", "W605"]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401", "F403"]
+"tests/*" = ["F401", "F811"]
