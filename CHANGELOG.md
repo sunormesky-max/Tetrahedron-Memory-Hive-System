@@ -2,6 +2,52 @@
 
 All notable changes to TetraMem-XL are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [5.2.0] - 2026-04-18
+
+### Added — Tetrahedral Cell Decomposition + Honeycomb Structural Analysis + Enhanced Memory Placement
+
+#### TetrahedralCell
+- Explicit tetrahedral cell data structure for each BCC decomposition unit
+- 4 quality metrics per cell: Volume, Quality (regularity), Skewness, Jacobian
+- Volume: |det(v1-v0, v2-v0, v3-v0)| / 6
+- Quality: volume ratio vs ideal regular tetrahedron of same average edge length
+- Skewness: 1 - (min_edge / max_edge), 0=perfect, 1=degenerate
+- Jacobian: inscribed/circumscribed sphere ratio vs ideal (sqrt(6)/12)
+- Per-cell density tracking: memory_count / 5, total_weight
+- BCC decomposition: 216 BCC units → 8000 tetrahedral cells (res=5)
+
+#### HoneycombCellMap
+- Global cell index: BCC unit cell → 8 tetrahedra mapping
+- Node-to-cell reverse index: which cells contain a given node
+- `find_optimal_placement_cells()` — quality + label overlap + density scoring
+- `structural_analysis()` — aggregate quality/volume/skewness/Jacobian/density stats
+- `get_best_cells()` / `get_cells_by_density()` — top-N cell queries
+
+#### Enhanced Memory Placement
+- Tetrahedral quality-aware placement: high-quality cells prioritized
+- Label-aware cell scoring: cells near same-label memories get bonus
+- Density penalty: over-full cells deprioritized
+- Body-center node gets quality bonus (central position in tetrahedron)
+- Fallback chain: optimal cells → label-face → label-edge → spatial proximity
+
+#### New API Endpoints (3)
+- `GET /api/v1/honeycomb/analysis` — full structural analysis with top cells
+- `GET /api/v1/honeycomb/cells` — tetrahedral cells sorted by quality/density
+- `GET /api/v1/honeycomb/cells/{node_id}` — cells containing a specific node
+
+#### MCP Tool Server v5.2.0
+- 2 new tools: honeycomb_analysis, tetrahedral_cells
+- Total: 42 tools
+
+#### Visualization UI
+- New "蜂巢结构" (Honeycomb Structure) panel with 7 structural metrics
+- Quality/density cell tables with color-coded values
+
+### Changed
+- `_find_nearest_empty_node` now uses tetrahedral quality scoring for optimal placement
+- `initialize()` now builds `HoneycombCellMap` after lattice construction
+- `stats()` includes `honeycomb_cells` structural analysis section
+
 ## [5.1.0] - 2026-04-18
 
 ### Added — Self-Organization Engine + Cluster Detection + Entropy Balance + Consolidation + Shortcuts
