@@ -1,6 +1,6 @@
 """
-TetraMem-XL API v3.0 — Honeycomb Neural Field
-Drop-in replacement for start_api_v2.py — same endpoints, new engine underneath.
+TetraMem-XL API v4.0 — PCNN-Grounded Honeycomb Neural Field
+Drop-in replacement for start_api_v2.py — same endpoints, PCNN engine underneath.
 """
 import os, time, hashlib, threading, json
 from contextlib import asynccontextmanager
@@ -11,16 +11,18 @@ from pydantic import BaseModel, Field
 from typing import Any, Dict, List, Optional
 
 from tetrahedron_memory.honeycomb_neural_field import HoneycombNeuralField
+from tetrahedron_memory.phase_transition_honeycomb import HoneycombPhaseTransition
 
 STORAGE_DIR = os.environ.get("TETRAMEM_STORAGE", "./tetramem_data_v2")
 
 _field: HoneycombNeuralField = None
+_phase_detector: HoneycombPhaseTransition = None
 _state_lock = threading.RLock()
 _start_time = time.time()
 
 
 def init_state():
-    global _field
+    global _field, _phase_detector
     _field = HoneycombNeuralField(resolution=5, spacing=1.0)
     _field.initialize()
 
@@ -37,13 +39,14 @@ def init_state():
                 weight=item.get("weight", 1.0),
                 metadata=item.get("metadata"),
             )
-        print(f"[TetraMem v3.0] Migrated {len(data.get('tetrahedra', []))} memories to honeycomb")
+        print(f"[TetraMem v4.0] Migrated {len(data.get('tetrahedra', []))} memories to honeycomb")
     else:
-        print("[TetraMem v3.0] Fresh start")
+        print("[TetraMem v4.0] Fresh start")
 
+    _phase_detector = HoneycombPhaseTransition()
     _field.start_pulse_engine()
     stats = _field.stats()
-    print(f"[TetraMem v3.0] Honeycomb: {stats['total_nodes']} nodes, {stats['face_edges']} face edges, pulse engine running")
+    print(f"[TetraMem v4.0] Honeycomb: {stats['total_nodes']} nodes, {stats['face_edges']} face edges, PCNN pulse engine running")
 
 
 @asynccontextmanager
@@ -51,10 +54,10 @@ async def lifespan(application):
     init_state()
     yield
     _field.stop_pulse_engine()
-    print("[TetraMem v3.0] Shutdown complete, pulse engine stopped")
+    print("[TetraMem v4.0] Shutdown complete, PCNN pulse engine stopped")
 
 
-app = FastAPI(title="TetraMem-XL v3", version="3.2.0", lifespan=lifespan)
+app = FastAPI(title="TetraMem-XL v4", version="4.0.0", lifespan=lifespan)
 
 
 class StoreReq(BaseModel):
@@ -94,6 +97,31 @@ def store(req: StoreReq):
         raise HTTPException(500, str(e))
 
 
+import threading as _threading
+
+def _auto_persist_loop():
+    while True:
+        _threading.Event().wait(timeout=120)
+        try:
+            with _state_lock:
+                field = _field
+            nodes = field.list_occupied()
+            import json as _json
+            export = {"tetrahedra": [
+                {"id": n["id"], "content": n.get("content", ""),
+                 "labels": n.get("labels", []), "weight": n.get("weight", 1.0),
+                 "metadata": n.get("metadata", {}),
+                 "centroid": n.get("centroid", n.get("position", [0, 0, 0]))}
+                for n in nodes
+            ], "metadata": {"persist_time": time.time()}}
+            path = Path(STORAGE_DIR) / "mesh_index.json"
+            path.write_text(_json.dumps(export, ensure_ascii=False, indent=2), encoding="utf-8")
+        except Exception:
+            pass
+
+_threading.Thread(target=_auto_persist_loop, daemon=True, name="auto-persist").start()
+
+
 @app.post("/api/v1/query")
 def query(req: QueryReq):
     try:
@@ -128,10 +156,17 @@ def dream():
 def phase_status():
     try:
         with _state_lock:
-            field = _field
-        if not hasattr(field, 'mesh'):
-            return {"status": "no_mesh"}
-        return {"status": "ok"}
+            detector = _phase_detector
+        if detector is None:
+            return {"status": "not_initialized"}
+        gt, tensions = detector.compute_global_tension(_field)
+        return {
+            "status": "ok",
+            "global_tension": round(gt, 3),
+            "nodes_with_tension": len(tensions),
+            "trend": detector.get_tension_trend(),
+            "total_transitions": detector._transition_count,
+        }
     except Exception as e:
         raise HTTPException(500, str(e))
 
@@ -139,17 +174,13 @@ def phase_status():
 @app.post("/api/v1/phase-transition/trigger")
 def phase_trigger():
     try:
-        from tetrahedron_memory.phase_transition import PhaseTransitionDetector
         with _state_lock:
-            field = _field
-        if not hasattr(field, 'mesh'):
-            raise HTTPException(400, "No mesh available")
-        detector = PhaseTransitionDetector(tension_threshold=0.0, cooldown_seconds=0)
-        global_tension, tensions = detector.compute_global_tension(field.mesh)
-        clusters = detector.identify_tension_clusters(tensions, field.mesh)
+            detector = HoneycombPhaseTransition(tension_threshold=0.0, cooldown_seconds=0)
+            global_tension, tensions = detector.compute_global_tension(_field)
+            clusters = detector.identify_tension_clusters(tensions, _field)
         if not clusters:
             return {"status": "no_tension", "global_tension": global_tension}
-        result = detector.execute_transition(field.mesh, tensions, clusters)
+        result = detector.execute_transition(_field, tensions, clusters)
         return {"status": "transition_complete", "result": result}
     except Exception as e:
         raise HTTPException(500, str(e))
@@ -178,9 +209,13 @@ def tension_map():
             tensions[nid] = tension
         global_tension = sum(tensions.values())
         top = sorted(tensions.items(), key=lambda x: -x[1])[:20]
+
+        with _state_lock:
+            detailed = field.get_tension_map(top_n=10)
         return {
             "global_tension": round(global_tension, 3),
             "top_tension_nodes": [{"id": tid[:12], "tension": round(t, 3)} for tid, t in top],
+            "detailed_tension": detailed,
             "total_scored": len(tensions),
         }
     except Exception as e:
@@ -210,7 +245,7 @@ def stats():
 
 @app.get("/api/v1/health")
 def health():
-    return {"status": "ok", "version": "3.2.0", "uptime_seconds": time.time() - _start_time}
+    return {"status": "ok", "version": "4.0.0", "uptime_seconds": time.time() - _start_time}
 
 
 @app.get("/api/v1/tetrahedra")
@@ -373,6 +408,46 @@ def seed_by_label():
 @app.get("/api/v1/topology-health")
 def topology_health():
     return {"result": _field.stats()}
+
+
+@app.get("/api/v1/pcnn/states")
+def pcnn_states():
+    with _state_lock:
+        return {"states": _field.get_pcnn_node_states()}
+
+
+@app.get("/api/v1/pcnn/tension-map")
+def pcnn_tension():
+    with _state_lock:
+        return {"tension_map": _field.get_tension_map()}
+
+
+@app.get("/api/v1/pcnn/hebbian")
+def hebbian_paths():
+    with _state_lock:
+        ps = _field.pulse_status()
+        return {
+            "hebbian": ps.get("hebbian", {}),
+            "top_paths": ps.get("hebbian_top_paths", []),
+        }
+
+
+@app.get("/api/v1/pcnn/config")
+def pcnn_config():
+    from tetrahedron_memory.honeycomb_neural_field import PCNNConfig
+    return {
+        "face_decay": PCNNConfig.FACE_DECAY,
+        "edge_decay": round(PCNNConfig.FACE_DECAY * PCNNConfig.EDGE_DECAY_FACTOR, 3),
+        "beta": PCNNConfig.BETA,
+        "alpha_feed": PCNNConfig.ALPHA_FEED,
+        "alpha_link": PCNNConfig.ALPHA_LINK,
+        "alpha_threshold": PCNNConfig.ALPHA_THRESHOLD,
+        "max_hops_exploratory": PCNNConfig.MAX_HOPS_EXPLORATORY,
+        "max_hops_reinforcing": PCNNConfig.MAX_HOPS_REINFORCING,
+        "max_hops_tension": PCNNConfig.MAX_HOPS_TENSION,
+        "bridge_threshold": PCNNConfig.BRIDGE_THRESHOLD,
+        "pulse_type_probabilities": {t.value: p for t, p in PCNNConfig.PULSE_TYPE_PROBABILITIES.items()},
+    }
 
 
 static_dir = Path(__file__).parent / "static"
