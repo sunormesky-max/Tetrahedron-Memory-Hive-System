@@ -1,5 +1,5 @@
 """
-TetraMem-XL API v4.0 — PCNN-Grounded Honeycomb Neural Field
+TetraMem-XL API v4.1 — PCNN Self-Check + Empty Detection + Duplicate Detection
 Drop-in replacement for start_api_v2.py — same endpoints, PCNN engine underneath.
 """
 import os, time, hashlib, threading, json
@@ -39,14 +39,14 @@ def init_state():
                 weight=item.get("weight", 1.0),
                 metadata=item.get("metadata"),
             )
-        print(f"[TetraMem v4.0] Migrated {len(data.get('tetrahedra', []))} memories to honeycomb")
+        print(f"[TetraMem v4.1] Migrated {len(data.get('tetrahedra', []))} memories to honeycomb")
     else:
-        print("[TetraMem v4.0] Fresh start")
+        print("[TetraMem v4.1] Fresh start")
 
     _phase_detector = HoneycombPhaseTransition()
     _field.start_pulse_engine()
     stats = _field.stats()
-    print(f"[TetraMem v4.0] Honeycomb: {stats['total_nodes']} nodes, {stats['face_edges']} face edges, PCNN pulse engine running")
+    print(f"[TetraMem v4.1] Honeycomb: {stats['total_nodes']} nodes, {stats['face_edges']} face edges, PCNN pulse engine running")
 
 
 @asynccontextmanager
@@ -54,10 +54,10 @@ async def lifespan(application):
     init_state()
     yield
     _field.stop_pulse_engine()
-    print("[TetraMem v4.0] Shutdown complete, PCNN pulse engine stopped")
+    print("[TetraMem v4.1] Shutdown complete, PCNN pulse engine stopped")
 
 
-app = FastAPI(title="TetraMem-XL v4", version="4.0.0", lifespan=lifespan)
+app = FastAPI(title="TetraMem-XL v4.1", version="4.1.0", lifespan=lifespan)
 
 
 class StoreReq(BaseModel):
@@ -245,7 +245,7 @@ def stats():
 
 @app.get("/api/v1/health")
 def health():
-    return {"status": "ok", "version": "4.0.0", "uptime_seconds": time.time() - _start_time}
+    return {"status": "ok", "version": "4.1.0", "uptime_seconds": time.time() - _start_time}
 
 
 @app.get("/api/v1/tetrahedra")
@@ -445,9 +445,42 @@ def pcnn_config():
         "max_hops_exploratory": PCNNConfig.MAX_HOPS_EXPLORATORY,
         "max_hops_reinforcing": PCNNConfig.MAX_HOPS_REINFORCING,
         "max_hops_tension": PCNNConfig.MAX_HOPS_TENSION,
+        "self_check_max_hops": PCNNConfig.SELF_CHECK_MAX_HOPS,
         "bridge_threshold": PCNNConfig.BRIDGE_THRESHOLD,
         "pulse_type_probabilities": {t.value: p for t, p in PCNNConfig.PULSE_TYPE_PROBABILITIES.items()},
     }
+
+
+@app.get("/api/v1/self-check/status")
+def self_check_status():
+    with _state_lock:
+        return _field.self_check_status()
+
+
+@app.post("/api/v1/self-check/run")
+def self_check_run():
+    with _state_lock:
+        return _field.run_self_check()
+
+
+@app.get("/api/v1/self-check/history")
+def self_check_history(n: int = 10):
+    with _state_lock:
+        return {"history": _field.self_check_history(n)}
+
+
+@app.get("/api/v1/duplicates")
+def detect_duplicates():
+    with _state_lock:
+        dupes = _field.detect_duplicates()
+    return {"duplicates": dupes, "count": len(dupes)}
+
+
+@app.get("/api/v1/isolated")
+def detect_isolated():
+    with _state_lock:
+        isolated = _field.detect_isolated()
+    return {"isolated": isolated, "count": len(isolated)}
 
 
 static_dir = Path(__file__).parent / "static"
