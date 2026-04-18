@@ -2,6 +2,62 @@
 
 All notable changes to TetraMem-XL are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [5.1.0] - 2026-04-18
+
+### Added — Self-Organization Engine + Cluster Detection + Entropy Balance + Consolidation + Shortcuts
+
+#### SelfOrganizeEngine
+- Unified self-organization engine with four autonomous modules per cycle
+- Runs every 180 pulse cycles (configurable via `SELF_ORGANIZE_INTERVAL`)
+- `OrganizeResult` — structured report per cycle: clusters, entropy, consolidations, shortcuts
+
+#### Cluster Detection
+- Label-cooccurrence grouping: memories sharing labels are clustered together
+- Spatial proximity verification: clusters validated by geometric centroid analysis
+- `SemanticCluster` data class with cluster_id, labels, node_ids, centroid, avg_weight
+- Automatic intra-cluster Hebbian reinforcement for weakly-connected cluster members
+- Minimum cluster size = 3 nodes, maximum 8 cluster labels analyzed per cycle
+
+#### Entropy Balance
+- Shannon entropy computed over weight distribution (normalized)
+- When weight concentration ratio > 5.0 (one node >> average):
+  - High-weight nodes suppressed by 10% (weight reflows to system)
+  - Low-weight nodes boosted by 20% of average weight
+- Preserves total system weight while preventing dominance
+
+#### Memory Consolidation
+- Low-weight duplicates (weight < 1.0, similarity >= 65%) automatically merged
+- Higher-weight memory absorbs lower-weight memory's weight (60% transfer), labels, activation
+- Donor memory marked `__consolidated__` with `consolidated_into` metadata
+- Maximum 5 consolidations per cycle to avoid burst disruption
+- Hebbian path recorded between consolidator and consolidated
+
+#### Topological Shortcuts
+- Virtual connections between semantically close but topologically distant memory pairs
+- Criteria: ≥2 shared labels, topological distance 3-6 hops, not already direct neighbors
+- Shortcut strength = base * shared_labels / total_unique_labels
+- Hebbian path recorded at 2x strength to create lasting bias
+- Maximum 3 shortcuts per cycle, 500 total with LRU eviction
+
+#### New API Endpoints (5)
+- `POST /api/v1/self-organize/run` — trigger self-organization cycle
+- `GET /api/v1/self-organize/status` — engine status, clusters, shortcuts, entropy
+- `GET /api/v1/self-organize/history` — previous organize cycle results
+- `GET /api/v1/clusters` — detected semantic clusters
+- `GET /api/v1/shortcuts` — topological shortcuts
+
+#### MCP Tool Server v5.1.0
+- 5 new tools: self_organize_run, self_organize_status, clusters, shortcuts
+- Total: 40 tools
+
+#### Visualization UI
+- New "自组织" (Self-Organization) panel with cluster display, shortcut table, entropy gauge
+- Organize history table with per-cycle metrics
+
+### Changed
+- `stats()` now includes `self_organize` section
+- Pulse engine startup log updated to v5.1
+
 ## [5.0.0] - 2026-04-18
 
 ### Added — Structural Cascade + Lattice Integrity + Crystallized Pathways
