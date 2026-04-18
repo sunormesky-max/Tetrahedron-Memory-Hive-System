@@ -165,6 +165,21 @@ class PCNNConfig:
     CONVERGENCE_CHECK_CYCLES = 60
     GLOBAL_DECAY_CYCLES = 120
 
+    SELF_ORGANIZE_INTERVAL = 180
+    CLUSTER_MIN_SIZE = 3
+    CLUSTER_LABEL_OVERLAP = 0.4
+    CLUSTER_MAX_LABELS = 8
+    ENTROPY_IDEAL_RATIO = 0.15
+    ENTROPY_BOOST_FACTOR = 0.2
+    ENTROPY_SUPPRESS_FACTOR = 0.1
+    CONSOLIDATION_MIN_SIMILARITY = 0.65
+    CONSOLIDATION_MAX_PER_CYCLE = 5
+    CONSOLIDATION_WEIGHT_TRANSFER = 0.6
+    SHORTCUT_MAX_DISTANCE = 6
+    SHORTCUT_MIN_LABEL_OVERLAP = 2
+    SHORTCUT_MAX_PER_CYCLE = 3
+    SHORTCUT_VIRTUAL_STRENGTH = 0.8
+
     MAX_PULSE_ACCUMULATOR = 5.0
     MAX_INTERNAL_ACTIVITY = 50.0
     MAX_FEEDING = 20.0
@@ -1023,6 +1038,384 @@ class SelfCheckEngine:
             }
 
 
+class SemanticCluster:
+    __slots__ = ("cluster_id", "labels", "node_ids", "centroid", "avg_weight", "total_activation")
+
+    def __init__(self, cluster_id: str, labels: Set[str]):
+        self.cluster_id = cluster_id
+        self.labels = labels
+        self.node_ids: List[str] = []
+        self.centroid: Optional[np.ndarray] = None
+        self.avg_weight: float = 0.0
+        self.total_activation: float = 0.0
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "cluster_id": self.cluster_id,
+            "labels": list(self.labels),
+            "node_count": len(self.node_ids),
+            "avg_weight": round(self.avg_weight, 3),
+            "total_activation": round(self.total_activation, 3),
+            "centroid": self.centroid.tolist() if self.centroid is not None else None,
+        }
+
+
+class OrganizeResult:
+    __slots__ = (
+        "organize_time", "clusters_found", "clusters_reinforced",
+        "entropy_before", "entropy_after", "consolidations_done",
+        "shortcuts_created", "details",
+    )
+
+    def __init__(self):
+        self.organize_time: float = time.time()
+        self.clusters_found: int = 0
+        self.clusters_reinforced: int = 0
+        self.entropy_before: float = 0.0
+        self.entropy_after: float = 0.0
+        self.consolidations_done: int = 0
+        self.shortcuts_created: int = 0
+        self.details: str = ""
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "organize_time": self.organize_time,
+            "clusters_found": self.clusters_found,
+            "clusters_reinforced": self.clusters_reinforced,
+            "entropy_before": round(self.entropy_before, 4),
+            "entropy_after": round(self.entropy_after, 4),
+            "consolidations_done": self.consolidations_done,
+            "shortcuts_created": self.shortcuts_created,
+            "details": self.details,
+        }
+
+
+class SelfOrganizeEngine:
+    """
+    Unified self-organization engine — autonomous topology optimization.
+
+    Four modules per cycle:
+      1. Cluster Detection: label-cooccurrence + spatial proximity grouping
+      2. Entropy Balance: weight redistribution to prevent concentration
+      3. Memory Consolidation: merge weak duplicate memories
+      4. Topological Shortcuts: virtual edges for semantically close but
+         topologically distant memory pairs
+
+    Runs periodically in the pulse loop, separate from SelfCheckEngine
+    which handles anomaly detection and repair.
+    """
+
+    def __init__(self, field: "HoneycombNeuralField"):
+        self._field = field
+        self._history: List[OrganizeResult] = []
+        self._max_history = 30
+        self._clusters: List[SemanticCluster] = []
+        self._shortcuts: Dict[Tuple[str, str], float] = {}
+        self._lock = threading.RLock()
+
+    def run_cycle(self) -> OrganizeResult:
+        result = OrganizeResult()
+        field = self._field
+
+        with field._lock:
+            occupied = [(nid, n) for nid, n in field._nodes.items() if n.is_occupied]
+            if len(occupied) < 3:
+                result.details = "insufficient nodes for organization"
+                return result
+
+            result.entropy_before = self._compute_entropy(occupied)
+
+            self._detect_clusters(field, occupied, result)
+            self._rebalance_entropy(field, occupied, result)
+            self._consolidate_memories(field, occupied, result)
+            self._create_shortcuts(field, occupied, result)
+
+            result.entropy_after = self._compute_entropy(occupied)
+            self._reinforce_clusters(field, result)
+
+        with self._lock:
+            self._history.append(result)
+            if len(self._history) > self._max_history:
+                self._history = self._history[-self._max_history // 2:]
+
+        return result
+
+    def _compute_entropy(self, occupied: List[Tuple[str, Any]]) -> float:
+        if not occupied:
+            return 0.0
+        weights = [n.weight for _, n in occupied]
+        total = sum(weights)
+        if total <= 0:
+            return 0.0
+        probs = [w / total for w in weights if w > 0]
+        entropy = -sum(p * math.log(p + 1e-10) for p in probs)
+        max_entropy = math.log(len(probs) + 1e-10)
+        return entropy / max(max_entropy, 1e-10)
+
+    def _detect_clusters(self, field, occupied, result: OrganizeResult):
+        cfg = PCNNConfig
+        label_groups: Dict[str, List[str]] = defaultdict(list)
+        for nid, node in occupied:
+            for lbl in node.labels:
+                if not lbl.startswith("__"):
+                    label_groups[lbl].append(nid)
+
+        candidate_labels = [
+            lbl for lbl, nids in label_groups.items()
+            if len(nids) >= cfg.CLUSTER_MIN_SIZE
+        ]
+
+        clusters: List[SemanticCluster] = []
+        used_nodes: Set[str] = set()
+
+        for lbl in sorted(candidate_labels, key=lambda l: -len(label_groups[l]))[:cfg.CLUSTER_MAX_LABELS]:
+            nids = label_groups[lbl]
+            available = [n for n in nids if n not in used_nodes]
+            if len(available) < cfg.CLUSTER_MIN_SIZE:
+                continue
+
+            cluster_labels = {lbl}
+            cluster_nodes = []
+            for nid in available:
+                node = field._nodes.get(nid)
+                if node is None:
+                    continue
+                other_labels = set(node.labels) - {"__pulse_bridge__", "__system__"}
+                cluster_labels.update(other_labels)
+                cluster_nodes.append((nid, node))
+
+            if len(cluster_nodes) < cfg.CLUSTER_MIN_SIZE:
+                continue
+
+            positions = [n.position for _, n in cluster_nodes]
+            centroid = np.mean(positions, axis=0)
+            avg_w = float(np.mean([n.weight for _, n in cluster_nodes]))
+            total_act = sum(n.activation for _, n in cluster_nodes)
+
+            cluster = SemanticCluster(f"cluster_{lbl}", cluster_labels)
+            cluster.node_ids = [nid for nid, _ in cluster_nodes]
+            cluster.centroid = centroid
+            cluster.avg_weight = avg_w
+            cluster.total_activation = total_act
+            clusters.append(cluster)
+
+            for nid, _ in cluster_nodes:
+                used_nodes.add(nid)
+
+        self._clusters = clusters
+        result.clusters_found = len(clusters)
+
+    def _reinforce_clusters(self, field, result: OrganizeResult):
+        for cluster in self._clusters:
+            if len(cluster.node_ids) < 2:
+                continue
+            for nid in cluster.node_ids:
+                node = field._nodes.get(nid)
+                if node and node.is_occupied:
+                    neighbor_in_cluster = 0
+                    for fnid in node.face_neighbors[:6]:
+                        fn = field._nodes.get(fnid)
+                        if fn and fn.is_occupied:
+                            shared = set(fn.labels) & cluster.labels
+                            if len(shared) > 0:
+                                neighbor_in_cluster += 1
+                    if neighbor_in_cluster < 2:
+                        boost = cluster.avg_weight * 0.05
+                        node.activation = min(10.0, node.activation + boost)
+                        field._hebbian.record_path(
+                            [cluster.node_ids[0], nid],
+                            success=True,
+                            strength=cluster.avg_weight * 0.3,
+                        )
+                        result.clusters_reinforced += 1
+
+    def _rebalance_entropy(self, field, occupied, result: OrganizeResult):
+        cfg = PCNNConfig
+        weights = [n.weight for _, n in occupied]
+        avg_w = float(np.mean(weights))
+        max_w = float(max(weights))
+        min_w = float(min(weights))
+
+        if max_w <= 0 or avg_w <= 0:
+            return
+
+        concentration = max_w / (avg_w + 1e-10)
+
+        if concentration > 5.0:
+            for nid, node in occupied:
+                if node.weight > avg_w * 4:
+                    suppress = node.weight * cfg.ENTROPY_SUPPRESS_FACTOR
+                    node.weight = max(min_w, node.weight - suppress)
+                elif node.weight < avg_w * 0.3:
+                    boost = avg_w * cfg.ENTROPY_BOOST_FACTOR
+                    node.weight = min(max_w, node.weight + boost)
+                    node.activation = min(10.0, node.activation + boost * 0.5)
+
+    def _consolidate_memories(self, field, occupied, result: OrganizeResult):
+        cfg = PCNNConfig
+        low_weight = [(nid, n) for nid, n in occupied if n.weight < 1.0 and n.is_occupied]
+        if len(low_weight) < 2:
+            return
+
+        consolidated = 0
+        checked = set()
+
+        for i, (nid_a, node_a) in enumerate(low_weight):
+            if consolidated >= cfg.CONSOLIDATION_MAX_PER_CYCLE:
+                break
+            if nid_a in checked:
+                continue
+
+            tokens_a = field._extract_tokens(node_a.content)
+            if not tokens_a:
+                continue
+
+            best_match = None
+            best_sim = 0.0
+
+            for j in range(i + 1, min(i + 20, len(low_weight))):
+                nid_b, node_b = low_weight[j]
+                if nid_b in checked:
+                    continue
+
+                tokens_b = field._extract_tokens(node_b.content)
+                if not tokens_b:
+                    continue
+
+                intersection = len(tokens_a & tokens_b)
+                union = len(tokens_a | tokens_b)
+                if union == 0:
+                    continue
+                jaccard = intersection / union
+
+                if jaccard >= cfg.CONSOLIDATION_MIN_SIMILARITY and jaccard > best_sim:
+                    best_sim = jaccard
+                    best_match = (nid_b, node_b)
+
+            if best_match is None:
+                continue
+
+            nid_b, node_b = best_match
+            receiver, donor = (node_a, node_b) if node_a.weight >= node_b.weight else (node_b, node_a)
+            receiver_nid, donor_nid = (nid_a, nid_b) if node_a.weight >= node_b.weight else (nid_b, nid_a)
+
+            transfer = donor.weight * cfg.CONSOLIDATION_WEIGHT_TRANSFER
+            receiver.weight = min(10.0, receiver.weight + transfer)
+            receiver.activation = min(10.0, receiver.activation + donor.activation * 0.3)
+            receiver.labels = list(set(receiver.labels) | set(donor.labels))
+            receiver.labels = [l for l in receiver.labels if not l.startswith("__duplicate")]
+
+            donor.metadata["consolidated_into"] = receiver_nid[:12]
+            donor.metadata["consolidation_weight"] = round(donor.weight, 3)
+            donor.labels.append("__consolidated__")
+            donor.weight *= (1.0 - cfg.CONSOLIDATION_WEIGHT_TRANSFER)
+            donor.activation *= 0.3
+
+            field._hebbian.record_path(
+                [receiver_nid, donor_nid], success=True, strength=receiver.weight * 0.2
+            )
+
+            checked.add(nid_a)
+            checked.add(nid_b)
+            consolidated += 1
+
+        result.consolidations_done = consolidated
+
+    def _create_shortcuts(self, field, occupied, result: OrganizeResult):
+        cfg = PCNNConfig
+        occupied_dict = {nid: n for nid, n in occupied}
+        shortcuts_this_cycle = 0
+
+        for nid_a, node_a in occupied[:50]:
+            if shortcuts_this_cycle >= cfg.SHORTCUT_MAX_PER_CYCLE:
+                break
+
+            labels_a = set(node_a.labels) - {"__pulse_bridge__", "__system__", "__consolidated__"}
+            if not labels_a:
+                continue
+
+            for nid_b, node_b in occupied[:50]:
+                if nid_a == nid_b or nid_b in node_a.face_neighbors or nid_b in node_a.edge_neighbors:
+                    continue
+
+                key = (min(nid_a, nid_b), max(nid_a, nid_b))
+                if key in self._shortcuts:
+                    continue
+
+                labels_b = set(node_b.labels) - {"__pulse_bridge__", "__system__", "__consolidated__"}
+                shared_labels = labels_a & labels_b
+                if len(shared_labels) < cfg.SHORTCUT_MIN_LABEL_OVERLAP:
+                    continue
+
+                distance = self._topo_distance(field, nid_a, nid_b)
+                if distance is None or distance <= 2 or distance > cfg.SHORTCUT_MAX_DISTANCE:
+                    continue
+
+                strength = cfg.SHORTCUT_VIRTUAL_STRENGTH * len(shared_labels) / max(len(labels_a | labels_b), 1)
+                self._shortcuts[key] = strength
+
+                field._hebbian.record_path(
+                    [nid_a, nid_b], success=True, strength=strength * 2.0
+                )
+                shortcuts_this_cycle += 1
+
+        if len(self._shortcuts) > 500:
+            sorted_s = sorted(self._shortcuts.items(), key=lambda x: x[1])
+            for k, _ in sorted_s[:len(self._shortcuts) - 300]:
+                del self._shortcuts[k]
+
+        result.shortcuts_created = shortcuts_this_cycle
+
+    def _topo_distance(self, field, nid_a: str, nid_b: str) -> Optional[int]:
+        if nid_a == nid_b:
+            return 0
+        visited = {nid_a}
+        frontier = [nid_a]
+        for depth in range(8):
+            next_frontier = []
+            for fid in frontier:
+                fn = field._nodes.get(fid)
+                if fn is None:
+                    continue
+                for nnid in fn.face_neighbors[:6] + fn.edge_neighbors[:4]:
+                    if nnid == nid_b:
+                        return depth + 1
+                    if nnid not in visited:
+                        visited.add(nnid)
+                        next_frontier.append(nnid)
+            frontier = next_frontier
+            if not frontier:
+                break
+        return None
+
+    def get_clusters(self) -> List[Dict]:
+        with self._lock:
+            return [c.to_dict() for c in self._clusters]
+
+    def get_shortcuts(self, n: int = 20) -> List[Dict]:
+        with self._lock:
+            sorted_s = sorted(self._shortcuts.items(), key=lambda x: -x[1])[:n]
+            return [
+                {"nodes": (k[0][:8], k[1][:8]), "strength": round(v, 3)}
+                for k, v in sorted_s
+            ]
+
+    def get_history(self, n: int = 10) -> List[Dict]:
+        with self._lock:
+            return [r.to_dict() for r in self._history[-n:]]
+
+    def stats(self) -> Dict[str, Any]:
+        with self._lock:
+            return {
+                "total_organize_cycles": len(self._history),
+                "active_clusters": len(self._clusters),
+                "active_shortcuts": len(self._shortcuts),
+                "latest_entropy": self._history[-1].entropy_after if self._history else None,
+                "total_consolidations": sum(r.consolidations_done for r in self._history),
+                "total_shortcuts_created": sum(r.shortcuts_created for r in self._history),
+            }
+
+
 class HoneycombNeuralField:
     """BCC Lattice Honeycomb with PCNN-grounded neural pulse engine."""
 
@@ -1060,6 +1453,7 @@ class HoneycombNeuralField:
         self._lattice_checker: Optional[LatticeIntegrityChecker] = None
         self._cascade_count: int = 0
         self._crystal_maintenance_cycle: int = 0
+        self._self_organize: Optional[SelfOrganizeEngine] = None
 
     def initialize(self) -> Dict[str, Any]:
         with self._lock:
@@ -1581,8 +1975,9 @@ class HoneycombNeuralField:
         self._self_check = SelfCheckEngine(self)
         self._self_check.start()
         self._lattice_checker = LatticeIntegrityChecker(self)
+        self._self_organize = SelfOrganizeEngine(self)
         logger.info(
-            "PCNN pulse engine started (v5.0) — face_decay=%.2f, edge_decay=%.2f, cascade=on, crystallize=on, lattice_check=on",
+            "PCNN pulse engine started (v5.1) — face_decay=%.2f, edge_decay=%.2f, cascade=on, crystallize=on, self_organize=on",
             PCNNConfig.FACE_DECAY, PCNNConfig.FACE_DECAY * PCNNConfig.EDGE_DECAY_FACTOR,
         )
 
@@ -1617,6 +2012,9 @@ class HoneycombNeuralField:
 
                 if cycle % 600 == 0 and self._lattice_checker:
                     self._lattice_checker.run_full_check()
+
+                if cycle % PCNNConfig.SELF_ORGANIZE_INTERVAL == 0 and self._self_organize:
+                    self._self_organize.run_cycle()
 
             except Exception as e:
                 logger.error("Pulse cycle error: %s", e, exc_info=True)
@@ -1991,6 +2389,7 @@ class HoneycombNeuralField:
                 "crystallized": self._crystallized.stats(),
                 "lattice_integrity": self._lattice_checker.get_latest() if self._lattice_checker else None,
                 "self_check": self.self_check_status() if self._self_check else {"engine_running": False},
+                "self_organize": self._self_organize.stats() if self._self_organize else {"engine_active": False},
                 "pcnn_config": {
                     "face_decay": PCNNConfig.FACE_DECAY,
                     "edge_decay": round(PCNNConfig.FACE_DECAY * PCNNConfig.EDGE_DECAY_FACTOR, 3),
@@ -2312,3 +2711,32 @@ class HoneycombNeuralField:
                 "crystallized": self._crystallized.stats(),
                 "hebbian_edges": len(self._hebbian._edges),
             }
+
+    def run_self_organize(self) -> Dict[str, Any]:
+        if self._self_organize is None:
+            self._self_organize = SelfOrganizeEngine(self)
+        result = self._self_organize.run_cycle()
+        return result.to_dict()
+
+    def self_organize_status(self) -> Dict[str, Any]:
+        if self._self_organize is None:
+            return {"engine_active": False}
+        status = self._self_organize.stats()
+        status["clusters"] = self._self_organize.get_clusters()
+        status["shortcuts"] = self._self_organize.get_shortcuts(10)
+        return status
+
+    def self_organize_history(self, n: int = 10) -> List[Dict]:
+        if self._self_organize is None:
+            return []
+        return self._self_organize.get_history(n)
+
+    def get_clusters(self) -> List[Dict]:
+        if self._self_organize is None:
+            return []
+        return self._self_organize.get_clusters()
+
+    def get_shortcuts(self, n: int = 20) -> List[Dict]:
+        if self._self_organize is None:
+            return []
+        return self._self_organize.get_shortcuts(n)
