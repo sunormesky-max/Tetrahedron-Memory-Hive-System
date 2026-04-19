@@ -2044,11 +2044,6 @@ class DreamEngine:
         self._lock = threading.Lock()
 
     def _extract_content_summary(self, content: str, max_chars: int = 40) -> str:
-        """
-        Extract a meaningful content summary from a memory node.
-        Takes the first meaningful phrase up to max_chars, respecting
-        sentence/phrase boundaries.
-        """
         if not content:
             return ""
         clean = content.lstrip("[").split("] ", 1)
@@ -2061,6 +2056,125 @@ class DreamEngine:
         if len(text) > max_chars:
             text = text[:max_chars] + "..."
         return text
+
+    def _extract_deep_structure(self, content: str) -> Dict:
+        """
+        Extract deep structural elements from a memory.
+        Returns: {core_concept, key_principles: [], methods: [], constraints: [], domain_specific: []}
+        """
+        if not content:
+            return {"core_concept": "", "key_principles": [], "methods": [], "constraints": []}
+        clean = content.lstrip("[").split("] ", 1)
+        text = clean[-1] if len(clean) > 1 else clean[0]
+        sections = text.split("\n")
+        core = ""
+        principles = []
+        methods = []
+        constraints = []
+        for sec in sections:
+            stripped = sec.strip()
+            if not stripped:
+                continue
+            if stripped.startswith("【") and "】" in stripped:
+                bracket_content = stripped
+                if any(k in bracket_content for k in ["核心", "本质", "关键", "根本", "基础", "原理", "逻辑"]):
+                    inner = bracket_content.split("】", 1)[1].strip() if "】" in bracket_content else ""
+                    if inner:
+                        principles.append(inner[:60])
+                elif any(k in bracket_content for k in ["流程", "步骤", "方法", "操作", "做法", "如何"]):
+                    inner = bracket_content.split("】", 1)[1].strip() if "】" in bracket_content else ""
+                    if inner:
+                        methods.append(inner[:60])
+                elif any(k in bracket_content for k in ["注意", "限制", "前提", "条件", "必须", "不可", "约束"]):
+                    inner = bracket_content.split("】", 1)[1].strip() if "】" in bracket_content else ""
+                    if inner:
+                        constraints.append(inner[:60])
+                elif not core:
+                    core = bracket_content.split("】", 1)[1].strip()[:40] if "】" in bracket_content else ""
+            elif any(stripped.startswith(p) for p in ["①", "②", "③", "④", "⑤", "⑥", "⑦", "⑧", "⑨", "⑩", "⒈", "⒉", "⒊", "1.", "2.", "3.", "4.", "5.", "- ", "* "]):
+                item = stripped.lstrip("①②③④⑤⑥⑦⑧⑨⑩⒈⒉⒊⒋⒌1234567890.-* ").strip()
+                if item:
+                    principles.append(item[:50])
+            elif not core and len(stripped) > 5:
+                core = stripped[:40]
+        if not core:
+            for sep in ["。", "，", "\n", "——"]:
+                if sep in text:
+                    core = text[:text.index(sep)][:40]
+                    break
+            if not core:
+                core = text[:40]
+        return {
+            "core_concept": core,
+            "key_principles": principles[:5],
+            "methods": methods[:3],
+            "constraints": constraints[:3],
+        }
+
+    def _compute_expertise_depth(self, domain_label: str, domain_nodes: List) -> float:
+        """
+        Measure how deep the expertise is in a given domain.
+        Deep expertise = high weight + many interconnected nodes + crystallized pathways + long content.
+        """
+        if not domain_nodes:
+            return 0.0
+        total_weight = sum(n.weight for _, n in domain_nodes)
+        avg_weight = total_weight / len(domain_nodes)
+        node_ids = {nid for nid, _ in domain_nodes}
+        internal_links = 0
+        for nid, n in domain_nodes:
+            for fnid in n.face_neighbors + n.edge_neighbors:
+                if fnid in node_ids:
+                    internal_links += 1
+        density = internal_links / max(len(domain_nodes) * 4, 1)
+        avg_content_len = sum(len(n.content) for _, n in domain_nodes) / max(len(domain_nodes), 1)
+        content_depth = min(1.0, avg_content_len / 500.0)
+        crystal_count = sum(1 for _, n in domain_nodes if n.crystal_channels)
+        crystal_ratio = crystal_count / max(len(domain_nodes), 1)
+        return min(1.0, avg_weight / 5.0 * 0.25 + density * 0.25 + content_depth * 0.3 + crystal_ratio * 0.2)
+
+    def _generate_deep_insight(self, struct_a: Dict, struct_b: Dict,
+                                domain_a: str, domain_b: str,
+                                depth_a: float, depth_b: float) -> str:
+        """
+        Generate a deep cross-domain insight from structural analysis.
+        Instead of just concatenating summaries, find structural analogies
+        and generate a substantive insight.
+        """
+        core_a = struct_a["core_concept"]
+        core_b = struct_b["core_concept"]
+        principles_a = struct_a["key_principles"]
+        principles_b = struct_b["key_principles"]
+        methods_a = struct_a["methods"]
+        methods_b = struct_b["methods"]
+        constraints_a = struct_a["constraints"]
+        constraints_b = struct_b["constraints"]
+
+        insight_parts = []
+        insight_parts.append(f"{domain_a}核心⟨{core_a}⟩与{domain_b}核心⟨{core_b}⟩的深层对照")
+
+        if principles_a and principles_b:
+            pa = principles_a[0] if principles_a else ""
+            pb = principles_b[0] if principles_b else ""
+            insight_parts.append(f"原理映射: {domain_a}的「{pa[:30]}」↔ {domain_b}的「{pb[:30]}」")
+
+        if methods_a and methods_b:
+            ma = methods_a[0] if methods_a else ""
+            mb = methods_b[0] if methods_b else ""
+            insight_parts.append(f"方法迁移: {domain_a}的「{ma[:25]}」→ 可否应用于{domain_b}的「{mb[:25]}」？")
+
+        if constraints_a and constraints_b:
+            ca = constraints_a[0] if constraints_a else ""
+            cb = constraints_b[0] if constraints_b else ""
+            insight_parts.append(f"约束碰撞: {domain_a}「{ca[:25]}」× {domain_b}「{cb[:25]}」")
+
+        combined_depth = (depth_a + depth_b) / 2
+        if combined_depth > 0.5:
+            insight_parts.append(f"【专深度{combined_depth:.0%}】{domain_a}↔{domain_b}交叉创新潜力高")
+        elif combined_depth > 0.25:
+            insight_parts.append(f"【专深度{combined_depth:.0%}】{domain_a}或{domain_b}需继续深化")
+
+        return " | ".join(insight_parts)
 
     def _trace_dream_path(self, field, nid_a: str, nid_b: str, max_hops: int = 8) -> List[str]:
         """
@@ -2135,14 +2249,52 @@ class DreamEngine:
                 result.insights = [{"note": "insufficient label diversity for dreaming"}]
                 return result
 
+            domain_depths = {}
+            for dname, dnodes in top_domains:
+                domain_depths[dname] = self._compute_expertise_depth(dname, dnodes)
+
             result.sources_used = len(occupied)
 
             for _ in range(cfg.DREAM_MAX_RECOMBINATIONS):
                 if len(top_domains) < 2:
                     break
-                d1_idx = random.randint(0, len(top_domains) - 1)
-                d2_idx = random.randint(0, len(top_domains) - 1)
-                if d1_idx == d2_idx:
+
+                mode = random.random()
+                if mode < 0.4:
+                    deepest = sorted(domain_depths.items(), key=lambda x: -x[1])
+                    d1_idx = next((i for i, (n, _) in enumerate(top_domains) if n == deepest[0][0]), 0)
+                    d2_candidates = [i for i in range(len(top_domains)) if i != d1_idx]
+                    if not d2_candidates:
+                        continue
+                    d2_idx = random.choice(d2_candidates)
+                elif mode < 0.7:
+                    d1_idx = random.randint(0, len(top_domains) - 1)
+                    d2_idx = random.randint(0, len(top_domains) - 1)
+                    if d1_idx == d2_idx:
+                        continue
+                else:
+                    d1_idx = random.randint(0, len(top_domains) - 1)
+                    same_domain_nodes = top_domains[d1_idx][1]
+                    if len(same_domain_nodes) < 3:
+                        continue
+                    sampled = random.sample(same_domain_nodes, min(2, len(same_domain_nodes)))
+                    src_a = sampled[0]
+                    src_b = sampled[1] if len(sampled) > 1 else random.choice(same_domain_nodes)
+                    nid_a, node_a = src_a
+                    nid_b, node_b = src_b
+                    domain_a_name = top_domains[d1_idx][0]
+                    domain_b_name = domain_a_name
+                    depth_a = domain_depths.get(domain_a_name, 0)
+                    depth_b = depth_a
+                    struct_a = self._extract_deep_structure(node_a.content)
+                    struct_b = self._extract_deep_structure(node_b.content)
+                    creativity = self._score_creativity(node_a, node_b, domain_a_name, domain_b_name)
+                    creativity = min(1.0, creativity * 1.3)
+                    if creativity < 0.3:
+                        continue
+                    self._create_deep_dream(field, result, nid_a, nid_b, node_a, node_b,
+                                            domain_a_name, domain_b_name, struct_a, struct_b,
+                                            depth_a, depth_b, creativity, cfg)
                     continue
 
                 domain_a_name, domain_a_nodes = top_domains[d1_idx]
@@ -2169,75 +2321,102 @@ class DreamEngine:
                 if creativity < 0.3:
                     continue
 
-                summary_a = self._extract_content_summary(node_a.content)
-                summary_b = self._extract_content_summary(node_b.content)
+                depth_a = domain_depths.get(domain_a_name, 0)
+                depth_b = domain_depths.get(domain_b_name, 0)
+                struct_a = self._extract_deep_structure(node_a.content)
+                struct_b = self._extract_deep_structure(node_b.content)
 
-                waypoints = self._trace_dream_path(field, nid_a, nid_b)
-                waypoint_summaries = []
-                for wid in waypoints[:3]:
-                    wn = field._nodes.get(wid)
-                    if wn and wn.is_occupied:
-                        ws = self._extract_content_summary(wn.content, 30)
-                        if ws:
-                            wlabels = [l for l in wn.labels if not l.startswith("__")][:2]
-                            waypoint_summaries.append((wlabels, ws))
+                self._create_deep_dream(field, result, nid_a, nid_b, node_a, node_b,
+                                        domain_a_name, domain_b_name, struct_a, struct_b,
+                                        depth_a, depth_b, creativity, cfg)
 
-                dream_parts = []
-                dream_parts.append(f"{domain_a_name}⟨{summary_a}⟩")
-                for wlabels, ws in waypoint_summaries:
-                    label_hint = "·".join(wlabels) if wlabels else "..."
-                    dream_parts.append(f"↔{label_hint}⟨{ws}⟩")
-                dream_parts.append(f"{domain_b_name}⟨{summary_b}⟩")
+        with self._lock:
+            self._history.append(result)
+            if len(self._history) > self._max_history:
+                self._history = self._history[-self._max_history // 2:]
 
-                dream_content = "[dream] " + " → ".join(dream_parts)
-                dream_labels = list(set([
-                    domain_a_name, domain_b_name, "__dream__",
-                ]))
-                dream_weight = min(
-                    cfg.DREAM_INSIGHT_WEIGHT * creativity,
-                    max(node_a.weight, node_b.weight) * 0.8,
-                )
+        return result
 
-                path_length = len(waypoints) + 2
+    def _create_deep_dream(self, field, result, nid_a, nid_b, node_a, node_b,
+                           domain_a_name, domain_b_name, struct_a, struct_b,
+                           depth_a, depth_b, creativity, cfg):
+        summary_a = struct_a["core_concept"]
+        summary_b = struct_b["core_concept"]
+        waypoints = self._trace_dream_path(field, nid_a, nid_b)
+        waypoint_summaries = []
+        for wid in waypoints[:3]:
+            wn = field._nodes.get(wid)
+            if wn and wn.is_occupied:
+                ws = self._extract_content_summary(wn.content, 30)
+                if ws:
+                    wlabels = [l for l in wn.labels if not l.startswith("__")][:2]
+                    waypoint_summaries.append((wlabels, ws))
 
-                try:
-                    dream_id = field.store(
-                        content=dream_content,
-                        labels=dream_labels,
-                        weight=dream_weight,
-                        metadata={
-                            "dream_source_a": nid_a[:12],
-                            "dream_source_b": nid_b[:12],
-                            "creativity_score": round(creativity, 3),
-                            "dream_type": "cross_domain" if domain_a_name != domain_b_name else "intra_domain",
-                            "spatial_distance": round(spatial_dist, 2),
-                            "topo_path_length": path_length,
-                            "waypoint_count": len(waypoints),
-                        },
-                    )
-                    result.dreams_created += 1
-                    self._total_dreams += 1
+        deep_insight = self._generate_deep_insight(
+            struct_a, struct_b, domain_a_name, domain_b_name, depth_a, depth_b
+        )
 
-                    is_cross = domain_a_name != domain_b_name
-                    if is_cross:
-                        result.cross_domain += 1
+        dream_parts = []
+        dream_parts.append(f"{domain_a_name}⟨{summary_a}⟩")
+        for wlabels, ws in waypoint_summaries:
+            label_hint = "·".join(wlabels) if wlabels else "..."
+            dream_parts.append(f"↔{label_hint}⟨{ws}⟩")
+        dream_parts.append(f"{domain_b_name}⟨{summary_b}⟩")
 
-                    result.insights.append({
-                        "dream_id": dream_id[:12],
-                        "domains": [domain_a_name, domain_b_name],
-                        "creativity": round(creativity, 3),
-                        "weight": round(dream_weight, 3),
-                        "cross_domain": is_cross,
-                        "spatial_distance": round(spatial_dist, 2),
-                        "topo_path_length": path_length,
-                    })
+        dream_content = "[dream] " + " → ".join(dream_parts) + " || " + deep_insight
+        dream_labels = list(set([
+            domain_a_name, domain_b_name, "__dream__",
+        ]))
+        dream_weight = min(
+            cfg.DREAM_INSIGHT_WEIGHT * creativity * (1.0 + (depth_a + depth_b) * 0.2),
+            max(node_a.weight, node_b.weight) * 0.8,
+        )
 
-                    field._emit_pulse(
-                        dream_id, strength=dream_weight * 0.6,
-                        pulse_type=PulseType.CASCADE,
-                    )
-                except Exception:
-                    pass
+        path_length = len(waypoints) + 2
+
+        try:
+            dream_id = field.store(
+                content=dream_content,
+                labels=dream_labels,
+                weight=dream_weight,
+                metadata={
+                    "dream_source_a": nid_a[:12],
+                    "dream_source_b": nid_b[:12],
+                    "creativity_score": round(creativity, 3),
+                    "dream_type": "cross_domain" if domain_a_name != domain_b_name else "intra_domain",
+                    "spatial_distance": round(float(np.linalg.norm(node_a.position - node_b.position)), 2),
+                    "topo_path_length": path_length,
+                    "waypoint_count": len(waypoints),
+                    "expertise_depth_a": round(depth_a, 3),
+                    "expertise_depth_b": round(depth_b, 3),
+                    "insight_type": "deep_structural",
+                },
+            )
+            result.dreams_created += 1
+            self._total_dreams += 1
+
+            is_cross = domain_a_name != domain_b_name
+            if is_cross:
+                result.cross_domain += 1
+
+            result.insights.append({
+                "dream_id": dream_id[:12],
+                "domains": [domain_a_name, domain_b_name],
+                "creativity": round(creativity, 3),
+                "weight": round(dream_weight, 3),
+                "cross_domain": is_cross,
+                "spatial_distance": round(float(np.linalg.norm(node_a.position - node_b.position)), 2),
+                "topo_path_length": path_length,
+                "expertise_depth": round((depth_a + depth_b) / 2, 3),
+                "insight_preview": deep_insight[:80],
+            })
+
+            field._emit_pulse(
+                dream_id, strength=dream_weight * 0.6,
+                pulse_type=PulseType.CASCADE,
+            )
+        except Exception:
+            pass
 
         with self._lock:
             self._history.append(result)
@@ -3038,9 +3217,9 @@ class HoneycombNeuralField:
             node.activation = weight
             node.base_activation = max(0.01, weight * 0.1)
             node.metadata = metadata or {}
-            node.metadata["geometric_quality"] = self._compute_node_geometric_quality(nid)
-            node.metadata["geo_topo_divergence"] = self._compute_geometric_topo_divergence(nid)
-            node.metadata["bcc_cell_coherence"] = self._bcc_cell_coherence(nid)
+            node.metadata["geometric_quality"] = float(self._compute_node_geometric_quality(nid))
+            node.metadata["geo_topo_divergence"] = float(self._compute_geometric_topo_divergence(nid))
+            node.metadata["bcc_cell_coherence"] = float(self._bcc_cell_coherence(nid))
             node.creation_time = creation_time_override if creation_time_override is not None else time.time()
             node.touch()
 
@@ -3962,19 +4141,19 @@ class HoneycombNeuralField:
             "position": node.position.tolist(),
             "centroid": node.position.tolist(),
             "labels": list(node.labels),
-            "weight": node.weight,
-            "activation": node.activation,
+            "weight": float(node.weight),
+            "activation": float(node.activation),
             "face_neighbors": len(node.face_neighbors),
             "edge_neighbors": len(node.edge_neighbors),
-            "creation_time": node.creation_time,
-            "access_count": node.access_count,
-            "metadata": node.metadata,
-            "feeding": node.feeding,
-            "linking": node.linking,
-            "internal_activity": node.internal_activity,
-            "threshold": node.threshold,
-            "fired": node.fired,
-            "crystal_channels": {k[:8]: round(v, 3) for k, v in node.crystal_channels.items()},
+            "creation_time": float(node.creation_time),
+            "access_count": int(node.access_count),
+            "metadata": {k: float(v) if isinstance(v, (np.floating, np.integer)) else bool(v) if isinstance(v, np.bool_) else v for k, v in node.metadata.items()},
+            "feeding": float(node.feeding),
+            "linking": float(node.linking),
+            "internal_activity": float(node.internal_activity),
+            "threshold": float(node.threshold),
+            "fired": bool(node.fired),
+            "crystal_channels": {k[:8]: round(float(v), 3) for k, v in node.crystal_channels.items()},
         }
 
     def list_occupied(self) -> List[Dict]:
@@ -4280,7 +4459,7 @@ class HoneycombNeuralField:
                     "linking": round(node.linking, 4),
                     "internal_activity": round(node.internal_activity, 4),
                     "threshold": round(node.threshold, 4),
-                    "fired": node.fired,
+            "fired": bool(node.fired),
                     "activation": round(node.activation, 4),
                 }
                 for nid, node in nodes
