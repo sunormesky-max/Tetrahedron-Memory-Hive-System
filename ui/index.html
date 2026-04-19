@@ -12,7 +12,7 @@
 html,body{width:100%;height:100%;overflow:hidden;font-family:'Rajdhani','Inter',Consolas,system-ui,sans-serif;background:#030308;color:#c8c8e0}
 
 /* === 全局流动背景 === */
-.app-layout{position:relative}
+.app-layout{display:flex;flex-direction:column;height:100%;position:relative}
 .app-layout::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%;background:conic-gradient(from 0deg at 50% 50%,transparent 0deg,rgba(100,60,255,.03) 60deg,transparent 120deg,rgba(0,200,255,.02) 200deg,transparent 280deg,rgba(200,60,255,.03) 340deg,transparent 360deg);animation:rotateBg 90s linear infinite;z-index:-1;pointer-events:none}
 @keyframes rotateBg{to{transform:rotate(360deg)}}
 
@@ -213,7 +213,7 @@ tr:hover td{background:rgba(100,80,255,.02)}
 </div>
 
 <div id="mode3d" class="content-3d">
-  <div class="canvas-wrap" id="canvasWrap"><div id="flowParticles" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0;overflow:hidden"></div>
+  <div class="canvas-wrap" id="canvasWrap">
     <div class="legend">
       <div class="legend-item"><div class="legend-dot" style="background:#7b8cff"></div>记忆节点</div>
       <div class="legend-item"><div class="legend-dot" style="background:#c9a04e"></div>高权重</div>
@@ -267,6 +267,8 @@ let _sceneInited=false;
 let _sceneBuilt=false;
 let G={stats:{},memories:[],selectedId:null,detail:{},associations:[]};
 let scene,camera,renderer,controls,meshGroup,edgeGroup,pulseGroup,tetraMeshMap={},raycaster,mouse,pulseFetchTimer=0;
+let latticeAdjacency=new Map();
+let latticePosMap=new Map();
 
 function spawnFlowParticles(){
   const container=document.getElementById('flowParticles');
@@ -746,7 +748,7 @@ function initScene(container){
   camera.position.set(8,6,10);camera.lookAt(0,0,0);
   renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});
   renderer.setSize(w,h);renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
-  renderer.domElement.style.position='relative';renderer.domElement.style.zIndex='1';container.appendChild(renderer.domElement);
+  container.appendChild(renderer.domElement);
   controls=new THREE.OrbitControls(camera,renderer.domElement);
   controls.enableDamping=true;controls.dampingFactor=0.08;controls.maxDistance=25;controls.minDistance=1;controls.autoRotate=true;controls.autoRotateSpeed=0.3;
   scene.add(new THREE.AmbientLight(0x303060,2.0));
@@ -769,26 +771,97 @@ function animate(){
   try{
     controls.update();const t=Date.now()*0.001;
     for(const id in tetraMeshMap){const obj=tetraMeshMap[id];if(obj&&obj._hl&&obj.material)try{obj.material.emissiveIntensity=0.3+0.2*Math.sin(t*3);}catch(e){}}
-    try{pulseGroup.children.forEach(p=>{if(p.userData?.strength&&p.material){p.material.opacity=Math.max(0,p.userData.strength*(0.5+0.5*Math.sin(t*4+p.userData.phase)));p.scale.setScalar(0.04+p.userData.strength*0.06);}});}catch(e){}
-    pulseFetchTimer++;if(pulseFetchTimer>90){pulseFetchTimer=0;fetchPulses();}
+    try{
+      const now=Date.now();
+      const toRemove=[];
+      pulseGroup.children.forEach(p=>{
+        if(!p.userData||!p.userData.born)return;
+        const age=now-p.userData.born;
+        const life=p.userData.life||1000;
+        const frac=1.0-age/life;
+        if(frac<=0){toRemove.push(p);return;}
+        if(p.userData.target){
+          const prog=Math.min(1.0,age/(life/(p.userData.speed||1.5)));
+          p.position.lerpVectors(p.userData.origin,p.userData.target,prog);
+          p.material.opacity=frac*0.9;
+          const s=0.02+frac*0.06;
+          p.scale.setScalar(s);
+        }else{
+          p.material.opacity=frac*0.4;
+        }
+      });
+      toRemove.forEach(p=>{
+        if(p.geometry)p.geometry.dispose();
+        if(p.material)p.material.dispose();
+        pulseGroup.remove(p);
+      });
+      const expiredGlows=[];
+      pulseGlowTimers.forEach((v,id)=>{
+        const age=now-v.born;
+        const frac=1.0-age/v.life;
+        if(frac<=0){expiredGlows.push(id);return;}
+        const obj=tetraMeshMap[id];
+        if(obj&&obj.material&&!obj._hl){
+          obj.material.emissiveIntensity=frac*(1.2);
+        }
+      });
+      expiredGlows.forEach(id=>{
+        const obj=tetraMeshMap[id];
+        if(obj&&obj.material&&!obj._hl){obj.material.emissiveIntensity=0.5;obj.material.emissive=obj.userData.isDream?new THREE.Color(0x5eb88a):(obj.userData.weight>=7?new THREE.Color(0xcf6b6b):obj.userData.weight>=4?new THREE.Color(0xc9a04e):new THREE.Color(0x7b8cff)).clone().multiplyScalar(0.35);}
+        pulseGlowTimers.delete(id);
+      });
+    }catch(e){}
+    pulseFetchTimer++;if(pulseFetchTimer>200){pulseFetchTimer=0;fetchPulses();}
     renderer.render(scene,camera);
   }catch(e){console.error('animate error:',e);}
 }
 
+let pulseTrails=[];
+let activeNodeGlows=new Map();
+let pulseGlowTimers=new Map();
+const PULSE_TRAIL_COLORS=[0x00d4ff,0x7b8cff,0xc084fc,0x5eb88a,0xc9a04e,0xec4899];
+
 function fetchPulses(){
   fetch(API+'/pulse-snapshot').then(r=>r.json()).then(data=>{
     if(!data.pulses)return;
-    pulseGroup.traverse(c=>{if(c.geometry)c.geometry.dispose();if(c.material)c.material.dispose();});
-    while(pulseGroup.children.length)pulseGroup.remove(pulseGroup.children[0]);
-    const sc=0.8;
-    data.pulses.slice(0,80).forEach(p=>{if(!p.centroid)return;
-      const pos=new THREE.Vector3(p.centroid[0]*sc,p.centroid[1]*sc,p.centroid[2]*sc);
-      const geo=new THREE.SphereGeometry(0.1,6,6);
-      const mat=new THREE.MeshBasicMaterial({color:p.occupied?0xc9a04e:0x7b8cff,transparent:true,opacity:Math.min(p.strength,1)*0.5});
-      const dot=new THREE.Mesh(geo,mat);dot.position.copy(pos);
-      const vs=Math.min(p.strength,2.0);
-      dot.userData={strength:vs,phase:Math.random()*6.28};
-      pulseGroup.add(dot);
+    const now=Date.now();
+    const pulsedIds=new Set();
+    data.pulses.forEach(p=>{
+      const nid=p.node_id||'';
+      if(!nid)return;
+      pulsedIds.add(nid);
+      const obj=tetraMeshMap[nid];
+      if(obj&&obj.material){
+        const baseE=obj.userData.isDream?new THREE.Color(0x5eb88a):(obj.userData.weight>=7?new THREE.Color(0xcf6b6b):obj.userData.weight>=4?new THREE.Color(0xc9a04e):new THREE.Color(0x7b8cff));
+        obj.material.emissive=baseE.clone();
+        obj.material.emissiveIntensity=1.2+Math.min((p.strength||1),2.0)*0.4;
+        pulseGlowTimers.set(nid,{born:now,life:4000,baseE:baseE.clone()});
+      }
+      if(!latticePosMap.has(nid))return;
+      const sparkCount=Math.min(Math.ceil((p.strength||1)*1.5),4);
+      for(let s=0;s<sparkCount;s++){
+        const neighbors=latticeAdjacency.get(nid);
+        if(!neighbors||neighbors.size===0)continue;
+        const nbArr=Array.from(neighbors);
+        const targetId=nbArr[Math.floor(Math.random()*nbArr.length)];
+        const origin=latticePosMap.get(nid);
+        const target=latticePosMap.get(targetId);
+        if(!origin||!target)continue;
+        const ci=Math.floor(Math.random()*PULSE_TRAIL_COLORS.length);
+        const trailGeo=new THREE.BufferGeometry().setFromPoints([origin.clone(),target.clone()]);
+        const trailMat=new THREE.LineBasicMaterial({color:PULSE_TRAIL_COLORS[ci],transparent:true,opacity:0.5});
+        const trail=new THREE.Line(trailGeo,trailMat);
+        trail.userData={born:now,life:5000};
+        pulseGroup.add(trail);
+        pulseTrails.push(trail);
+        const sparkGeo=new THREE.SphereGeometry(0.04+((p.strength||1)*0.02),6,6);
+        const sparkMat=new THREE.MeshBasicMaterial({color:PULSE_TRAIL_COLORS[ci],transparent:true,opacity:0.95});
+        const spark=new THREE.Mesh(sparkGeo,sparkMat);
+        spark.position.copy(origin);
+        spark.userData={born:now,life:3500,target:target.clone(),origin:origin.clone(),speed:0.3+Math.random()*0.2};
+        pulseGroup.add(spark);
+        pulseTrails.push(spark);
+      }
     });
   }).catch(()=>{});
 }
@@ -802,7 +875,7 @@ function weightToColor(w,isDream){
 function updateScene(tetras){
   meshGroup.traverse(c=>{if(c.geometry)c.geometry.dispose();if(c.material){if(c.material.map)c.material.map.dispose();c.material.dispose();}});
   edgeGroup.traverse(c=>{if(c.geometry)c.geometry.dispose();if(c.material)c.material.dispose();});
-  meshGroup.clear();edgeGroup.clear();tetraMeshMap={};
+  meshGroup.clear();edgeGroup.clear();tetraMeshMap={};pulseGlowTimers.clear();pulseTrails.forEach(p=>{if(p.geometry)p.geometry.dispose();if(p.material)p.material.dispose();pulseGroup.remove(p);});pulseTrails=[];
   api('/lattice-info').then(data=>{if(renderer)buildScene(data);}).catch(()=>{if(renderer)buildFallback(tetras);});
 }
 
@@ -813,14 +886,18 @@ function buildScene(data){
 
   const neighborVerts=[];
   const posMap=new Map();
-  mems.forEach(m=>posMap.set(m.id,new THREE.Vector3(m.pos[0]*sc,m.pos[1]*sc,m.pos[2]*sc)));
+  latticePosMap=new Map();
+  latticeAdjacency=new Map();
+  mems.forEach(m=>{const v=new THREE.Vector3(m.pos[0]*sc,m.pos[1]*sc,m.pos[2]*sc);posMap.set(m.id,v);latticePosMap.set(m.id,v);latticeAdjacency.set(m.id,new Set());});
   const thresh=sp*sc*2.0;
   for(let i=0;i<mems.length;i++){
-    const p1=posMap.get(mems[i].id);
+    const idA=mems[i].id;const p1=posMap.get(idA);
     for(let j=i+1;j<mems.length;j++){
-      const p2=posMap.get(mems[j].id);
+      const idB=mems[j].id;const p2=posMap.get(idB);
       if(p1.distanceTo(p2)<thresh){
         neighborVerts.push(p1.x,p1.y,p1.z,p2.x,p2.y,p2.z);
+        latticeAdjacency.get(idA).add(idB);
+        latticeAdjacency.get(idB).add(idA);
       }
     }
   }
@@ -1363,5 +1440,6 @@ function disconnectSSE(){
 }
 </script>
 
+<div id="flowParticles" style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9999;overflow:hidden"></div>
 </body>
 </html>
