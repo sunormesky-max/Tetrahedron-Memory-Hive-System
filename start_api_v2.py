@@ -111,7 +111,8 @@ class AssociateReq(BaseModel):
 
 class TimelineReq(BaseModel):
     direction: str = "newest"
-    limit: int = Field(default=20, ge=1, le=100)
+    limit: int = Field(default=20, ge=1, le=500)
+    offset: int = Field(default=0, ge=0)
     labels: Optional[List[str]] = None
     min_weight: float = Field(default=0.0, ge=0.0)
 
@@ -393,13 +394,14 @@ def pulse_snapshot():
 @app.post("/api/v1/timeline")
 def timeline(req: TimelineReq):
     with _state_lock:
-        items = _field.browse_timeline(
+        items, total = _field.browse_timeline(
             direction=req.direction,
             limit=req.limit,
+            offset=req.offset,
             label_filter=req.labels,
             min_weight=req.min_weight,
         )
-    return {"items": items, "count": len(items)}
+    return {"items": items, "count": len(items), "total": total}
 
 
 @app.get("/api/v1/pulse-status")
