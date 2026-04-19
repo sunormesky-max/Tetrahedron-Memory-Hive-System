@@ -83,10 +83,10 @@ async def lifespan(application):
     init_state()
     yield
     _field.stop_pulse_engine()
-    print("[TetraMem v6.0] Shutdown complete, PCNN pulse engine stopped")
+    print("[TetraMem v6.2] Shutdown complete, PCNN pulse engine stopped")
 
 
-app = FastAPI(title="TetraMem-XL v6.0", version="6.0.0", lifespan=lifespan)
+app = FastAPI(title="TetraMem-XL v6.2", version="6.2.0", lifespan=lifespan)
 
 
 class StoreReq(BaseModel):
@@ -281,7 +281,7 @@ def stats():
 
 @app.get("/api/v1/health")
 def health():
-    return {"status": "ok", "version": "6.0.0", "uptime_seconds": time.time() - _start_time}
+    return {"status": "ok", "version": "6.2.0", "uptime_seconds": time.time() - _start_time}
 
 
 @app.get("/api/v1/tetrahedra")
@@ -679,7 +679,7 @@ def status_endpoint():
     return {
         "status": "ok",
         "backend": "tetramem",
-        "version": "6.0.0",
+        "version": "6.2.0",
         "total_memories": stats.get("occupied_nodes", 0),
         "pulse_engine_running": stats.get("pulse_engine_running", False),
         "uptime_seconds": time.time() - _start_time,
@@ -928,6 +928,44 @@ def crystallographic_direction_test():
         factor = _field._bcc_direction_factor(a.position, b.position)
         dist = float(np.linalg.norm(a.position - b.position))
         return {"factor": round(factor, 4), "distance": round(dist, 4), "sample_nodes": [occupied[0][0][:8], occupied[1][0][:8]]}
+
+
+@app.get("/api/v1/spatial/autocorrelation")
+def spatial_autocorrelation():
+    with _state_lock:
+        morans_i = _field.compute_spatial_autocorrelation()
+        return {
+            "morans_i": round(morans_i, 4),
+            "interpretation": "clustered" if morans_i > 0.1 else ("dispersed" if morans_i < -0.1 else "random"),
+            "history_len": len(_field._autocorrelation_history),
+        }
+
+
+@app.get("/api/v1/spatial/bcc-cell-coherence/{node_id}")
+def bcc_cell_coherence(node_id: str):
+    with _state_lock:
+        coherence = _field._bcc_cell_coherence(node_id)
+        cellmates = _field._get_bcc_cellmates(node_id)
+        occ_cellmates = sum(1 for cmid in cellmates if _field._nodes.get(cmid) and _field._nodes[cmid].is_occupied)
+        return {
+            "node_id": node_id,
+            "bcc_cell_coherence": round(coherence, 4),
+            "total_cellmates": len(cellmates),
+            "occupied_cellmates": occ_cellmates,
+        }
+
+
+@app.get("/api/v1/spatial/vacancy-map")
+def vacancy_map(top_n: int = 20):
+    with _state_lock:
+        vacancies = []
+        for nid, node in _field._nodes.items():
+            if not node.is_occupied:
+                attraction = _field._vacancy_attraction(nid)
+                if attraction > 0:
+                    vacancies.append({"node_id": nid[:8], "attraction": round(attraction, 4)})
+        vacancies.sort(key=lambda x: -x["attraction"])
+        return {"top_vacancies": vacancies[:top_n], "total_with_attraction": len(vacancies)}
 
 
 if __name__ == "__main__":
