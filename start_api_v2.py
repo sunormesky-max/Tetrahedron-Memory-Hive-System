@@ -29,7 +29,8 @@ def init_state():
     json_file = Path(STORAGE_DIR) / "mesh_index.json"
     if json_file.exists():
         data = json.loads(json_file.read_text(encoding="utf-8"))
-        for item in data.get("tetrahedra", []):
+        loaded = data.get("tetrahedra", [])
+        for item in loaded:
             content = item.get("content", "")
             if not content:
                 continue
@@ -39,7 +40,11 @@ def init_state():
                 weight=item.get("weight", 1.0),
                 metadata=item.get("metadata"),
             )
-        print(f"[TetraMem v5.3] Migrated {len(data.get('tetrahedra', []))} memories to honeycomb")
+        persist_meta = data.get("metadata", {})
+        persist_time = persist_meta.get("persist_time", 0)
+        from datetime import datetime as _dt
+        pt_str = _dt.fromtimestamp(persist_time).strftime("%Y-%m-%d %H:%M") if persist_time else "unknown"
+        print(f"[TetraMem v5.3] Migrated {len(loaded)} memories from persist file (saved at {pt_str})")
     else:
         print("[TetraMem v5.3] Fresh start")
 
@@ -92,6 +97,7 @@ def store(req: StoreReq):
     try:
         with _state_lock:
             tid = _field.store(req.content, labels=req.labels, weight=req.weight, metadata=req.metadata)
+        _sync_persist()
         return {"id": tid}
     except Exception as e:
         raise HTTPException(500, str(e))
@@ -99,25 +105,30 @@ def store(req: StoreReq):
 
 import threading as _threading
 
+def _sync_persist():
+    try:
+        with _state_lock:
+            field = _field
+        if field is None:
+            return
+        nodes = field.list_occupied()
+        import json as _json
+        export = {"tetrahedra": [
+            {"id": n["id"], "content": n.get("content", ""),
+             "labels": n.get("labels", []), "weight": n.get("weight", 1.0),
+             "metadata": n.get("metadata", {}),
+             "centroid": n.get("centroid", n.get("position", [0, 0, 0]))}
+            for n in nodes
+        ], "metadata": {"persist_time": time.time()}}
+        path = Path(STORAGE_DIR) / "mesh_index.json"
+        path.write_text(_json.dumps(export, ensure_ascii=False, indent=2), encoding="utf-8")
+    except Exception as e:
+        print(f"[TetraMem] sync persist error: {e}")
+
 def _auto_persist_loop():
     while True:
-        _threading.Event().wait(timeout=120)
-        try:
-            with _state_lock:
-                field = _field
-            nodes = field.list_occupied()
-            import json as _json
-            export = {"tetrahedra": [
-                {"id": n["id"], "content": n.get("content", ""),
-                 "labels": n.get("labels", []), "weight": n.get("weight", 1.0),
-                 "metadata": n.get("metadata", {}),
-                 "centroid": n.get("centroid", n.get("position", [0, 0, 0]))}
-                for n in nodes
-            ], "metadata": {"persist_time": time.time()}}
-            path = Path(STORAGE_DIR) / "mesh_index.json"
-            path.write_text(_json.dumps(export, ensure_ascii=False, indent=2), encoding="utf-8")
-        except Exception:
-            pass
+        _threading.Event().wait(timeout=30)
+        _sync_persist()
 
 _threading.Thread(target=_auto_persist_loop, daemon=True, name="auto-persist").start()
 
