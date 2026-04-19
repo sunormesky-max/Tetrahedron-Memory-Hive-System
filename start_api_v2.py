@@ -668,7 +668,7 @@ def search_endpoint(request: dict = None):
         mapped.append({
             "text": r.get("content", ""),
             "content": r.get("content", ""),
-            "score": max(0, 1.0 - r.get("distance", 1.0)),
+            "score": round(r.get("distance", 0.0), 6),
             "source": "tetramem",
             "metadata": {"id": r.get("id", ""), "weight": r.get("weight", 0), "labels": r.get("labels", [])},
         })
