@@ -169,7 +169,7 @@ def _sync_persist():
 
 def _auto_persist_loop():
     while True:
-        _threading.Event().wait(timeout=30)
+        time.sleep(30)
         _sync_persist()
 
 _threading.Thread(target=_auto_persist_loop, daemon=True, name="auto-persist").start()
