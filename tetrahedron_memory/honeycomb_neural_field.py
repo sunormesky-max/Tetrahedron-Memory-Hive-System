@@ -134,7 +134,7 @@ class PCNNConfig:
         PulseType.STRUCTURE: 0.07,
     }
 
-    HEBBIAN_MAX_PATHS = 500
+    HEBBIAN_MAX_PATHS = 4000
     HEBBIAN_DECAY = 0.98
     HEBBIAN_REINFORCE = 1.15
     HEBBIAN_MIN_WEIGHT = 0.01
@@ -157,8 +157,8 @@ class PCNNConfig:
     STRUCTURE_STRENGTH = 0.40
     STRUCTURE_INTEGRITY_INTERVAL = 300
 
-    CRYSTALLIZE_THRESHOLD = 3.0
-    CRYSTALLIZE_MAX_PATHS = 200
+    CRYSTALLIZE_THRESHOLD = 5.0
+    CRYSTALLIZE_MAX_PATHS = 600
     CRYSTAL_PULSE_BOOST = 1.8
     CRYSTAL_WEIGHT_FLOOR = 2.0
 
@@ -4250,20 +4250,48 @@ class HoneycombNeuralField:
             if len(nodes_proj) < 2:
                 continue
             nodes_proj.sort(key=lambda x: x[1])
-            clusters = []
-            current_cluster = [nodes_proj[0]]
-            for i in range(1, len(nodes_proj)):
-                if nodes_proj[i][1] - nodes_proj[i-1][1] < self._spacing * 1.5:
-                    current_cluster.append(nodes_proj[i])
+            proj_vals = [p for _, p in nodes_proj]
+            proj_range = max(proj_vals) - min(proj_vals)
+            if proj_range <= 0:
+                continue
+            n_bins = max(10, int(proj_range / self._spacing))
+            if n_bins > 200:
+                n_bins = 200
+            bin_width = proj_range / n_bins
+            bins = [0] * n_bins
+            bin_nodes = [[] for _ in range(n_bins)]
+            for nid, proj in nodes_proj:
+                bi = min(int((proj - proj_vals[0]) / bin_width), n_bins - 1)
+                bins[bi] += 1
+                bin_nodes[bi].append(nid)
+            if max(bins) == 0:
+                continue
+            avg_density = len(nodes_proj) / n_bins
+            if avg_density < 1:
+                continue
+            threshold_density = avg_density * 2.0
+            dense_indices = [i for i, c in enumerate(bins) if c >= threshold_density]
+            if not dense_indices:
+                continue
+            groups = []
+            current_group = [dense_indices[0]]
+            for i in range(1, len(dense_indices)):
+                if dense_indices[i] - dense_indices[i-1] <= 1:
+                    current_group.append(dense_indices[i])
                 else:
-                    if len(current_cluster) >= 3:
-                        clusters.append(current_cluster)
-                    current_cluster = [nodes_proj[i]]
-            if len(current_cluster) >= 3:
-                clusters.append(current_cluster)
+                    groups.append(current_group)
+                    current_group = [dense_indices[i]]
+            groups.append(current_group)
+            clusters = []
+            for group in groups:
+                cluster_nodes = []
+                for bi in group:
+                    cluster_nodes.extend(bin_nodes[bi])
+                if len(cluster_nodes) >= 3:
+                    clusters.append(cluster_nodes)
 
             for cluster in clusters:
-                ids = [nid for nid, _ in cluster]
+                ids = cluster
                 avg_weight = np.mean([self._nodes[nid].weight for nid in ids])
                 resonance_strength = len(cluster) * avg_weight / 10.0
                 if resonance_strength > 0.5:
