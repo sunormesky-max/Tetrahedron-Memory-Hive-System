@@ -1818,6 +1818,66 @@ class DreamEngine:
         self._total_dreams = 0
         self._lock = threading.Lock()
 
+    def _extract_content_summary(self, content: str, max_chars: int = 40) -> str:
+        """
+        Extract a meaningful content summary from a memory node.
+        Takes the first meaningful phrase up to max_chars, respecting
+        sentence/phrase boundaries.
+        """
+        if not content:
+            return ""
+        clean = content.lstrip("[").split("] ", 1)
+        text = clean[-1] if len(clean) > 1 else clean[0]
+        text = text.strip()
+        for sep in ["。", "，", "；", "\n", "——", "：", "|"]:
+            if sep in text and text.index(sep) < max_chars:
+                text = text[:text.index(sep)]
+                break
+        if len(text) > max_chars:
+            text = text[:max_chars] + "..."
+        return text
+
+    def _trace_dream_path(self, field, nid_a: str, nid_b: str, max_hops: int = 8) -> List[str]:
+        """
+        BFS through the BCC lattice to find the topological path between two nodes.
+        Returns a list of occupied node IDs along the path (waypoints).
+        This IS the dream's spatial structure — the geometric journey through the lattice.
+        """
+        if nid_a == nid_b:
+            return []
+        visited = {nid_a}
+        parent = {}
+        queue = [nid_a]
+        for _ in range(max_hops):
+            next_q = []
+            for fid in queue:
+                fn = field._nodes.get(fid)
+                if fn is None:
+                    continue
+                for nnid in fn.face_neighbors[:6] + fn.edge_neighbors[:4]:
+                    if nnid == nid_b:
+                        path = [nid_b]
+                        cur = fid
+                        while cur in parent:
+                            path.append(cur)
+                            cur = parent[cur]
+                        path.append(nid_a)
+                        path.reverse()
+                        occupied_waypoints = []
+                        for pid in path:
+                            pn = field._nodes.get(pid)
+                            if pn and pn.is_occupied and pid not in (nid_a, nid_b):
+                                occupied_waypoints.append(pid)
+                        return occupied_waypoints
+                    if nnid not in visited:
+                        visited.add(nnid)
+                        parent[nnid] = fid
+                        next_q.append(nnid)
+            queue = next_q
+            if not queue:
+                break
+        return []
+
     def run_dream_cycle(self) -> DreamCycleResult:
         result = DreamCycleResult()
         field = self._field
@@ -1868,26 +1928,38 @@ class DreamEngine:
                 nid_a, node_a = src_a
                 nid_b, node_b = src_b
 
+                spatial_dist = float(np.linalg.norm(node_a.position - node_b.position))
+                max_dist = field._spacing * 8
+                spatial_factor = min(1.0, spatial_dist / max_dist)
+                if spatial_factor < 0.15:
+                    continue
+
                 creativity = self._score_creativity(node_a, node_b, domain_a_name, domain_b_name)
 
                 if creativity < 0.3:
                     continue
 
+                summary_a = self._extract_content_summary(node_a.content)
+                summary_b = self._extract_content_summary(node_b.content)
+
+                waypoints = self._trace_dream_path(field, nid_a, nid_b)
+                waypoint_summaries = []
+                for wid in waypoints[:3]:
+                    wn = field._nodes.get(wid)
+                    if wn and wn.is_occupied:
+                        ws = self._extract_content_summary(wn.content, 30)
+                        if ws:
+                            wlabels = [l for l in wn.labels if not l.startswith("__")][:2]
+                            waypoint_summaries.append((wlabels, ws))
+
                 dream_parts = []
-                tokens_a = field._extract_tokens(node_a.content)
-                tokens_b = field._extract_tokens(node_b.content)
+                dream_parts.append(f"{domain_a_name}⟨{summary_a}⟩")
+                for wlabels, ws in waypoint_summaries:
+                    label_hint = "·".join(wlabels) if wlabels else "..."
+                    dream_parts.append(f"↔{label_hint}⟨{ws}⟩")
+                dream_parts.append(f"{domain_b_name}⟨{summary_b}⟩")
 
-                if tokens_a:
-                    sample_a = random.sample(list(tokens_a), min(3, len(tokens_a)))
-                    dream_parts.append(f"{domain_a_name}: {' '.join(sample_a)}")
-                if tokens_b:
-                    sample_b = random.sample(list(tokens_b), min(3, len(tokens_b)))
-                    dream_parts.append(f"{domain_b_name}: {' '.join(sample_b)}")
-
-                if not dream_parts:
-                    continue
-
-                dream_content = "[dream] " + " | ".join(dream_parts)
+                dream_content = "[dream] " + " → ".join(dream_parts)
                 dream_labels = list(set([
                     domain_a_name, domain_b_name, "__dream__",
                 ]))
@@ -1895,6 +1967,8 @@ class DreamEngine:
                     cfg.DREAM_INSIGHT_WEIGHT * creativity,
                     max(node_a.weight, node_b.weight) * 0.8,
                 )
+
+                path_length = len(waypoints) + 2
 
                 try:
                     dream_id = field.store(
@@ -1906,6 +1980,9 @@ class DreamEngine:
                             "dream_source_b": nid_b[:12],
                             "creativity_score": round(creativity, 3),
                             "dream_type": "cross_domain" if domain_a_name != domain_b_name else "intra_domain",
+                            "spatial_distance": round(spatial_dist, 2),
+                            "topo_path_length": path_length,
+                            "waypoint_count": len(waypoints),
                         },
                     )
                     result.dreams_created += 1
@@ -1921,6 +1998,8 @@ class DreamEngine:
                         "creativity": round(creativity, 3),
                         "weight": round(dream_weight, 3),
                         "cross_domain": is_cross,
+                        "spatial_distance": round(spatial_dist, 2),
+                        "topo_path_length": path_length,
                     })
 
                     field._emit_pulse(
@@ -1942,10 +2021,12 @@ class DreamEngine:
         cross_bonus = cfg.DREAM_CROSS_DOMAIN_BONUS if domain_a != domain_b else 1.0
         weight_factor = (node_a.weight * node_b.weight) / 25.0
         activation_factor = (node_a.activation + node_b.activation) / 10.0
-        novelty = self._novelty_score(node_a, node_b)
         structural = self._structural_distance(node_a, node_b)
+        crystal_boost_a = sum(node_a.crystal_channels.values()) if node_a.crystal_channels else 0
+        crystal_boost_b = sum(node_b.crystal_channels.values()) if node_b.crystal_channels else 0
+        crystal_factor = min(1.0, (crystal_boost_a + crystal_boost_b) / 10.0)
         base = (cross_bonus * weight_factor * activation_factor) / (cross_bonus + 1)
-        creativity = base * (0.6 + 0.3 * novelty + 0.1 * structural)
+        creativity = base * (0.4 + 0.35 * structural + 0.15 * crystal_factor + 0.1 * min(1.0, weight_factor))
         return min(1.0, creativity)
 
     def _novelty_score(self, node_a, node_b) -> float:
@@ -1966,16 +2047,15 @@ class DreamEngine:
             return 0.5
 
     def _is_duplicate_dream(self, field, dream_content: str) -> bool:
-        tokens = field._extract_tokens(dream_content)
-        if not tokens:
+        parts = dream_content.split("→")
+        if len(parts) < 2:
             return False
         for nid, node in field._nodes.items():
             if node.is_occupied and "__dream__" in node.labels:
-                existing_tokens = field._extract_tokens(node.content)
-                if existing_tokens:
-                    overlap = len(tokens & existing_tokens)
-                    union = len(tokens | existing_tokens)
-                    if union > 0 and overlap / union > 0.8:
+                existing_parts = node.content.split("→")
+                if len(existing_parts) == len(parts):
+                    overlap = sum(1 for a, b in zip(parts, existing_parts) if a.strip() == b.strip())
+                    if overlap / len(parts) > 0.8:
                         return True
         return False
 
@@ -1983,17 +2063,16 @@ class DreamEngine:
         if len(sources) < 3:
             return None
         sampled = random.sample(sources, min(3, len(sources)))
-        all_tokens = []
+        summaries = []
         all_labels = set()
         for node, domain in zip(sampled, domain_names[:len(sampled)]):
-            tokens = field._extract_tokens(node.content)
-            if tokens:
-                all_tokens.append((domain, random.sample(list(tokens), min(2, len(tokens)))))
+            summary = self._extract_content_summary(node.content, 30)
+            if summary:
+                summaries.append(f"{domain}⟨{summary}⟩")
             all_labels.add(domain)
-        parts = [f"{d}: {' '.join(t)}" for d, t in all_tokens if t]
-        if len(parts) < 3:
+        if len(summaries) < 3:
             return None
-        content = "[dream:fusion] " + " + ".join(parts)
+        content = "[dream:fusion] " + " → ".join(summaries)
         return {"content": content, "labels": list(all_labels) + ["__dream__", "__dream_fusion__"]}
 
     def get_history(self, n: int = 10) -> List[Dict]:
@@ -3952,7 +4031,7 @@ class FeedbackLoop:
                         for fnid in node.face_neighbors[:8]:
                             fn = field._nodes.get(fnid)
                             if fn and fn.is_occupied:
-                                field._hebbian.reinforce(context_id, fnid, 0.5)
+                                field._hebbian.record_path([context_id, fnid], True, 0.5)
                     adjustments.append("hebbian_reinforced")
 
                 adjustments.append(f"weight_boosted:+{boost:.3f}")
@@ -3981,13 +4060,13 @@ class FeedbackLoop:
 
             if src and tgt and success:
                 if field._hebbian:
-                    field._hebbian.reinforce(source_id, target_id, 0.3 * confidence)
+                    field._hebbian.record_path([source_id, target_id], True, 0.3 * confidence)
                     learning_result["hebbian_reinforced"] = True
 
                 if action == "navigate" and field._crystallized:
                     path_weight = field._hebbian.get_path_bias(source_id, target_id) if field._hebbian else 0
                     if path_weight > PCNNConfig.CRYSTALLIZE_THRESHOLD * 0.5:
-                        field._crystallized.add_crystal(source_id, target_id, path_weight)
+                        field._crystallized.try_crystallize(source_id, target_id, path_weight)
                         learning_result["crystal_candidate"] = True
 
             elif src and tgt and not success:
