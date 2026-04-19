@@ -143,8 +143,8 @@ class PCNNConfig:
     SELF_CHECK_MAX_HOPS = 4
     SELF_CHECK_STRENGTH = 0.55
     ISOLATED_NODE_THRESHOLD = 0
-    DUPLICATE_TOKEN_OVERLAP = 0.70
-    DUPLICATE_MERGE_MIN_WEIGHT_RATIO = 0.3
+    DUPLICATE_TOKEN_OVERLAP = 0.85
+    DUPLICATE_MERGE_MIN_WEIGHT_RATIO = 1.1
 
     CASCADE_BRANCHING_FACTOR = 3
     CASCADE_BRANCHING_DECAY = 0.65
@@ -165,7 +165,7 @@ class PCNNConfig:
     CONVERGENCE_CHECK_CYCLES = 60
     GLOBAL_DECAY_CYCLES = 120
 
-    SELF_ORGANIZE_INTERVAL = 180
+    SELF_ORGANIZE_INTERVAL = 60
     CLUSTER_MIN_SIZE = 3
     CLUSTER_LABEL_OVERLAP = 0.4
     CLUSTER_MAX_LABELS = 8
@@ -1705,6 +1705,10 @@ class SelfOrganizeEngine:
             occupied = [(nid, n) for nid, n in field._nodes.items() if n.is_occupied]
             if len(occupied) < 3:
                 result.details = "insufficient nodes for organization"
+                with self._lock:
+                    self._history.append(result)
+                    if len(self._history) > self._max_history:
+                        self._history = self._history[-self._max_history // 2:]
                 return result
 
             result.entropy_before = self._compute_entropy(occupied)
@@ -3582,10 +3586,9 @@ class HoneycombNeuralField:
         tokens = set()
         for w in re.findall(r"[a-zA-Z0-9]{2,}", text.lower()):
             tokens.add(w)
-        for c in re.findall(r"[\u4e00-\u9fff]", text):
-            tokens.add(c)
-        for bigram in re.findall(r"[\u4e00-\u9fff]{2}", text):
-            tokens.add(bigram)
+        for bigram in re.findall(r"[\u4e00-\u9fff]{2,}", text):
+            for i in range(len(bigram) - 1):
+                tokens.add(bigram[i:i+2])
         return tokens
 
     def _emit_pulse(
