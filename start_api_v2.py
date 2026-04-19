@@ -74,6 +74,7 @@ def init_state():
 
     _phase_detector = HoneycombPhaseTransition()
     _field.start_pulse_engine()
+    _field._phase_transition = _phase_detector
     stats = _field.stats()
     print(f"[TetraMem v6.0] Honeycomb: {stats['total_nodes']} nodes, {stats['face_edges']} face edges, PCNN pulse engine running")
 
@@ -92,6 +93,15 @@ async def lifespan(application):
 
 
 app = FastAPI(title="TetraMem-XL v6.5", version="6.5.0", lifespan=lifespan)
+
+
+def _resolve_node(field, node_id: str) -> str:
+    if node_id in field._nodes:
+        return node_id
+    for nid in field._nodes:
+        if nid.startswith(node_id):
+            return nid
+    return node_id
 
 
 class StoreReq(BaseModel):
@@ -912,11 +922,12 @@ def reflection_field_run():
 @app.get("/api/v1/reflection-field/energy/{node_id}")
 def reflection_field_energy(node_id: str):
     with _state_lock:
+        nid = _resolve_node(_field, node_id)
         if _field._reflection_field is None:
-            return {"node_id": node_id, "energy": 0.5}
-        energy = _field._reflection_field.get_node_energy(node_id)
-        quality = _field._reflection_field.get_spatial_quality(_field, node_id)
-        return {"node_id": node_id, "energy": round(energy, 4), "spatial_quality": round(quality, 4)}
+            return {"node_id": nid, "energy": 0.5}
+        energy = _field._reflection_field.get_node_energy(nid)
+        quality = _field._reflection_field.get_spatial_quality(_field, nid)
+        return {"node_id": nid, "energy": round(energy, 4), "spatial_quality": round(quality, 4)}
 
 
 static_dir = Path(__file__).parent / "static"
@@ -927,10 +938,11 @@ if static_dir.exists():
 @app.get("/api/v1/spatial/quality/{node_id}")
 def spatial_quality(node_id: str):
     with _state_lock:
-        gq = _field._compute_node_geometric_quality(node_id)
-        div = _field._compute_geometric_topo_divergence(node_id)
-        rf_energy = _field._reflection_field.get_node_energy(node_id) if _field._reflection_field else 0.5
-        return {"node_id": node_id, "geometric_quality": gq, "geo_topo_divergence": round(div, 4), "field_energy": rf_energy}
+        nid = _resolve_node(_field, node_id)
+        gq = _field._compute_node_geometric_quality(nid)
+        div = _field._compute_geometric_topo_divergence(nid)
+        rf_energy = _field._reflection_field.get_node_energy(nid) if _field._reflection_field else 0.5
+        return {"node_id": nid, "geometric_quality": gq, "geo_topo_divergence": round(div, 4), "field_energy": rf_energy}
 
 
 @app.get("/api/v1/spatial/crystallographic-direction")
@@ -959,11 +971,12 @@ def spatial_autocorrelation():
 @app.get("/api/v1/spatial/bcc-cell-coherence/{node_id}")
 def bcc_cell_coherence(node_id: str):
     with _state_lock:
-        coherence = _field._bcc_cell_coherence(node_id)
-        cellmates = _field._get_bcc_cellmates(node_id)
+        nid = _resolve_node(_field, node_id)
+        coherence = _field._bcc_cell_coherence(nid)
+        cellmates = _field._get_bcc_cellmates(nid)
         occ_cellmates = sum(1 for cmid in cellmates if _field._nodes.get(cmid) and _field._nodes[cmid].is_occupied)
         return {
-            "node_id": node_id,
+            "node_id": nid,
             "bcc_cell_coherence": round(coherence, 4),
             "total_cellmates": len(cellmates),
             "occupied_cellmates": occ_cellmates,
