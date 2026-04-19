@@ -200,11 +200,6 @@ class PCNNConfig:
     MAX_FEEDING = 20.0
     MAX_LINKING = 10.0
 
-    @classmethod
-    @property
-    def EDGE_DECAY(cls) -> float:
-        return cls.FACE_DECAY * cls.EDGE_DECAY_FACTOR
-
 
 class HoneycombNode:
     __slots__ = (
@@ -2556,51 +2551,12 @@ class DreamEngine:
                             + 0.08 * hebbian_factor + 0.07 * pcnn_factor + 0.05 * resonance_factor + 0.05 * moran_factor)
         return min(1.0, creativity)
 
-    def _novelty_score(self, node_a, node_b) -> float:
-        field = self._field
-        tokens_a = field._extract_tokens(node_a.content)
-        tokens_b = field._extract_tokens(node_b.content)
-        if not tokens_a or not tokens_b:
-            return 0.5
-        overlap = len(tokens_a & tokens_b)
-        union = len(tokens_a | tokens_b)
-        return 1.0 - (overlap / max(union, 1))
-
     def _structural_distance(self, node_a, node_b) -> float:
         try:
             dist = float(np.linalg.norm(node_a.position - node_b.position))
             return min(1.0, dist / (self._field._spacing * 8))
         except Exception:
             return 0.5
-
-    def _is_duplicate_dream(self, field, dream_content: str) -> bool:
-        parts = dream_content.split("→")
-        if len(parts) < 2:
-            return False
-        for nid, node in field._nodes.items():
-            if node.is_occupied and "__dream__" in node.labels:
-                existing_parts = node.content.split("→")
-                if len(existing_parts) == len(parts):
-                    overlap = sum(1 for a, b in zip(parts, existing_parts) if a.strip() == b.strip())
-                    if overlap / len(parts) > 0.8:
-                        return True
-        return False
-
-    def _multi_source_dream(self, field, sources: List, domain_names: List[str]) -> Optional[Dict]:
-        if len(sources) < 3:
-            return None
-        sampled = random.sample(sources, min(3, len(sources)))
-        summaries = []
-        all_labels = set()
-        for node, domain in zip(sampled, domain_names[:len(sampled)]):
-            summary = self._extract_content_summary(node.content, 30)
-            if summary:
-                summaries.append(f"{domain}⟨{summary}⟩")
-            all_labels.add(domain)
-        if len(summaries) < 3:
-            return None
-        content = "[dream:fusion] " + " → ".join(summaries)
-        return {"content": content, "labels": list(all_labels) + ["__dream__", "__dream_fusion__"]}
 
     def get_history(self, n: int = 10) -> List[Dict]:
         return [r.to_dict() for r in self._history[-n:]]
@@ -3465,12 +3421,13 @@ class HoneycombNeuralField:
         self._content_hash_index.pop(chash, None)
         for lbl in node.labels:
             self._label_index[lbl].discard(nid)
-        node.content = ""
+        for tok in self._extract_tokens(node.content or ""):
+            self._content_token_index[tok].discard(nid)
+        node.content = None
         node.labels = []
         node.weight = 0.0
         node.activation = 0.0
         node.base_activation = 0.01
-        node.is_occupied = False
         node.metadata = {}
         node.crystal_channels.clear()
 
@@ -3663,15 +3620,14 @@ class HoneycombNeuralField:
 
         best_id = None
         best_score = float('inf')
-        sample = min(500, len(self._nodes))
+        sample = min(300, len(self._nodes))
         for nid in random.sample(list(self._nodes.keys()), sample):
             node = self._nodes[nid]
             if node.is_occupied:
                 continue
-            min_occ_dist = min(float(np.sum((node.position - op) ** 2)) for op in occ_positions)
             centroid_dist = float(np.sum((node.position - centroid) ** 2))
             vacancy = self._vacancy_attraction(nid)
-            score = min_occ_dist * 0.3 + centroid_dist * 0.7 - vacancy * 0.2
+            score = centroid_dist * 0.7 - vacancy * 0.3
             if score < best_score:
                 best_score = score
                 best_id = nid
