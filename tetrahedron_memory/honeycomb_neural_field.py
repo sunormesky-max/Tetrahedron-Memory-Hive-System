@@ -2432,7 +2432,8 @@ class HoneycombNeuralField:
         logger.info("Connectivity: %d face edges, %d edge connections", face_count, edge_count)
 
     def store(self, content: str, labels: Optional[List[str]] = None,
-              weight: float = 1.0, metadata: Optional[Dict] = None) -> str:
+              weight: float = 1.0, metadata: Optional[Dict] = None,
+              creation_time_override: Optional[float] = None) -> str:
         with self._lock:
             chash = hashlib.sha256(content.encode()).hexdigest()[:12]
             if chash in self._content_hash_index:
@@ -2463,7 +2464,7 @@ class HoneycombNeuralField:
             node.activation = weight
             node.base_activation = max(0.01, weight * 0.1)
             node.metadata = metadata or {}
-            node.creation_time = time.time()
+            node.creation_time = creation_time_override if creation_time_override is not None else time.time()
             node.touch()
 
             node.feeding = weight
