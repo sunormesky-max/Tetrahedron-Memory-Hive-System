@@ -753,50 +753,50 @@ function updateScene(tetras){
 }
 
 function buildScene(data){
-  const res=data.resolution||5;const sp=data.spacing||1.0;const sc=0.8;
-  const memMap={};(data.memories||[]).forEach(m=>{memMap[m.id]=m;});
-  const memEntries=Object.entries(memMap);
-  if(memEntries.length===0)return;
+  const sp=data.spacing||1.0;const sc=0.8;
+  const mems=(data.memories||[]).slice(0,800);
+  if(mems.length===0)return;
 
   const neighborVerts=[];
-  for(const[id,m]of memEntries){
-    const p=new THREE.Vector3(m.pos[0]*sc,m.pos[1]*sc,m.pos[2]*sc);
-    for(const[id2,m2]of memEntries){
-      if(id===id2)continue;
-      const p2=new THREE.Vector3(m2.pos[0]*sc,m2.pos[1]*sc,m2.pos[2]*sc);
-      const d=p.distanceTo(p2);
-      if(d<sp*sc*2.5){
-        neighborVerts.push(p.x,p.y,p.z,p2.x,p2.y,p2.z);
+  const posMap=new Map();
+  mems.forEach(m=>posMap.set(m.id,new THREE.Vector3(m.pos[0]*sc,m.pos[1]*sc,m.pos[2]*sc)));
+  const thresh=sp*sc*2.0;
+  for(let i=0;i<mems.length;i++){
+    const p1=posMap.get(mems[i].id);
+    for(let j=i+1;j<mems.length;j++){
+      const p2=posMap.get(mems[j].id);
+      if(p1.distanceTo(p2)<thresh){
+        neighborVerts.push(p1.x,p1.y,p1.z,p2.x,p2.y,p2.z);
       }
     }
   }
   if(neighborVerts.length>0){
     const geo=new THREE.BufferGeometry();
     geo.setAttribute('position',new THREE.Float32BufferAttribute(neighborVerts,3));
-    edgeGroup.add(new THREE.LineSegments(geo,new THREE.LineBasicMaterial({color:0x1a1a3a,transparent:true,opacity:0.2})));
+    edgeGroup.add(new THREE.LineSegments(geo,new THREE.LineBasicMaterial({color:0x1a1a3a,transparent:true,opacity:0.15})));
   }
 
-  for(const[id,m]of memEntries){
-    const p=new THREE.Vector3(m.pos[0]*sc,m.pos[1]*sc,m.pos[2]*sc);
-    const isDream=m.is_dream;const color=weightToColor(m.weight||1,isDream);
-    const s=0.25,h=s*1.2,a=s*1.5;
-    const tGeo=new THREE.BufferGeometry();
-    const tV=new Float32Array([0,h*.75,0,-a,-h*.25,a*.5,a,-h*.25,a*.5,0,-h*.25,-a]);
-    tGeo.setAttribute('position',new THREE.BufferAttribute(tV,3));
-    tGeo.setIndex(new THREE.BufferAttribute(new Uint16Array([0,1,2,0,2,3,0,3,1,1,3,2]),1));
-    tGeo.computeVertexNormals();
-    const tMat=new THREE.MeshPhongMaterial({color,transparent:true,opacity:0.9,emissive:color.clone().multiplyScalar(0.4),emissiveIntensity:0.6,shininess:80});
-    const tMesh=new THREE.Mesh(tGeo,tMat);tMesh.position.copy(p);tMesh.userData={id:m.id,weight:m.weight||1,isDream};
-    meshGroup.add(tMesh);tetraMeshMap[m.id]=tMesh;
-    const wGeo=new THREE.EdgesGeometry(tGeo);
-    const wire=new THREE.LineSegments(wGeo,new THREE.LineBasicMaterial({color:isDream?0x5eb88a:0x3a4a7a,transparent:true,opacity:0.6}));
-    wire.position.copy(p);meshGroup.add(wire);
-    if(m.content&&(m.weight||0)>=2){
-      const lc=document.createElement('canvas');lc.width=512;lc.height=64;const ctx=lc.getContext('2d');
-      ctx.fillStyle=isDream?'#5eb88a':'#7b8cff';ctx.font='22px sans-serif';ctx.fillText(m.content.slice(0,20),4,36);
+  const tV=new Float32Array([0,0.3,0, -0.375,-0.1,0.225, 0.375,-0.1,0.225, 0,-0.1,-0.3]);
+  const tIdx=new Uint16Array([0,1,2, 0,2,3, 0,3,1, 1,3,2]);
+  for(const m of mems){
+    const p=posMap.get(m.id);
+    const isDream=m.is_dream;
+    const color=weightToColor(m.weight||1,isDream);
+    const geo=new THREE.BufferGeometry();
+    geo.setAttribute('position',new THREE.BufferAttribute(new Float32Array(tV),3));
+    geo.setIndex(new THREE.BufferAttribute(new Uint16Array(tIdx),1));
+    geo.computeVertexNormals();
+    const mat=new THREE.MeshPhongMaterial({color,transparent:true,opacity:0.88,emissive:color.clone().multiplyScalar(0.35),emissiveIntensity:0.5,shininess:60});
+    const mesh=new THREE.Mesh(geo,mat);
+    mesh.position.copy(p);
+    mesh.userData={id:m.id,weight:m.weight||1,isDream};
+    meshGroup.add(mesh);tetraMeshMap[m.id]=mesh;
+    if(m.weight>=4&&m.content){
+      const lc=document.createElement('canvas');lc.width=384;lc.height=48;const ctx=lc.getContext('2d');
+      ctx.fillStyle=isDream?'#5eb88a':'#7b8cff';ctx.font='18px sans-serif';ctx.fillText(m.content.slice(0,18),4,30);
       const tex=new THREE.CanvasTexture(lc);
-      const sprite=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,opacity:0.85}));
-      sprite.position.copy(p);sprite.position.y+=0.18;sprite.scale.set(0.6,0.1,1);meshGroup.add(sprite);
+      const sprite=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,opacity:0.75}));
+      sprite.position.copy(p);sprite.position.y+=0.25;sprite.scale.set(0.5,0.08,1);meshGroup.add(sprite);
     }
   }
 }
