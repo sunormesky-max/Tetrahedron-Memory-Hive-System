@@ -2,6 +2,82 @@
 
 All notable changes to TetraMem-XL are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [6.0.0] - 2026-04-19
+
+### Added — Agent-Driven Memory System + OpenClaw Deep Integration
+
+#### FeedbackLoop — Agent Decision Feedback Loop
+- `record_outcome()` — records agent action results (positive/negative/neutral)
+- `learn_from_action()` — learns from agent behavior to strengthen/weaken Hebbian paths
+- Core principle: negative outcomes do NOT reduce weight, only tag as `__low_priority__`
+- Positive outcomes boost weight (confidence * 0.2) and reinforce Hebbian paths
+- 3 consecutive positives on a node → Hebbian reinforcement of neighboring paths
+- `get_stats()` and `get_learning_insights()` for feedback analysis
+
+#### SessionManager — Conversation Memory Lifecycle
+- `create_session()` — creates scoped conversation with ephemeral memories
+- `add_to_session()` — stores conversation turns as temporary (ephemeral) memories
+- `recall_session()` — retrieves conversation history
+- `consolidate_session()` — promotes important ephemeral memories to permanent
+- Memory hierarchy: ephemeral → short-term → long-term → eternal
+- Auto-cleanup of expired sessions (max_age configurable)
+
+#### SSE Event Streaming
+- `GET /api/v1/events` — real-time Server-Sent Events stream
+- Event types: `feedback_recorded`, `feedback_learned`, `session_created`, `session_consolidated`, `heartbeat`
+- Topic-based filtering via query parameter
+
+#### OpenClaw Compatibility Endpoints
+- `POST /api/v1/search` — maps to query() for memory backend compatibility
+- `POST /api/v1/read` — read specific memory by ID or content
+- `GET /api/v1/status` — combined health + stats
+- `POST /api/v1/sync` — trigger persistence sync
+- `GET /api/v1/capabilities/embeddings` — returns unavailable (topological engine only)
+- `GET /api/v1/capabilities/vectors` — returns unavailable
+
+#### MCP Tool Server v3.0.0 (22 tools)
+- 8 new Agent tools: `tetramem_agent_context`, `tetramem_agent_reasoning`, `tetramem_agent_suggest`, `tetramem_agent_navigate`
+- 2 new Feedback tools: `tetramem_feedback_record`, `tetramem_feedback_insights`
+- 4 new Session tools: `tetramem_session_create`, `tetramem_session_add`, `tetramem_session_recall`, `tetramem_session_consolidate`
+
+#### OpenClaw Deep Integration
+- `tetramem-manager.js` updated with correct API endpoints (POST /api/v1/search, /read, /status, /sync)
+- Memory backend switched from `"builtin"` to `"tetramem"` in openclaw.json
+- System prompt injection via `systemPromptOverride` for memory-first behavior
+- Auto-learning cron script enhanced with v6.0 Agent tools (context, feedback, dream)
+- Watchdog verified patches intact after gateway restart
+
+#### New API Endpoints (12)
+- `POST /api/v1/feedback/record` — record decision outcome
+- `POST /api/v1/feedback/learn` — learn from agent action
+- `GET /api/v1/feedback/stats` — feedback statistics
+- `GET /api/v1/feedback/insights` — learning insights
+- `POST /api/v1/session/create` — create conversation session
+- `POST /api/v1/session/{id}/add` — add conversation turn
+- `GET /api/v1/session/{id}/recall` — recall session history
+- `POST /api/v1/session/{id}/consolidate` — consolidate ephemeral memories
+- `GET /api/v1/session/list` — list active sessions
+- `GET /api/v1/session/{id}` — get session details
+- `GET /api/v1/events` — SSE event stream
+- OpenClaw compat: `/search`, `/read`, `/status`, `/sync`, `/capabilities/*`
+
+#### New Classes in honeycomb_neural_field.py
+- `FeedbackRecord` — feedback data structure with action/outcome/confidence
+- `FeedbackLoop` — agent decision learning engine (~250 lines)
+- `SessionRecord` — conversation turn data structure
+- `Session` — session container with ephemeral ID tracking
+- `SessionManager` — conversation memory lifecycle manager (~200 lines)
+
+### Documentation
+- `INTEGRATION_GUIDE.md` — complete integration guide for other agents
+- `TetraMem-XL-Agent-Architecture-v6.md` — architecture design document
+
+### Debugging Notes
+- OpenClaw config uses `.strict()` Zod schemas — any unrecognized key rejects the entire config
+- PowerShell SSH quoting issues resolved by writing Python scripts to server
+- SelfCheckEngine deadlock resolved — RLock properly handles reentrant calls
+- `tetramem-manager-template.js` must use POST (not GET) for /search endpoint
+
 ## [5.3.0] - 2026-04-19
 
 ### Added — Dream Engine + Agent Memory Driver
