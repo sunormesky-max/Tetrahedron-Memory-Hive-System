@@ -481,18 +481,40 @@ function renderMemories(el){
   </div></div><div id="panelMemResults"></div>`;
   panelDoSearch();
 }
+let tlOffset=0;const TL_PAGE_SIZE=100;
 async function panelDoSearch(){
   const q=document.getElementById('panelSearch')?.value||'';
   const el=document.getElementById('panelMemResults');if(!el)return;
   if(q){
-    const r=await api('/query',{body:{query:q,k:30}});
+    const r=await api('/query',{body:{query:q,k:50}});
     const items=r?.results||[];
     el.innerHTML=memTable('查询结果 ('+items.length+')',items);
   }else{
-    const r=await api('/timeline',{body:{direction:'newest',limit:40}});
+    tlOffset=0;
+    const r=await api('/timeline',{body:{direction:'newest',limit:TL_PAGE_SIZE}});
     const items=r?.items||[];
-    el.innerHTML=memTable('最新记忆 ('+items.length+')',items);
+    tlOffset=items.length;
+    const total=r?.total||items.length;
+    el.innerHTML=memTable(`最新记忆 (${items.length}/${total})`,items)+(total>TL_PAGE_SIZE?`<div style="text-align:center;margin-top:8px"><button class="btn" onclick="loadMoreTimeline()" style="font-size:11px;padding:6px 18px">加载更多...</button></div>`:'');
   }
+}
+async function loadMoreTimeline(){
+  const el=document.getElementById('panelMemResults');if(!el)return;
+  const r=await api('/timeline',{body:{direction:'newest',limit:TL_PAGE_SIZE,offset:tlOffset}});
+  const items=r?.items||[];
+  const total=r?.total||0;
+  const tbl=el.querySelector('table');
+  if(tbl){
+    const tbody=tbl.querySelector('tbody')||tbl;
+    tbody.insertAdjacentHTML('beforeend',items.map(m=>`<tr><td style="max-width:350px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(m.content)}">${esc(m.content)}</td>
+    <td>${(m.weight||0).toFixed(1)}</td><td>${(m.activation||0).toFixed(3)}</td>
+    <td>${(m.labels||[]).map(l=>{const c=l==='__pulse_bridge__'?'bridge':l==='__dream__'?'dream':l==='__insight__'?'insight':'face';return `<span class="tag2 ${c}">${esc(l)}</span>`;}).join('')}</td></tr>`).join(''));
+  }
+  tlOffset+=items.length;
+  const hdr=el.querySelector('h2');
+  if(hdr)hdr.textContent=`最新记忆 (${tlOffset}/${total})`;
+  const moreBtn=el.querySelector('button');
+  if(moreBtn&&tlOffset>=total)moreBtn.remove();
 }
 function memTable(title,items){
   return `<div class="card"><h2>${title}</h2><table><tr><th>内容</th><th>权重</th><th>激活</th><th>标签</th></tr>
@@ -620,24 +642,40 @@ function showImportDialog(){
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
 /* ===== Right Panel (3D mode) ===== */
+let rpPage=0;const RP_PAGE_SIZE=100;
 function showRightPanelList(){
+  rpPage=0;
   const body=document.getElementById('rpBody');
   const hdr=document.getElementById('rpHeader');
   hdr.textContent='记忆集群 ('+G.memories.length+')';
   body.innerHTML=`<input id="rpFilter" placeholder="筛选记忆..." class="input-field" style="width:100%;margin-bottom:8px" oninput="filterRightPanel()">
-  <div id="rpList"></div>`;
+  <div id="rpList"></div><div id="rpMore" style="text-align:center;padding:8px;display:none"><button class="btn" onclick="loadMoreRp()" style="font-size:11px;padding:6px 18px">加载更多...</button></div>`;
   filterRightPanel();
 }
 function filterRightPanel(){
+  rpPage=0;
   const ft=(document.getElementById('rpFilter')?.value||'').toLowerCase();
   const list=document.getElementById('rpList');if(!list)return;
   const filtered=ft?G.memories.filter(m=>(m.content||'').toLowerCase().includes(ft)||(m.labels||[]).some(l=>l.toLowerCase().includes(ft))):G.memories;
-  list.innerHTML=filtered.slice(0,50).map(m=>`<div class="mem-card" onclick="selectMemory('${m.id}')">
+  list._filtered=filtered;
+  list.innerHTML=filtered.slice(0,RP_PAGE_SIZE).map(m=>rpCard(m)).join('');
+  document.getElementById('rpMore').style.display=filtered.length>RP_PAGE_SIZE?'block':'none';
+}
+function loadMoreRp(){
+  rpPage++;
+  const list=document.getElementById('rpList');if(!list||!list._filtered)return;
+  const start=rpPage*RP_PAGE_SIZE;
+  const items=list._filtered.slice(start,start+RP_PAGE_SIZE);
+  list.insertAdjacentHTML('beforeend',items.map(m=>rpCard(m)).join(''));
+  if(start+RP_PAGE_SIZE>=list._filtered.length)document.getElementById('rpMore').style.display='none';
+}
+function rpCard(m){
+  return `<div class="mem-card" onclick="selectMemory('${m.id}')">
     <div class="mem-id">${(m.id||'').slice(0,12)}</div>
     <div class="mem-content">${(m.content||'').slice(0,70)}</div>
     <div class="mem-meta"><span class="weight">w=${(m.weight||0).toFixed(1)}</span>
     <div class="tag-list">${(m.labels||[]).slice(0,3).map(l=>`<span class="tag-item ${l==='__dream__'||l==='__pulse_bridge__'?'dream':''}">${l}</span>`).join('')}</div></div>
-  </div>`).join('');
+  </div>`;
 }
 
 async function selectMemory(id){
