@@ -4584,7 +4584,8 @@ class HoneycombNeuralField:
             return isolated
 
     def browse_timeline(self, direction: str = "newest", limit: int = 20,
-                        label_filter=None, min_weight: float = 0.0) -> List[Dict]:
+                        label_filter=None, min_weight: float = 0.0,
+                        offset: int = 0) -> tuple:
         with self._lock:
             items = []
             for nid, node in self._nodes.items():
@@ -4603,7 +4604,8 @@ class HoneycombNeuralField:
                     "activation": node.activation,
                 })
             items.sort(key=lambda x: x["creation_time"], reverse=(direction == "newest"))
-            return items[:limit]
+            total = len(items)
+            return items[offset:offset + limit], total
 
     def associate(self, tetra_id: str, max_depth: int = 2) -> List[Dict]:
         with self._lock:
