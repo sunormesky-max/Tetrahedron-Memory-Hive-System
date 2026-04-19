@@ -899,7 +899,9 @@ function animate(){
   if(!renderer||!scene)return;
   try{
     controls.update();const t=Date.now()*0.001;
-    for(const id in tetraMeshMap){const obj=tetraMeshMap[id];if(obj&&obj._hl&&obj.material)try{obj.material.emissiveIntensity=0.3+0.2*Math.sin(t*3);}catch(e){}}
+    for(const id in tetraMeshMap){const obj=tetraMeshMap[id];
+      if(obj&&obj.userData&&obj.userData.rAx)obj.rotateOnAxis(obj.userData.rAx,obj.userData.rSpd);
+      if(obj&&obj._hl&&obj.material)try{obj.material.emissiveIntensity=0.3+0.2*Math.sin(t*3);}catch(e){}}
     try{
       const now=Date.now();
       const toRemove=[];
@@ -1049,7 +1051,8 @@ function buildScene(data){
     const mat=new THREE.MeshPhongMaterial({color,transparent:true,opacity:0.88,emissive:color.clone().multiplyScalar(0.35),emissiveIntensity:0.5,shininess:60});
     const mesh=new THREE.Mesh(geo,mat);
     mesh.position.copy(p);
-    mesh.userData={id:m.id,weight:m.weight||1,isDream};
+    const rAx=new THREE.Vector3(Math.random()-0.5,Math.random()-0.5,Math.random()-0.5).normalize();
+    mesh.userData={id:m.id,weight:m.weight||1,isDream,rAx,rSpd:0.002+Math.random()*0.006+(m.weight||1)*0.0005};
     meshGroup.add(mesh);tetraMeshMap[m.id]=mesh;
     if(m.weight>=4&&m.content){
       const lc=document.createElement('canvas');lc.width=384;lc.height=48;const ctx=lc.getContext('2d');
@@ -1071,7 +1074,7 @@ function buildFallback(tetras){
     const isDream=t.labels&&(t.labels.includes('__dream__')||t.labels.includes('__pulse_bridge__'));
     const color=weightToColor(t.weight||1,isDream);
     const dot=new THREE.Mesh(new THREE.SphereGeometry(0.08,8,8),new THREE.MeshBasicMaterial({color}));
-    dot.position.copy(pos);dot.userData={id:t.id,weight:t.weight||1,isDream};
+    dot.position.copy(pos);dot.userData={id:t.id,weight:t.weight||1,isDream,rAx:new THREE.Vector3(0,1,0),rSpd:0.001+Math.random()*0.003};
     meshGroup.add(dot);tetraMeshMap[t.id]=dot;
   });
 }
