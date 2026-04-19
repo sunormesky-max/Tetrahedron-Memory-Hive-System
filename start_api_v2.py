@@ -2,6 +2,7 @@
 TetraMem-XL API v6.0 — Agent-Driven Memory System + Feedback Loop + Session Management + SSE Events
 """
 import os, time, hashlib, threading, json, asyncio
+import numpy as np
 from contextlib import asynccontextmanager
 from pathlib import Path
 from fastapi import FastAPI, HTTPException
@@ -877,9 +878,56 @@ def honeycomb_cells_for_node(node_id: str):
         return {"node_id": node_id, "cells": cells, "count": len(cells)}
 
 
+@app.get("/api/v1/reflection-field/status")
+def reflection_field_status():
+    with _state_lock:
+        if _field._reflection_field is None:
+            return {"status": "not_initialized"}
+        return _field._reflection_field.stats()
+
+
+@app.post("/api/v1/reflection-field/run")
+def reflection_field_run():
+    with _state_lock:
+        if _field._reflection_field is None:
+            _field._reflection_field = __import__("tetrahedron_memory.honeycomb_neural_field", fromlist=["SpatialReflectionField"]).SpatialReflectionField()
+        return _field._reflection_field.run_reflection_cycle(_field)
+
+
+@app.get("/api/v1/reflection-field/energy/{node_id}")
+def reflection_field_energy(node_id: str):
+    with _state_lock:
+        if _field._reflection_field is None:
+            return {"node_id": node_id, "energy": 0.5}
+        energy = _field._reflection_field.get_node_energy(node_id)
+        quality = _field._reflection_field.get_spatial_quality(_field, node_id)
+        return {"node_id": node_id, "energy": round(energy, 4), "spatial_quality": round(quality, 4)}
+
+
 static_dir = Path(__file__).parent / "static"
 if static_dir.exists():
     app.mount("/ui", StaticFiles(directory=str(static_dir), html=True))
+
+
+@app.get("/api/v1/spatial/quality/{node_id}")
+def spatial_quality(node_id: str):
+    with _state_lock:
+        gq = _field._compute_node_geometric_quality(node_id)
+        div = _field._compute_geometric_topo_divergence(node_id)
+        rf_energy = _field._reflection_field.get_node_energy(node_id) if _field._reflection_field else 0.5
+        return {"node_id": node_id, "geometric_quality": gq, "geo_topo_divergence": round(div, 4), "field_energy": rf_energy}
+
+
+@app.get("/api/v1/spatial/crystallographic-direction")
+def crystallographic_direction_test():
+    with _state_lock:
+        occupied = [(nid, n) for nid, n in _field._nodes.items() if n.is_occupied]
+        if len(occupied) < 2:
+            return {"error": "need at least 2 nodes"}
+        a, b = occupied[0][1], occupied[1][1]
+        factor = _field._bcc_direction_factor(a.position, b.position)
+        dist = float(np.linalg.norm(a.position - b.position))
+        return {"factor": round(factor, 4), "distance": round(dist, 4), "sample_nodes": [occupied[0][0][:8], occupied[1][0][:8]]}
 
 
 if __name__ == "__main__":
