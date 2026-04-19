@@ -3002,6 +3002,47 @@ class HoneycombNeuralField:
 
         logger.info("BCC lattice: %d nodes", len(self._nodes))
 
+    def _expand_lattice(self):
+        old_res = self._resolution
+        new_res = old_res + 1
+        self._resolution = new_res
+        sp = self._spacing
+        new_nodes = 0
+        new_body = 0
+
+        for ix in range(-new_res, new_res + 1):
+            for iy in range(-new_res, new_res + 1):
+                for iz in range(-new_res, new_res + 1):
+                    if abs(ix) <= old_res and abs(iy) <= old_res and abs(iz) <= old_res:
+                        continue
+                    pos = np.array([ix * sp, iy * sp, iz * sp], dtype=np.float32)
+                    nid = hashlib.sha256(pos.tobytes()).hexdigest()[:16]
+                    if nid not in self._nodes:
+                        self._nodes[nid] = HoneycombNode(nid, pos)
+                        self._position_index[(ix, iy, iz)] = nid
+                        new_nodes += 1
+
+        for ix in range(-new_res, new_res):
+            for iy in range(-new_res, new_res):
+                for iz in range(-new_res, new_res):
+                    if abs(ix) < old_res and abs(iy) < old_res and abs(iz) < old_res:
+                        continue
+                    bpos = np.array([(ix + 0.5) * sp, (iy + 0.5) * sp, (iz + 0.5) * sp], dtype=np.float32)
+                    bid = hashlib.sha256(bpos.tobytes()).hexdigest()[:16]
+                    key = (ix, iy, iz, "b")
+                    if bid not in self._nodes:
+                        self._nodes[bid] = HoneycombNode(bid, bpos)
+                        self._position_index[key] = bid
+                        new_body += 1
+                    elif key not in self._position_index:
+                        self._position_index[key] = bid
+
+        self._build_connectivity()
+        self._cell_map.build(self._nodes, self._position_index, self._spacing)
+        self._build_bcc_unit_index()
+        logger.info("Lattice expanded: res %d->%d, +%d corners +%d body, total %d nodes",
+                     old_res, new_res, new_nodes, new_body, len(self._nodes))
+
     def _build_connectivity(self):
         face_count = 0
         edge_count = 0
@@ -3298,6 +3339,13 @@ class HoneycombNeuralField:
                     if weight > existing.weight:
                         existing.weight = min(10.0, existing.weight + (weight - existing.weight) * 0.3)
                     return existing_id
+
+            total = len(self._nodes)
+            occupied_count = sum(1 for n in self._nodes.values() if n.is_occupied)
+            if total > 0 and occupied_count / total > 0.85:
+                logger.info("Lattice occupancy %.1f%% — auto-expanding (res %d->%d)",
+                            occupied_count / total * 100, self._resolution, self._resolution + 1)
+                self._expand_lattice()
 
             nid = self._find_nearest_empty_node(content, labels)
             node = self._nodes[nid]
