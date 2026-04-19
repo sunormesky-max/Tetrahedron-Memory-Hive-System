@@ -471,7 +471,7 @@ class TetraDreamCycle:
         self._last_stats: Dict[str, Any] = {}
         self._entropy_tracker = EntropyTracker()
         self._dream_store = DreamStore()
-        self._phase_detector = phase_detector or PhaseTransitionDetector()
+        self._phase_detector = PhaseTransitionDetector()
 
     def _wrap_legacy_fn(self, fn):
         def wrapper(inputs):
