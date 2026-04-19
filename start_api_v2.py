@@ -22,12 +22,12 @@ _state_lock = threading.RLock()
 _start_time = time.time()
 
 _event_subscribers: List[asyncio.Queue] = []
-_event_lock = threading.Lock()
+_event_subscriber_lock = threading.Lock()
 
 
 def _emit_event(event_type: str, data: Dict[str, Any]):
     msg = json.dumps({"event": event_type, "data": data, "timestamp": time.time()}, ensure_ascii=False)
-    with _event_lock:
+    with _event_subscriber_lock:
         dead = []
         for i, q in enumerate(_event_subscribers):
             try:
@@ -591,13 +591,15 @@ def session_get(session_id: str):
 async def events(topics: str = ""):
     topic_set = set(topics.split(",")) if topics else set()
     queue = asyncio.Queue(maxsize=100)
-    _event_subscribers.append(queue)
+    with _event_subscriber_lock:
+        _event_subscribers.append(queue)
 
     async def event_generator():
+        heartbeat_count = 0
         try:
             while True:
                 try:
-                    msg = await asyncio.wait_for(queue.get(), timeout=30)
+                    msg = queue.get_nowait()
                     if topic_set:
                         try:
                             evt = json.loads(msg)
@@ -606,15 +608,21 @@ async def events(topics: str = ""):
                         except Exception:
                             pass
                     yield f"data: {msg}\n\n"
-                except asyncio.TimeoutError:
+                except asyncio.QueueEmpty:
+                    pass
+                await asyncio.sleep(1)
+                heartbeat_count += 1
+                if heartbeat_count >= 30:
+                    heartbeat_count = 0
                     yield f"data: {json.dumps({'event': 'heartbeat', 'timestamp': time.time()})}\n\n"
         except asyncio.CancelledError:
             pass
         finally:
-            try:
-                _event_subscribers.remove(queue)
-            except ValueError:
-                pass
+            with _event_subscriber_lock:
+                try:
+                    _event_subscribers.remove(queue)
+                except ValueError:
+                    pass
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
