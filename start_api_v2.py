@@ -53,11 +53,15 @@ def init_state():
             content = item.get("content", "")
             if not content:
                 continue
+            meta = item.get("metadata") or {}
+            ct = meta.pop("creation_time", None)
+            ct_override = float(ct) if ct else None
             _field.store(
                 content=content,
                 labels=item.get("labels", []),
                 weight=item.get("weight", 1.0),
-                metadata=item.get("metadata"),
+                metadata=meta if meta else None,
+                creation_time_override=ct_override,
             )
         persist_meta = data.get("metadata", {})
         persist_time = persist_meta.get("persist_time", 0)
@@ -135,7 +139,8 @@ def _sync_persist():
         export = {"tetrahedra": [
             {"id": n["id"], "content": n.get("content", ""),
              "labels": n.get("labels", []), "weight": n.get("weight", 1.0),
-             "metadata": n.get("metadata", {}),
+             "metadata": {**n.get("metadata", {}),
+                          "creation_time": n.get("creation_time", 0.0)},
              "centroid": n.get("centroid", n.get("position", [0, 0, 0]))}
             for n in nodes
         ], "metadata": {"persist_time": time.time()}}
