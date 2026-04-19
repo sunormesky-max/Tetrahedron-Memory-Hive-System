@@ -2658,12 +2658,16 @@ class HoneycombNeuralField:
         self._feedback_loop: Optional[FeedbackLoop] = None
         self._session_manager: Optional[SessionManager] = None
         self._reflection_field: Optional[SpatialReflectionField] = None
+        self._bcc_unit_index: Dict[str, List[str]] = defaultdict(list)
+        self._spatial_autocorrelation: float = 0.0
+        self._autocorrelation_history: List[float] = []
 
     def initialize(self) -> Dict[str, Any]:
         with self._lock:
             self._build_bcc_lattice()
             self._build_connectivity()
             self._cell_map.build(self._nodes, self._position_index, self._spacing)
+            self._build_bcc_unit_index()
             logger.info(
                 "Honeycomb cells: %d tetrahedral cells in %d BCC units",
                 len(self._cell_map._cells), len(self._cell_map._bcc_cell_index),
@@ -2800,8 +2804,6 @@ class HoneycombNeuralField:
             if not (isinstance(key, tuple) and len(key) == 3):
                 continue
             ix, iy, iz = key
-            if (ix, iy, iz, "b") in self._position_index:
-                continue
             for dx, dy, dz in [(1,0,0),(-1,0,0),(0,1,0),(0,-1,0),(0,0,1),(0,0,-1)]:
                 nk = (ix + dx, iy + dy, iz + dz)
                 nnid = self._position_index.get(nk)
@@ -2818,7 +2820,190 @@ class HoneycombNeuralField:
                     self._edges.append((nid, nnid, "edge"))
                     edge_count += 1
 
-        logger.info("Connectivity: %d face edges, %d edge connections", face_count, edge_count)
+        vertex_count = 0
+        for key, nid in list(self._position_index.items()):
+            if not (isinstance(key, tuple) and len(key) == 3):
+                continue
+            ix, iy, iz = key
+            for dx, dy, dz in [(1,1,0),(1,-1,0),(-1,1,0),(-1,-1,0),
+                                (1,0,1),(1,0,-1),(-1,0,1),(-1,0,-1),
+                                (0,1,1),(0,1,-1),(0,-1,1),(0,-1,-1)]:
+                nk = (ix + dx, iy + dy, iz + dz)
+                nnid = self._position_index.get(nk)
+                if not nnid or nnid == nid:
+                    continue
+                node = self._nodes.get(nid)
+                nn = self._nodes.get(nnid)
+                if not node or not nn:
+                    continue
+                if (nnid not in node.face_neighbors and
+                    nnid not in node.edge_neighbors and
+                    nnid not in node.vertex_neighbors):
+                    node.vertex_neighbors.append(nnid)
+                    if nid not in nn.vertex_neighbors:
+                        nn.vertex_neighbors.append(nid)
+                    self._edges.append((nid, nnid, "vertex"))
+                    vertex_count += 1
+
+        logger.info("Connectivity: %d face, %d edge, %d vertex", face_count, edge_count, vertex_count)
+
+    def _build_bcc_unit_index(self):
+        """
+        Build BCC unit cell containment index.
+        For each BCC unit cell (body-center + 8 corners), track which nodes
+        belong to the same unit. This provides natural geometric neighborhoods
+        beyond face/edge/vertex neighbor types.
+        """
+        self._bcc_unit_index.clear()
+        for key, bid in self._position_index.items():
+            if not (isinstance(key, tuple) and len(key) == 4 and key[3] == "b"):
+                continue
+            ix, iy, iz = key[0], key[1], key[2]
+            unit_members = [bid]
+            for dx in (0, 1):
+                for dy in (0, 1):
+                    for dz in (0, 1):
+                        ck = (ix + dx, iy + dy, iz + dz)
+                        cnid = self._position_index.get(ck)
+                        if cnid:
+                            unit_members.append(cnid)
+            for nid in unit_members:
+                self._bcc_unit_index[nid].append(bid)
+        logger.info("BCC unit index: %d nodes mapped to %d unit cells",
+                     len(self._bcc_unit_index), len(set(uid for uids in self._bcc_unit_index.values() for uid in uids)))
+
+    def _get_bcc_cellmates(self, nid: str) -> List[str]:
+        """Get all nodes sharing at least one BCC unit cell with the given node."""
+        unit_ids = self._bcc_unit_index.get(nid, [])
+        if not unit_ids:
+            return []
+        cellmates = set()
+        for uid in unit_ids:
+            bc_node = self._nodes.get(uid)
+            if bc_node is None:
+                continue
+            for fnid in bc_node.face_neighbors:
+                if fnid != nid:
+                    cellmates.add(fnid)
+            if uid != nid:
+                cellmates.add(uid)
+        return list(cellmates)
+
+    def _bcc_cell_coherence(self, nid: str) -> float:
+        """
+        Measure label coherence within the BCC unit cells containing this node.
+        High coherence = same-label memories are concentrated in the same unit cell,
+        which is geometrically efficient for BCC topology.
+        """
+        node = self._nodes.get(nid)
+        if node is None or not node.is_occupied or not node.labels:
+            return 0.5
+        node_labels = set(l for l in node.labels if not l.startswith("__"))
+        if not node_labels:
+            return 0.5
+        unit_ids = self._bcc_unit_index.get(nid, [])
+        if not unit_ids:
+            return 0.5
+        coherent = 0
+        total = 0
+        for uid in unit_ids:
+            bc_node = self._nodes.get(uid)
+            if bc_node is None:
+                continue
+            for fnid in bc_node.face_neighbors:
+                if fnid == nid:
+                    continue
+                fn = self._nodes.get(fnid)
+                if fn and fn.is_occupied and fn.labels:
+                    fn_labels = set(l for l in fn.labels if not l.startswith("__"))
+                    if fn_labels:
+                        overlap = len(node_labels & fn_labels) / max(len(node_labels | fn_labels), 1)
+                        coherent += overlap
+                        total += 1
+        if total == 0:
+            return 0.5
+        return coherent / total
+
+    def compute_spatial_autocorrelation(self) -> float:
+        """
+        Compute Moran's I for spatial autocorrelation of memory weights.
+        Positive I = weights are spatially clustered (similar weights near each other).
+        Negative I = weights are spatially dispersed (different weights near each other).
+        Near zero = random spatial distribution.
+        Uses face-neighbor adjacency as the spatial weight matrix.
+        """
+        occupied = [(nid, n) for nid, n in self._nodes.items() if n.is_occupied]
+        if len(occupied) < 3:
+            self._spatial_autocorrelation = 0.0
+            return 0.0
+        weights = np.array([n.weight for _, n in occupied], dtype=np.float64)
+        nid_list = [nid for nid, _ in occupied]
+        nid_to_idx = {nid: i for i, nid in enumerate(nid_list)}
+        n = len(weights)
+        w_mean = float(np.mean(weights))
+        deviations = weights - w_mean
+        num_sum = 0.0
+        den_sum = float(np.sum(deviations ** 2))
+        if den_sum < 1e-12:
+            self._spatial_autocorrelation = 0.0
+            return 0.0
+        w_total = 0.0
+        for i, nid in enumerate(nid_list):
+            node = self._nodes.get(nid)
+            if node is None:
+                continue
+            for fnid in node.face_neighbors:
+                j = nid_to_idx.get(fnid)
+                if j is not None and j != i:
+                    w_ij = 1.0
+                    num_sum += w_ij * deviations[i] * deviations[j]
+                    w_total += w_ij
+            for enid in node.edge_neighbors:
+                j = nid_to_idx.get(enid)
+                if j is not None and j != i:
+                    w_ij = 0.5
+                    num_sum += w_ij * deviations[i] * deviations[j]
+                    w_total += w_ij
+        if w_total < 1e-12:
+            self._spatial_autocorrelation = 0.0
+            return 0.0
+        morans_i = (n / w_total) * (num_sum / den_sum)
+        morans_i = max(-1.0, min(1.0, morans_i))
+        self._spatial_autocorrelation = morans_i
+        self._autocorrelation_history.append(morans_i)
+        if len(self._autocorrelation_history) > 50:
+            self._autocorrelation_history = self._autocorrelation_history[-25:]
+        return morans_i
+
+    def _vacancy_attraction(self, nid: str) -> float:
+        """
+        Compute the 'attraction' score of an empty node based on the weight
+        and density of its surrounding occupied neighbors. High attraction means
+        this empty node is in a desirable location surrounded by strong memories.
+        Uses face > edge > vertex neighbor priority with BCC cellmate bonus.
+        """
+        node = self._nodes.get(nid)
+        if node is None or node.is_occupied:
+            return 0.0
+        attraction = 0.0
+        for fnid in node.face_neighbors:
+            fn = self._nodes.get(fnid)
+            if fn and fn.is_occupied:
+                attraction += fn.weight * 1.0
+        for enid in node.edge_neighbors:
+            en = self._nodes.get(enid)
+            if en and en.is_occupied:
+                attraction += en.weight * 0.5
+        for vnid in node.vertex_neighbors:
+            vn = self._nodes.get(vnid)
+            if vn and vn.is_occupied:
+                attraction += vn.weight * 0.25
+        cellmates = self._get_bcc_cellmates(nid)
+        for cmid in cellmates:
+            cm = self._nodes.get(cmid)
+            if cm and cm.is_occupied:
+                attraction += cm.weight * 0.3
+        return attraction
 
     def store(self, content: str, labels: Optional[List[str]] = None,
               weight: float = 1.0, metadata: Optional[Dict] = None,
@@ -2855,6 +3040,7 @@ class HoneycombNeuralField:
             node.metadata = metadata or {}
             node.metadata["geometric_quality"] = self._compute_node_geometric_quality(nid)
             node.metadata["geo_topo_divergence"] = self._compute_geometric_topo_divergence(nid)
+            node.metadata["bcc_cell_coherence"] = self._bcc_cell_coherence(nid)
             node.creation_time = creation_time_override if creation_time_override is not None else time.time()
             node.touch()
 
@@ -2927,7 +3113,8 @@ class HoneycombNeuralField:
                     cells = self._cell_map.get_cells_for_node(fnid)
                     if cells:
                         cell_quality = max(c.quality for c in cells)
-                    face_candidates.append((fnid, fn, bonus + 10 + cell_quality * 3))
+                    vacancy = self._vacancy_attraction(fnid) * 0.5
+                    face_candidates.append((fnid, fn, bonus + 10 + cell_quality * 3 + vacancy))
 
         if face_candidates:
             face_candidates.sort(key=lambda x: -x[2])
@@ -2941,7 +3128,8 @@ class HoneycombNeuralField:
             for enid in on.edge_neighbors:
                 en = self._nodes.get(enid)
                 if en and not en.is_occupied:
-                    edge_candidates.append((enid, en, bonus + 5))
+                    vacancy = self._vacancy_attraction(enid) * 0.5
+                    edge_candidates.append((enid, en, bonus + 5 + vacancy))
 
         if edge_candidates:
             edge_candidates.sort(key=lambda x: -x[2])
@@ -2950,11 +3138,25 @@ class HoneycombNeuralField:
             chosen = random.choice(top_tier)
             return chosen[0]
 
+        cellmate_candidates = []
+        for on, bonus in related_occ:
+            if bonus > 0:
+                for cmid in self._get_bcc_cellmates(on.id):
+                    cm = self._nodes.get(cmid)
+                    if cm and not cm.is_occupied:
+                        vacancy = self._vacancy_attraction(cmid) * 0.3
+                        cellmate_candidates.append((cmid, cm, bonus + 3 + vacancy))
+        if cellmate_candidates:
+            cellmate_candidates.sort(key=lambda x: -x[2])
+            top = cellmate_candidates[0][2]
+            top_tier = [c for c in cellmate_candidates if c[2] >= top * 0.8]
+            return random.choice(top_tier)[0]
+
         occ_positions = [n.position for n in occupied_nodes]
         centroid = np.mean(occ_positions, axis=0)
 
         best_id = None
-        best_dist = float('inf')
+        best_score = float('inf')
         sample = min(500, len(self._nodes))
         for nid in random.sample(list(self._nodes.keys()), sample):
             node = self._nodes[nid]
@@ -2962,9 +3164,10 @@ class HoneycombNeuralField:
                 continue
             min_occ_dist = min(float(np.sum((node.position - op) ** 2)) for op in occ_positions)
             centroid_dist = float(np.sum((node.position - centroid) ** 2))
-            score = min_occ_dist * 0.3 + centroid_dist * 0.7
-            if score < best_dist:
-                best_dist = score
+            vacancy = self._vacancy_attraction(nid)
+            score = min_occ_dist * 0.3 + centroid_dist * 0.7 - vacancy * 0.2
+            if score < best_score:
+                best_score = score
                 best_id = nid
 
         return best_id or random.choice(list(self._nodes.keys()))
@@ -3054,24 +3257,32 @@ class HoneycombNeuralField:
                 if occ_neighbors > 0:
                     neighbor_density_score = min(1.0, occ_neighbors / 6.0)
 
+                bcc_coherence = self._bcc_cell_coherence(nid)
+
+                autocorr_bonus = 0.0
+                if self._spatial_autocorrelation > 0.1:
+                    autocorr_bonus = self._spatial_autocorrelation * neighbor_density_score * 0.03
+
                 dream_bonus = 0.0
                 if "__dream__" in node.labels:
                     dream_bonus = 0.03
 
                 final = (
-                    0.20 * text_score
-                    + 0.06 * trigram_score
-                    + 0.12 * label_score
-                    + 0.10 * activation_score
-                    + 0.05 * weight_score
-                    + 0.04 * hebbian_boost
-                    + 0.04 * crystal_boost
+                    0.18 * text_score
+                    + 0.05 * trigram_score
+                    + 0.10 * label_score
+                    + 0.08 * activation_score
+                    + 0.04 * weight_score
+                    + 0.03 * hebbian_boost
+                    + 0.03 * crystal_boost
                     + 0.02 * pulse_boost
                     + 0.10 * spatial_quality
                     + 0.10 * geometric_quality
-                    + 0.06 * neighbor_density_score
+                    + 0.05 * neighbor_density_score
                     + 0.05 * geo_topo_divergence
                     + 0.03 * divergence_bonus
+                    + 0.05 * bcc_coherence
+                    + 0.02 * autocorr_bonus
                     + 0.01 * dream_bonus
                 )
                 scored.append((nid, final))
@@ -3404,7 +3615,7 @@ class HoneycombNeuralField:
         self._session_manager = SessionManager(self)
         self._reflection_field = SpatialReflectionField()
         logger.info(
-            "PCNN pulse engine started (v6.1) — face_decay=%.2f, edge_decay=%.2f, cascade=on, dream=on, reflection=on",
+            "PCNN pulse engine started (v6.2) — face_decay=%.2f, edge_decay=%.2f, cascade=on, dream=on, reflection=on, vertex=on, autocorr=on",
             PCNNConfig.FACE_DECAY, PCNNConfig.FACE_DECAY * PCNNConfig.EDGE_DECAY_FACTOR,
         )
 
@@ -3448,6 +3659,9 @@ class HoneycombNeuralField:
 
                 if cycle % 150 == 0 and self._reflection_field:
                     self._reflection_field.run_reflection_cycle(self)
+
+                if cycle % 300 == 0:
+                    self.compute_spatial_autocorrelation()
 
             except Exception as e:
                 logger.error("Pulse cycle error: %s", e, exc_info=True)
@@ -3626,6 +3840,12 @@ class HoneycombNeuralField:
                         out = 1.0 if en.fired else 0.0
                         if out > 0:
                             neighbor_outputs.append((enid, out * en.activation * 0.05, "edge"))
+                for vnid in node.vertex_neighbors[:2]:
+                    vn = self._nodes.get(vnid)
+                    if vn:
+                        out = 1.0 if vn.fired else 0.0
+                        if out > 0:
+                            neighbor_outputs.append((vnid, out * vn.activation * 0.02, "vertex"))
 
                 node.pcnn_step(neighbor_outputs)
 
@@ -3807,6 +4027,8 @@ class HoneycombNeuralField:
                 "empty_nodes": total - occupied,
                 "face_edges": face_edges,
                 "edge_edges": edge_edges,
+                "vertex_edges": sum(1 for _, _, t in self._edges if t == "vertex"),
+                "avg_vertex_connections": float(np.mean([len(n.vertex_neighbors) for n in self._nodes.values()])) if self._nodes else 0,
                 "avg_activation": float(avg_activation),
                 "avg_face_connections": float(avg_face_conn),
                 "pulse_count": self._pulse_count,
@@ -3825,6 +4047,11 @@ class HoneycombNeuralField:
                 "self_check": self.self_check_status() if self._self_check else {"engine_running": False},
                 "self_organize": self._self_organize.stats() if self._self_organize else {"engine_active": False},
                 "honeycomb_cells": self._cell_map.structural_analysis(),
+                "spatial_autocorrelation": {
+                    "morans_i": round(self._spatial_autocorrelation, 4),
+                    "history_len": len(self._autocorrelation_history),
+                },
+                "bcc_unit_index_size": len(self._bcc_unit_index),
                 "pcnn_config": {
                     "face_decay": PCNNConfig.FACE_DECAY,
                     "edge_decay": round(PCNNConfig.FACE_DECAY * PCNNConfig.EDGE_DECAY_FACTOR, 3),
