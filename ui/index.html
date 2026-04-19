@@ -131,9 +131,9 @@ tr:hover td{background:rgba(100,120,255,.02)}
 <div class="login-box">
   <h1>TetraMem-XL</h1>
   <div class="sub">BCC 晶格蜂巢 + PCNN 脉冲 + 空间几何 v6.2</div>
-  <input id="user" placeholder="用户名" autocomplete="off">
+  <input id="user" placeholder="用户�? autocomplete="off">
   <input id="pass" type="password" placeholder="密码">
-  <button onclick="doLogin()">登 录</button>
+  <button onclick="doLogin()">�?�?/button>
   <div id="loginErr" class="login-error"></div>
 </div>
 </div>
@@ -146,14 +146,14 @@ tr:hover td{background:rgba(100,120,255,.02)}
     <span>节点<b id="sNodes">-</b></span>
     <span>记忆<b id="sMem">-</b></span>
     <span>面边<b id="sFaces">-</b></span>
-    <span>体顶边<b id="sVertex" style="color:#b08cff">-</b></span>
+    <span>体顶�?b id="sVertex" style="color:#b08cff">-</b></span>
     <span>脉冲<b class="system-pulse" id="sPulse">-</b></span>
     <span>桥接<b id="sBridge" style="color:#5eb88a">-</b></span>
-    <span>激发<b id="sFired" style="color:#ec4899">-</b></span>
-    <span>自相关<b id="sMoran" style="color:#06b6d4">-</b></span>
+    <span>激�?b id="sFired" style="color:#ec4899">-</b></span>
+    <span>自相�?b id="sMoran" style="color:#06b6d4">-</b></span>
   </div>
   <div class="pulse-ind"><div class="pulse-dot"></div><span id="sInterval">-</span></div>
-  <button class="logout-btn" onclick="doLogout()">退出</button>
+  <button class="logout-btn" onclick="doLogout()">退�?/button>
 </div>
 
 <div class="main-area">
@@ -168,26 +168,26 @@ tr:hover td{background:rgba(100,120,255,.02)}
   <button onclick="switchMode('hebbian',this)">赫布路径</button>
   <div class="section">系统</div>
   <button onclick="switchMode('config',this)">参数配置</button>
-  <button onclick="switchMode('phase',this)">相变检测</button>
+  <button onclick="switchMode('phase',this)">相变检�?/button>
   <button onclick="switchMode('selfcheck',this)">自检脉冲</button>
   <button onclick="switchMode('cascade',this)">级联脉冲</button>
-  <button onclick="switchMode('lattice',this)">晶格完整性</button>
+  <button onclick="switchMode('lattice',this)">晶格完整�?/button>
   <button onclick="switchMode('crystal',this)">结晶通路</button>
-  <button onclick="switchMode('organize',this)">自组织</button>
+  <button onclick="switchMode('organize',this)">自组�?/button>
   <button onclick="switchMode('honeycomb',this)">蜂巢结构</button>
   <button onclick="switchMode('spatial',this)">空间几何</button>
   <button onclick="switchMode('dream',this)">梦境引擎</button>
   <button onclick="switchMode('agent',this)">Agent驱动</button>
   <button onclick="switchMode('feedback',this)">反馈闭环</button>
   <button onclick="switchMode('session',this)">会话管理</button>
-  <button onclick="switchMode('events',this)">事件流</button>
+  <button onclick="switchMode('events',this)">事件�?/button>
 </div>
 
 <div id="mode3d" class="content-3d">
   <div class="canvas-wrap" id="canvasWrap">
     <div class="legend">
       <div class="legend-item"><div class="legend-dot" style="background:#7b8cff"></div>记忆节点</div>
-      <div class="legend-item"><div class="legend-dot" style="background:#c9a04e"></div>高权重</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#c9a04e"></div>高权�?/div>
       <div class="legend-item"><div class="legend-dot" style="background:#5eb88a"></div>梦境 / 桥接</div>
       <div class="legend-item"><div class="legend-dot" style="background:rgba(123,140,255,.4)"></div>神经脉冲</div>
       <div class="legend-item"><div class="legend-dot" style="background:rgba(176,140,255,.4)"></div>vertex 邻居</div>
@@ -207,7 +207,7 @@ tr:hover td{background:rgba(100,120,255,.02)}
   <input id="queryText" placeholder="搜索记忆..." class="input-field" style="width:130px">
   <button onclick="doQuery()" class="btn btn-accent">查询</button>
   <button onclick="triggerDream()" class="btn btn-green">梦境</button>
-  <button onclick="doSelfOrg()" class="btn btn-warn">自组织</button>
+  <button onclick="doSelfOrg()" class="btn btn-warn">自组�?/button>
   <button onclick="doPhaseTrigger()" class="btn">相变</button>
   <button onclick="exportData()" class="btn">导出</button>
   <button onclick="refreshAll();rebuildScene()" class="btn">刷新</button>
@@ -291,7 +291,7 @@ async function refreshTopbar(){
     document.getElementById('sInterval').textContent=(s.adaptive_interval||0.5).toFixed(2)+'s';
     document.getElementById('sVertex').textContent=s.vertex_edges||0;
     const mi=s.spatial_autocorrelation?.morans_i||0;
-    document.getElementById('sMoran').textContent=mi.toFixed(3)+(mi>0.1?' ↑':mi<-0.1?' ↓':' ≈');
+    document.getElementById('sMoran').textContent=mi.toFixed(3)+(mi>0.1?' �?:mi<-0.1?' �?:' �?);
   }catch(e){}
 }
 
@@ -328,7 +328,7 @@ function switchMode(mode,btn){
 
 async function renderPanelMode(mode){
   const el=document.getElementById('modePanel');
-  el.innerHTML='<div class="card"><h2>加载中...</h2></div>';
+  el.innerHTML='<div class="card"><h2>加载�?..</h2></div>';
   switch(mode){
     case 'dashboard':await renderDashboard(el);break;
     case 'pcnn':await renderPCNN(el);break;
@@ -362,19 +362,19 @@ async function renderDashboard(el){
   <div class="card"><h2>系统总览</h2>
   <div class="stats-grid">
     <div class="stat"><div class="label">总节点数</div><div class="value">${s.total_nodes}</div></div>
-    <div class="stat"><div class="label">已占用</div><div class="value green">${s.occupied_nodes}</div></div>
+    <div class="stat"><div class="label">已占�?/div><div class="value green">${s.occupied_nodes}</div></div>
     <div class="stat"><div class="label">桥接节点</div><div class="value cyan">${s.bridge_nodes||0}</div></div>
     <div class="stat"><div class="label">面边连接</div><div class="value">${s.face_edges}</div></div>
     <div class="stat"><div class="label">棱边连接</div><div class="value purple">${s.edge_edges}</div></div>
-    <div class="stat"><div class="label">体顶边连接</div><div class="value" style="color:#b08cff">${s.vertex_edges||0}</div></div>
+    <div class="stat"><div class="label">体顶边连�?/div><div class="value" style="color:#b08cff">${s.vertex_edges||0}</div></div>
     <div class="stat"><div class="label">Moran's I</div><div class="value" style="color:${(s.spatial_autocorrelation?.morans_i||0)>0.1?'#5eb88a':(s.spatial_autocorrelation?.morans_i||0)<-0.1?'#cf6b6b':'#06b6d4'}">${(s.spatial_autocorrelation?.morans_i||0).toFixed(4)}</div></div>
     <div class="stat"><div class="label">BCC单元索引</div><div class="value" style="color:#b08cff">${s.bcc_unit_index_size||0}</div></div>
     <div class="stat"><div class="label">脉冲总数</div><div class="value yellow">${s.pulse_count}</div></div>
     <div class="stat"><div class="label">桥接计数</div><div class="value green">${s.bridge_count}</div></div>
-    <div class="stat"><div class="label">激发节点</div><div class="value pink">${s.fired_nodes||0}</div></div>
-    <div class="stat"><div class="label">平均激活</div><div class="value cyan">${(s.avg_activation||0).toFixed(4)}</div></div>
+    <div class="stat"><div class="label">激发节�?/div><div class="value pink">${s.fired_nodes||0}</div></div>
+    <div class="stat"><div class="label">平均激�?/div><div class="value cyan">${(s.avg_activation||0).toFixed(4)}</div></div>
     <div class="stat"><div class="label">自适应间隔</div><div class="value yellow">${(s.adaptive_interval||0).toFixed(3)}s</div></div>
-    <div class="stat"><div class="label">桥接率</div><div class="value">${((s.bridge_rate||0)*100).toFixed(3)}%</div></div>
+    <div class="stat"><div class="label">桥接�?/div><div class="value">${((s.bridge_rate||0)*100).toFixed(3)}%</div></div>
   </div></div>
   <div class="card"><h2>脉冲类型分布</h2>
   <div style="display:flex;gap:24px;align-items:center;flex-wrap:wrap">
@@ -392,7 +392,7 @@ async function renderDashboard(el){
     <div class="stat"><div class="label">路径段数</div><div class="value">${hb.total_path_segments||0}</div></div>
     <div class="stat"><div class="label">成功次数</div><div class="value green">${hb.success_count||0}</div></div>
     <div class="stat"><div class="label">平均权重</div><div class="value cyan">${(hb.avg_path_weight||0).toFixed(4)}</div></div>
-    <div class="stat"><div class="label">最大权重</div><div class="value yellow">${(hb.max_path_weight||0).toFixed(4)}</div></div>
+    <div class="stat"><div class="label">最大权�?/div><div class="value yellow">${(hb.max_path_weight||0).toFixed(4)}</div></div>
   </div></div>
   <div class="card"><h2>PCNN 配置参数</h2>
   <div class="config-grid">
@@ -405,20 +405,20 @@ async function renderPCNN(el){
   const st=states?.states||[];
   const hot=ps?.hot_nodes||[];
   el.innerHTML=`
-  <div class="refresh-info">数据快照 — 切换其他面板再切回可刷新</div>
-  <div class="card"><h2>PCNN 节点动力学 (${st.length} 个活跃节点)</h2>
-  <p style="font-size:11px;color:#3a3a5a;margin-bottom:10px">F=馈送 &middot; L=耦合 &middot; U=内部活性 &middot; Th=阈值 &middot; Eckhorn PCNN 模型</p>
-  <table><tr><th>ID</th><th>F</th><th>L</th><th>U</th><th>Th</th><th>激发</th><th>激活值</th></tr>
+  <div class="refresh-info">数据快照 �?切换其他面板再切回可刷新</div>
+  <div class="card"><h2>PCNN 节点动力�?(${st.length} 个活跃节�?</h2>
+  <p style="font-size:11px;color:#3a3a5a;margin-bottom:10px">F=馈�?&middot; L=耦合 &middot; U=内部活�?&middot; Th=阈�?&middot; Eckhorn PCNN 模型</p>
+  <table><tr><th>ID</th><th>F</th><th>L</th><th>U</th><th>Th</th><th>激�?/th><th>激活�?/th></tr>
   ${st.map(s=>`<tr><td style="font-size:10px">${s.id}</td><td>${s.feeding.toFixed(3)}</td><td>${s.linking.toFixed(3)}</td><td>${s.internal_activity.toFixed(3)}</td><td>${s.threshold.toFixed(3)}</td><td>${s.fired?'<span style="color:#5eb88a">FIRE</span>':'-'}</td><td>${s.activation.toFixed(3)}</td></tr>`).join('')}
   </table></div>
-  <div class="card"><h2>热点节点（脉冲累加器）</h2>
-  <table><tr><th>ID</th><th>累加值</th></tr>
+  <div class="card"><h2>热点节点（脉冲累加器�?/h2>
+  <table><tr><th>ID</th><th>累加�?/th></tr>
   ${hot.map(([id,a])=>`<tr><td>${id}</td><td>${a.toFixed(3)}</td></tr>`).join('')}
   </table></div>`;
 }
 
 function renderMemories(el){
-  el.innerHTML=`<div class="card"><h2>记忆浏览器</h2>
+  el.innerHTML=`<div class="card"><h2>记忆浏览�?/h2>
   <div style="display:flex;gap:8px;margin-bottom:14px">
     <input id="panelSearch" placeholder="搜索记忆..." class="input-field" style="flex:1">
     <button onclick="panelDoSearch()" class="btn btn-accent">搜索</button>
@@ -435,11 +435,11 @@ async function panelDoSearch(){
   }else{
     const r=await api('/timeline',{body:{direction:'newest',limit:40}});
     const items=r?.items||[];
-    el.innerHTML=memTable('最新记忆 ('+items.length+')',items);
+    el.innerHTML=memTable('最新记�?('+items.length+')',items);
   }
 }
 function memTable(title,items){
-  return `<div class="card"><h2>${title}</h2><table><tr><th>内容</th><th>权重</th><th>激活</th><th>标签</th></tr>
+  return `<div class="card"><h2>${title}</h2><table><tr><th>内容</th><th>权重</th><th>激�?/th><th>标签</th></tr>
   ${items.map(m=>`<tr><td style="max-width:350px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(m.content)}">${esc(m.content)}</td>
   <td>${(m.weight||0).toFixed(1)}</td><td>${(m.activation||0).toFixed(3)}</td>
   <td>${(m.labels||[]).map(l=>{const c=l==='__pulse_bridge__'?'bridge':l==='__dream__'?'dream':l==='__insight__'?'insight':'face';return `<span class="tag2 ${c}">${esc(l)}</span>`;}).join('')}</td></tr>`).join('')}
@@ -453,8 +453,8 @@ async function renderTension(el){
   el.innerHTML=`
   <div class="card"><h2>全局张力: ${(t?.global_tension||0).toFixed(2)}</h2>
   <div class="stats-grid">
-    <div class="stat"><div class="label">已评分节点</div><div class="value">${t?.total_scored||0}</div></div>
-    <div class="stat"><div class="label">最大局部张力</div><div class="value red">${maxT.toFixed(3)}</div></div>
+    <div class="stat"><div class="label">已评分节�?/div><div class="value">${t?.total_scored||0}</div></div>
+    <div class="stat"><div class="label">最大局部张�?/div><div class="value red">${maxT.toFixed(3)}</div></div>
   </div></div>
   <div class="card"><h2>张力分布详情 (${detailed.length})</h2>
   <table><tr><th>ID</th><th>权重</th><th>邻居均权</th><th>方差</th><th>张力</th><th></th></tr>
@@ -469,15 +469,15 @@ async function renderHebbian(el){
   const paths=h?.top_paths||[];
   el.innerHTML=`
   <div class="card"><h2>赫布路径记忆</h2>
-  <p style="font-size:11px;color:#3a3a5a;margin-bottom:14px">当脉冲路径成功形成桥接或命中高权重节点时，路径段被强化。未来脉冲优先沿已验证路径传播（赫布学习法则）。</p>
+  <p style="font-size:11px;color:#3a3a5a;margin-bottom:14px">当脉冲路径成功形成桥接或命中高权重节点时，路径段被强化。未来脉冲优先沿已验证路径传播（赫布学习法则）�?/p>
   <div class="stats-grid">
     <div class="stat"><div class="label">路径段数</div><div class="value">${info.total_path_segments||0}</div></div>
     <div class="stat"><div class="label">成功次数</div><div class="value green">${info.success_count||0}</div></div>
     <div class="stat"><div class="label">平均权重</div><div class="value cyan">${(info.avg_path_weight||0).toFixed(4)}</div></div>
-    <div class="stat"><div class="label">最大权重</div><div class="value yellow">${(info.max_path_weight||0).toFixed(4)}</div></div>
+    <div class="stat"><div class="label">最大权�?/div><div class="value yellow">${(info.max_path_weight||0).toFixed(4)}</div></div>
     <div class="stat"><div class="label">衰减周期</div><div class="value">${info.decay_cycles||0}</div></div>
   </div></div>
-  <div class="card"><h2>热门路径段</h2>
+  <div class="card"><h2>热门路径�?/h2>
   <table><tr><th>起点</th><th>终点</th><th>权重</th></tr>
   ${paths.map(([f,t,w])=>`<tr><td>${f}</td><td>${t}</td><td>${w}</td></tr>`).join('')}
   </table></div>`;
@@ -488,7 +488,7 @@ async function renderConfig(el){
   if(!c){el.innerHTML='<div class="card"><h2>加载失败</h2></div>';return;}
   const probs=c.pulse_type_probabilities||{};
   el.innerHTML=`
-  <div class="card"><h2>PCNN 参数（BCC 晶格 + Eckhorn 模型推导）</h2>
+  <div class="card"><h2>PCNN 参数（BCC 晶格 + Eckhorn 模型推导�?/h2>
   <div class="config-grid">
     ${Object.entries(c).filter(([k])=>k!=='pulse_type_probabilities').map(([k,v])=>`<div class="config-item"><div class="key">${k}</div><div class="val">${v}</div></div>`).join('')}
   </div></div>
@@ -503,15 +503,15 @@ async function renderConfig(el){
 async function renderPhase(el){
   const st=await api('phase-transition/status');
   el.innerHTML=`
-  <div class="card"><h2>相变检测状态</h2>
+  <div class="card"><h2>相变检测状�?/h2>
   <div class="stats-grid">
     <div class="stat"><div class="label">全局张力</div><div class="value ${(st?.global_tension||0)>100?'red':'green'}">${(st?.global_tension||0).toFixed(2)}</div></div>
-    <div class="stat"><div class="label">含张力节点</div><div class="value">${st?.nodes_with_tension||0}</div></div>
+    <div class="stat"><div class="label">含张力节�?/div><div class="value">${st?.nodes_with_tension||0}</div></div>
     <div class="stat"><div class="label">趋势</div><div class="value yellow">${{rising:'上升',falling:'下降',stable:'稳定',insufficient_data:'数据不足'}[st?.trend]||st?.trend||'-'}</div></div>
     <div class="stat"><div class="label">相变次数</div><div class="value">${st?.total_transitions||0}</div></div>
   </div></div>
   <div class="card"><h2>手动触发</h2>
-  <p style="font-size:11px;color:#3a3a5a;margin-bottom:10px">强制执行全局相变（忽略阈值和冷却时间）。</p>
+  <p style="font-size:11px;color:#3a3a5a;margin-bottom:10px">强制执行全局相变（忽略阈值和冷却时间）�?/p>
   <button onclick="triggerPhaseUI()" class="btn btn-danger">触发相变</button>
   <pre id="phaseResult" style="margin-top:12px;font-size:10px;color:#4a4a6a;max-height:300px;overflow:auto"></pre>
   </div>`;
@@ -524,14 +524,14 @@ async function triggerPhaseUI(){
 
 let _importRunning=false;
 function showImportDialog(){
-  if(typeof ElementPlus==='undefined'){alert('需要 Element Plus');return;}
+  if(typeof ElementPlus==='undefined'){alert('需�?Element Plus');return;}
   const h=`<div style="max-height:500px">
     <p style="font-size:12px;color:#a0a0c0;margin-bottom:12px">支持 JSON 格式，结构：{"tetrahedra":[{"content":"...","labels":["..."],"weight":1.0}]}</p>
     <textarea id="importData" rows="10" class="input-field" style="width:100%;margin-bottom:10px" placeholder='粘贴 JSON 数据或选择文件...'></textarea>
     <input type="file" id="importFile" accept=".json" style="margin-bottom:10px;color:#a0a0c0;font-size:12px">
     <div id="importProgress" style="font-size:11px;color:#4a4a6a;margin-top:8px"></div>
   </div>`;
-  ElementPlus.ElMessageBox({title:'导入记忆',dangerouslyUseHTMLString:true,message:h,confirmButtonText:'开始导入',cancelButtonText:'取消',beforeClose:async(action,instance,done)=>{
+  ElementPlus.ElMessageBox({title:'导入记忆',dangerouslyUseHTMLString:true,message:h,confirmButtonText:'开始导�?,cancelButtonText:'取消',beforeClose:async(action,instance,done)=>{
     if(action==='confirm'){
       const fileInput=document.getElementById('importFile');
       const textArea=document.getElementById('importData');
@@ -544,7 +544,7 @@ function showImportDialog(){
       if(!data||!data.tetrahedra){ElementPlus.ElMessage.error('无效数据格式');done();return;}
       const items=data.tetrahedra;
       let ok=0,fail=0;
-      document.getElementById('importProgress').textContent=`导入中 0/${items.length}...`;
+      document.getElementById('importProgress').textContent=`导入�?0/${items.length}...`;
       for(let i=0;i<items.length;i++){
         const t=items[i];
         if(!t.content){continue;}
@@ -552,9 +552,9 @@ function showImportDialog(){
           await api('/store',{body:{content:t.content,labels:t.labels||[],weight:t.weight||1.0,metadata:t.metadata||{}}});
           ok++;
         }catch(e){fail++;}
-        if(i%10===0)document.getElementById('importProgress').textContent=`导入中 ${i+1}/${items.length} (成功:${ok} 失败:${fail})...`;
+        if(i%10===0)document.getElementById('importProgress').textContent=`导入�?${i+1}/${items.length} (成功:${ok} 失败:${fail})...`;
       }
-      document.getElementById('importProgress').textContent=`完成！成功:${ok} 失败:${fail} 总计:${items.length}`;
+      document.getElementById('importProgress').textContent=`完成！成�?${ok} 失败:${fail} 总计:${items.length}`;
       refreshAll();
       setTimeout(done,800);
     }else{done();}
@@ -568,7 +568,7 @@ function showRightPanelList(){
   const body=document.getElementById('rpBody');
   const hdr=document.getElementById('rpHeader');
   hdr.textContent='记忆集群 ('+G.memories.length+')';
-  body.innerHTML=`<input id="rpFilter" placeholder="筛选记忆..." class="input-field" style="width:100%;margin-bottom:8px" oninput="filterRightPanel()">
+  body.innerHTML=`<input id="rpFilter" placeholder="筛选记�?.." class="input-field" style="width:100%;margin-bottom:8px" oninput="filterRightPanel()">
   <div id="rpList"></div>`;
   filterRightPanel();
 }
@@ -595,10 +595,10 @@ async function selectMemory(id){
     body.innerHTML=`<button onclick="G.selectedId=null;showRightPanelList()" class="btn" style="margin-bottom:10px">&larr; 返回列表</button>
     <div class="detail-field"><label>标识</label><div class="val" style="font-size:10px;color:#2a2a4a;font-family:monospace">${d.id}</div></div>
     <div class="detail-field"><label>权重</label><div class="val"><input type="range" id="editW" min="0.5" max="10" step="0.5" value="${d.weight||1}"> <span style="color:#c9a04e" id="editWVal">${(d.weight||1).toFixed(1)}</span></div></div>
-    <div class="detail-field"><label>激活值</label><div class="val" style="color:#06b6d4">${(d.activation||0).toFixed(4)}</div></div>
+    <div class="detail-field"><label>激活�?/label><div class="val" style="color:#06b6d4">${(d.activation||0).toFixed(4)}</div></div>
     <div class="detail-field"><label>标签</label><div class="val"><div class="tag-list">${(d.labels||[]).map(l=>`<span class="tag-item ${l.startsWith('__')?'dream':''}">${l}</span>`).join('')}</div></div></div>
     <div class="detail-field"><label>内容</label><textarea id="editC" rows="4" class="input-field" style="width:100%;margin-top:4px">${d.content||''}</textarea></div>
-    <div class="detail-field"><label>元信息</label><div class="val" style="font-size:10px;color:#2a2a4a">创建时间: ${fmtTime(d.creation_time)}<br>访问次数: ${d.access_count||0}</div></div>
+    <div class="detail-field"><label>元信�?/label><div class="val" style="font-size:10px;color:#2a2a4a">创建时间: ${fmtTime(d.creation_time)}<br>访问次数: ${d.access_count||0}</div></div>
     <div style="display:flex;gap:6px;margin-top:12px">
       <button onclick="saveEdit()" class="btn btn-accent">保存</button>
       <button onclick="deleteMemory()" class="btn btn-danger">删除</button>
@@ -629,15 +629,15 @@ async function saveEdit(){
     const w=parseFloat(document.getElementById('editW').value);
     const c=document.getElementById('editC').value;
     await api('/tetrahedra/'+G.selectedId,{method:'PUT',body:{content:c,weight:w}});
-    if(typeof ElementPlus!=='undefined')ElementPlus.ElMessage.success('已保存');
+    if(typeof ElementPlus!=='undefined')ElementPlus.ElMessage.success('已保�?);
     refreshAll();
   }catch(e){if(typeof ElementPlus!=='undefined')ElementPlus.ElMessage.error('保存失败: '+e.message);}
 }
 async function deleteMemory(){
   try{
-    if(typeof ElementPlus!=='undefined')await ElementPlus.ElMessageBox.confirm('确定删除这条记忆？此操作不可恢复。','确认删除',{type:'warning'});
+    if(typeof ElementPlus!=='undefined')await ElementPlus.ElMessageBox.confirm('确定删除这条记忆？此操作不可恢复�?,'确认删除',{type:'warning'});
     await api('/tetrahedra/'+G.selectedId,{method:'DELETE'});
-    if(typeof ElementPlus!=='undefined')ElementPlus.ElMessage.success('已删除');
+    if(typeof ElementPlus!=='undefined')ElementPlus.ElMessage.success('已删�?);
     G.selectedId=null;showRightPanelList();refreshAll();
   }catch(e){}
 }
@@ -661,25 +661,25 @@ async function doQuery(){
   }catch(e){if(typeof ElementPlus!=='undefined')ElementPlus.ElMessage.error('查询失败');}
 }
 async function triggerDream(){
-  if(typeof ElementPlus!=='undefined')ElementPlus.ElMessage.info('梦境周期触发中...');
+  if(typeof ElementPlus!=='undefined')ElementPlus.ElMessage.info('梦境周期触发�?..');
   const r=await api('/dream',{body:{force:true}});
   if(typeof ElementPlus!=='undefined')ElementPlus.ElMessage.success('梦境完成: '+(r.result?.phase||'完成'));
   refreshAll();
 }
 async function doSelfOrg(){
   await api('/self-organize',{body:{}});
-  if(typeof ElementPlus!=='undefined')ElementPlus.ElMessage.success('自组织完成');
+  if(typeof ElementPlus!=='undefined')ElementPlus.ElMessage.success('自组织完�?);
   refreshAll();
 }
 async function doPhaseTrigger(){
-  if(typeof ElementPlus!=='undefined')ElementPlus.ElMessage.info('相变触发中...');
+  if(typeof ElementPlus!=='undefined')ElementPlus.ElMessage.info('相变触发�?..');
   const r=await api('/phase-transition/trigger',{body:{}});
   if(typeof ElementPlus!=='undefined')ElementPlus.ElMessage.success('结果: '+(r.status||'完成'));
   refreshAll();
 }
 async function exportData(){
   await api('/export');
-  if(typeof ElementPlus!=='undefined')ElementPlus.ElMessage.success('已导出');
+  if(typeof ElementPlus!=='undefined')ElementPlus.ElMessage.success('已导�?);
 }
 
 function fmtTime(ts){if(!ts)return'-';return new Date(ts*1000).toLocaleString('zh-CN');}
@@ -847,25 +847,25 @@ async function renderSelfCheck(el){
 
   let dupHTML = dup.length === 0 
     ? '<div style="color:#3a5a3a;padding:12px">未检测到重复记忆</div>'
-    : dup.map(d => '<div style=\"background:rgba(255,180,50,.06);border:1px solid rgba(255,180,50,.1);border-radius:8px;padding:12px;margin-bottom:8px\"><div style=\"display:flex;justify-content:space-between;align-items:center;margin-bottom:6px\"><span style=\"color:#ffa726;font-weight:600\">' + (d.similarity*100).toFixed(1) + '%</span><span style=\"color:#3a3a5a;font-size:11px\">' + d.node_a + ' ↔ ' + d.node_b + '</span></div><div style=\"font-size:12px;color:#7a7a9a;margin-bottom:4px\">A: ' + d.content_a + '</div><div style=\"font-size:12px;color:#7a7a9a\">B: ' + d.content_b + '</div><div style=\"margin-top:6px;font-size:11px;color:#4a4a6a\">权重: ' + (d.weight_a||0).toFixed(2) + ' / ' + (d.weight_b||0).toFixed(2) + '</div></div>').join('');
+    : dup.map(d => '<div style=\"background:rgba(255,180,50,.06);border:1px solid rgba(255,180,50,.1);border-radius:8px;padding:12px;margin-bottom:8px\"><div style=\"display:flex;justify-content:space-between;align-items:center;margin-bottom:6px\"><span style=\"color:#ffa726;font-weight:600\">' + (d.similarity*100).toFixed(1) + '%</span><span style=\"color:#3a3a5a;font-size:11px\">' + d.node_a + ' �?' + d.node_b + '</span></div><div style=\"font-size:12px;color:#7a7a9a;margin-bottom:4px\">A: ' + d.content_a + '</div><div style=\"font-size:12px;color:#7a7a9a\">B: ' + d.content_b + '</div><div style=\"margin-top:6px;font-size:11px;color:#4a4a6a\">权重: ' + (d.weight_a||0).toFixed(2) + ' / ' + (d.weight_b||0).toFixed(2) + '</div></div>').join('');
 
   let isoHTML = isoList.length === 0
-    ? '<div style=\"color:#3a5a3a;padding:12px\">未检测到孤立节点 — 网络连通性良好</div>'
+    ? '<div style=\"color:#3a5a3a;padding:12px\">未检测到孤立节点 �?网络连通性良�?/div>'
     : isoList.map(n => '<div style=\"background:rgba(255,80,80,.06);border:1px solid rgba(255,80,80,.1);border-radius:8px;padding:12px;margin-bottom:8px\"><div style=\"display:flex;justify-content:space-between;align-items:center\"><span style=\"color:#ff6b6b;font-weight:600\">' + n.id + '</span><span style=\"color:#3a3a5a;font-size:11px\">权重 ' + (n.weight||0).toFixed(2) + '</span></div><div style=\"font-size:12px;color:#7a7a9a;margin-top:4px\">' + n.content + '</div></div>').join('');
 
   let latestHTML = '';
   if(sc.latest_check){
     let lc = sc.latest_check;
     let t = new Date(lc.check_time*1000).toLocaleString('zh-CN');
-    latestHTML = '<div class=\"card\"><h2>最近一次检查</h2><div style=\"font-size:12px;color:#5a5a7a\">时间: ' + t + '</div><div style=\"font-size:12px;color:#5a5a7a\">异常: ' + lc.anomalies_found + ' | 修复: ' + lc.repairs_succeeded + '/' + lc.repairs_attempted + '</div><div style=\"font-size:12px;color:' + (lc.pulse_triggered?'#b388ff':'#3a3a5a') + '\">脉冲触发: ' + (lc.pulse_triggered?'是':'否') + '</div></div>';
+    latestHTML = '<div class=\"card\"><h2>最近一次检�?/h2><div style=\"font-size:12px;color:#5a5a7a\">时间: ' + t + '</div><div style=\"font-size:12px;color:#5a5a7a\">异常: ' + lc.anomalies_found + ' | 修复: ' + lc.repairs_succeeded + '/' + lc.repairs_attempted + '</div><div style=\"font-size:12px;color:' + (lc.pulse_triggered?'#b388ff':'#3a3a5a') + '\">脉冲触发: ' + (lc.pulse_triggered?'�?:'�?) + '</div></div>';
   }
 
-  el.innerHTML = '<div style=\"display:flex;gap:12px;align-items:center;margin-bottom:20px\"><h1 style=\"margin:0;font-size:20px;color:#b388ff\">自检脉冲 — 主动意识</h1><button onclick=\"runSelfCheck()\" class=\"btn btn-accent\" style=\"font-size:12px;padding:6px 16px\">立即自检</button></div><div class=\"stats-grid\" style=\"margin-bottom:20px\"><div class=\"stat\"><div class=\"label\">总检查次数</div><div class=\"value\">' + (sc.total_checks||0) + '</div></div><div class=\"stat\"><div class=\"label\">发现异常</div><div class=\"value yellow\">' + (sc.total_anomalies_found||0) + '</div></div><div class=\"stat\"><div class=\"label\">自动修复</div><div class=\"value green\">' + (sc.total_repairs_done||0) + '</div></div><div class=\"stat\"><div class=\"label\">引擎状态</div><div class=\"value ' + (sc.engine_running?'green':'pink') + '\">' + (sc.engine_running?'运行中':'停止') + '</div></div><div class=\"stat\"><div class=\"label\">检查间隔</div><div class=\"value\">' + (sc.check_interval||60) + 's</div></div><div class=\"stat\"><div class=\"label\">重复对数</div><div class=\"value yellow\">' + dup.length + '</div></div><div class=\"stat\"><div class=\"label\">孤立节点</div><div class=\"value ' + (isoList.length>0?'pink':'green') + '\">' + isoList.length + '</div></div></div>' + latestHTML + '<div class=\"card\"><h2>重复记忆检测（相似度 >= 70%）</h2>' + dupHTML + '</div><div class=\"card\"><h2>孤立节点检测（无已占用邻居）</h2>' + isoHTML + '</div><div id=\"selfCheckResult\"></div>';
+  el.innerHTML = '<div style=\"display:flex;gap:12px;align-items:center;margin-bottom:20px\"><h1 style=\"margin:0;font-size:20px;color:#b388ff\">自检脉冲 �?主动意识</h1><button onclick=\"runSelfCheck()\" class=\"btn btn-accent\" style=\"font-size:12px;padding:6px 16px\">立即自检</button></div><div class=\"stats-grid\" style=\"margin-bottom:20px\"><div class=\"stat\"><div class=\"label\">总检查次�?/div><div class=\"value\">' + (sc.total_checks||0) + '</div></div><div class=\"stat\"><div class=\"label\">发现异常</div><div class=\"value yellow\">' + (sc.total_anomalies_found||0) + '</div></div><div class=\"stat\"><div class=\"label\">自动修复</div><div class=\"value green\">' + (sc.total_repairs_done||0) + '</div></div><div class=\"stat\"><div class=\"label\">引擎状�?/div><div class=\"value ' + (sc.engine_running?'green':'pink') + '\">' + (sc.engine_running?'运行�?:'停止') + '</div></div><div class=\"stat\"><div class=\"label\">检查间�?/div><div class=\"value\">' + (sc.check_interval||60) + 's</div></div><div class=\"stat\"><div class=\"label\">重复对数</div><div class=\"value yellow\">' + dup.length + '</div></div><div class=\"stat\"><div class=\"label\">孤立节点</div><div class=\"value ' + (isoList.length>0?'pink':'green') + '\">' + isoList.length + '</div></div></div>' + latestHTML + '<div class=\"card\"><h2>重复记忆检测（相似�?>= 70%�?/h2>' + dupHTML + '</div><div class=\"card\"><h2>孤立节点检测（无已占用邻居�?/h2>' + isoHTML + '</div><div id=\"selfCheckResult\"></div>';
 }
 
 async function runSelfCheck(){
   const res=document.getElementById('selfCheckResult');
-  if(res) res.innerHTML='<div class="card" style="border-color:#b388ff"><h2 style="color:#b388ff">自检中...</h2></div>';
+  if(res) res.innerHTML='<div class="card" style="border-color:#b388ff"><h2 style="color:#b388ff">自检�?..</h2></div>';
   await api('self-check/run',{method:'POST'});
   await renderSelfCheck(document.getElementById('modePanel'));
 }
@@ -876,13 +876,13 @@ async function renderCascade(el){
   const cc=ps.cascade_count||0;
   const cs=ps.crystallized||{};
   const tc=ps.crystallized_top||[];
-  let crystalHTML=tc.length?'<table class="mem-table"><tr><th>节点A</th><th>节点B</th><th>晶体权重</th><th>传输次数</th><th>年龄(秒)</th></tr>'+tc.map(c=>'<tr><td>'+c.nodes[0]+'</td><td>'+c.nodes[1]+'</td><td>'+c.crystal_weight+'</td><td>'+c.transmissions+'</td><td>'+c.age_seconds+'</td></tr>').join('')+'</table>':'<p style="color:#888">暂无结晶通路（需脉冲运行一段时间后自动生成）</p>';
-  el.innerHTML='<div style="display:flex;gap:12px;align-items:center;margin-bottom:20px"><h1 style="margin:0;font-size:20px;color:#64b5f6">级联脉冲 — 多方向分支传播</h1><button onclick="triggerCascade()" class="btn btn-accent" style="font-size:12px;padding:6px 16px">触发级联</button></div><div class="stats-grid" style="margin-bottom:20px"><div class="stat"><div class="label">级联脉冲总数</div><div class="value" style="color:#64b5f6">'+cc+'</div></div><div class="stat"><div class="label">总脉冲数</div><div class="value">'+ps.pulse_count+'</div></div><div class="stat"><div class="label">桥接数</div><div class="value green">'+ps.bridge_count+'</div></div><div class="stat"><div class="label">结晶通路数</div><div class="value" style="color:#aed581">'+(cs.total_crystals||0)+'</div></div><div class="stat"><div class="label">结晶传输次数</div><div class="value">'+(cs.total_transmissions||0)+'</div></div></div><div class="card"><h2>赫布路径 Top 10</h2>'+(ps.hebbian_top_paths?ps.hebbian_top_paths.map(p=>'<div style="padding:4px 0;border-bottom:1px solid #333"><span style="color:#7b8cff">'+p[0]+'</span> → <span style="color:#7b8cff">'+p[1]+'</span> <span style="color:#c9a04e">w='+p[2]+'</span></div>').join(''):'<p style="color:#888">暂无数据</p>')+'</div><div class="card"><h2>结晶通路 Top 10</h2>'+crystalHTML+'</div><div id="cascadeResult"></div>';
+  let crystalHTML=tc.length?'<table class="mem-table"><tr><th>节点A</th><th>节点B</th><th>晶体权重</th><th>传输次数</th><th>年龄(�?</th></tr>'+tc.map(c=>'<tr><td>'+c.nodes[0]+'</td><td>'+c.nodes[1]+'</td><td>'+c.crystal_weight+'</td><td>'+c.transmissions+'</td><td>'+c.age_seconds+'</td></tr>').join('')+'</table>':'<p style="color:#888">暂无结晶通路（需脉冲运行一段时间后自动生成�?/p>';
+  el.innerHTML='<div style="display:flex;gap:12px;align-items:center;margin-bottom:20px"><h1 style="margin:0;font-size:20px;color:#64b5f6">级联脉冲 �?多方向分支传�?/h1><button onclick="triggerCascade()" class="btn btn-accent" style="font-size:12px;padding:6px 16px">触发级联</button></div><div class="stats-grid" style="margin-bottom:20px"><div class="stat"><div class="label">级联脉冲总数</div><div class="value" style="color:#64b5f6">'+cc+'</div></div><div class="stat"><div class="label">总脉冲数</div><div class="value">'+ps.pulse_count+'</div></div><div class="stat"><div class="label">桥接�?/div><div class="value green">'+ps.bridge_count+'</div></div><div class="stat"><div class="label">结晶通路�?/div><div class="value" style="color:#aed581">'+(cs.total_crystals||0)+'</div></div><div class="stat"><div class="label">结晶传输次数</div><div class="value">'+(cs.total_transmissions||0)+'</div></div></div><div class="card"><h2>赫布路径 Top 10</h2>'+(ps.hebbian_top_paths?ps.hebbian_top_paths.map(p=>'<div style="padding:4px 0;border-bottom:1px solid #333"><span style="color:#7b8cff">'+p[0]+'</span> �?<span style="color:#7b8cff">'+p[1]+'</span> <span style="color:#c9a04e">w='+p[2]+'</span></div>').join(''):'<p style="color:#888">暂无数据</p>')+'</div><div class="card"><h2>结晶通路 Top 10</h2>'+crystalHTML+'</div><div id="cascadeResult"></div>';
 }
 
 async function triggerCascade(){
   const res=document.getElementById('cascadeResult');
-  if(res) res.innerHTML='<div class="card" style="border-color:#64b5f6"><h2 style="color:#64b5f6">级联脉冲触发中...</h2></div>';
+  if(res) res.innerHTML='<div class="card" style="border-color:#64b5f6"><h2 style="color:#64b5f6">级联脉冲触发�?..</h2></div>';
   await api('/cascade/trigger',{method:'POST',body:{strength:0.5}});
   await renderCascade(document.getElementById('modePanel'));
 }
@@ -893,9 +893,9 @@ async function renderLattice(el){
   const scoreColor=r.integrity_score>0.9?'#5eb88a':r.integrity_score>0.5?'#c9a04e':'#ff5555';
   let errorHTML='';
   if(r.coordination_errors&&r.coordination_errors.length>0){
-    errorHTML='<div class="card"><h2>配位数异常节点（边界效应，属正常现象）</h2><p style="color:#888;font-size:12px">BCC晶格边界节点自然无法达到理想配位数8，此为正常拓扑边界效应</p><div style="max-height:200px;overflow-y:auto"><table class="mem-table"><tr><th>节点</th><th>类型</th><th>实际face</th><th>实际edge</th></tr>'+r.coordination_errors.slice(0,30).map(e=>'<tr><td>'+e.node+'</td><td>'+e.type+'</td><td>'+e.actual_face+'</td><td>'+(e.actual_edge||'-')+'</td></tr>').join('')+'</table></div></div>';
+    errorHTML='<div class="card"><h2>配位数异常节点（边界效应，属正常现象�?/h2><p style="color:#888;font-size:12px">BCC晶格边界节点自然无法达到理想配位�?，此为正常拓扑边界效�?/p><div style="max-height:200px;overflow-y:auto"><table class="mem-table"><tr><th>节点</th><th>类型</th><th>实际face</th><th>实际edge</th></tr>'+r.coordination_errors.slice(0,30).map(e=>'<tr><td>'+e.node+'</td><td>'+e.type+'</td><td>'+e.actual_face+'</td><td>'+(e.actual_edge||'-')+'</td></tr>').join('')+'</table></div></div>';
   }
-  el.innerHTML='<div style="display:flex;gap:12px;align-items:center;margin-bottom:20px"><h1 style="margin:0;font-size:20px;color:#aed581">BCC晶格完整性验证</h1><button onclick="runLatticeCheck()" class="btn btn-accent" style="font-size:12px;padding:6px 16px">重新检测</button></div><div class="stats-grid" style="margin-bottom:20px"><div class="stat"><div class="label">完整性评分</div><div class="value" style="color:'+scoreColor+';font-size:24px">'+(r.integrity_score*100).toFixed(1)+'%</div></div><div class="stat"><div class="label">总节点数</div><div class="value">'+r.total_nodes+'</div></div><div class="stat"><div class="label">连通分量</div><div class="value '+(r.connectivity_components===1?'green':'pink')+'">'+r.connectivity_components+'</div></div><div class="stat"><div class="label">断裂边</div><div class="value '+(r.broken_edges.length===0?'green':'pink')+'">'+r.broken_edges.length+'</div></div><div class="stat"><div class="label">孤立节点</div><div class="value '+(r.orphan_nodes.length===0?'green':'pink')+'">'+r.orphan_nodes.length+'</div></div><div class="stat"><div class="label">Face边检查</div><div class="value">'+r.face_edges_checked+'</div></div><div class="stat"><div class="label">Edge边检查</div><div class="value">'+r.edge_edges_checked+'</div></div></div><div class="card" style="border-color:'+scoreColor+'"><p style="color:'+scoreColor+'">'+r.details+'</p></div>'+errorHTML;
+  el.innerHTML='<div style="display:flex;gap:12px;align-items:center;margin-bottom:20px"><h1 style="margin:0;font-size:20px;color:#aed581">BCC晶格完整性验�?/h1><button onclick="runLatticeCheck()" class="btn btn-accent" style="font-size:12px;padding:6px 16px">重新检�?/button></div><div class="stats-grid" style="margin-bottom:20px"><div class="stat"><div class="label">完整性评�?/div><div class="value" style="color:'+scoreColor+';font-size:24px">'+(r.integrity_score*100).toFixed(1)+'%</div></div><div class="stat"><div class="label">总节点数</div><div class="value">'+r.total_nodes+'</div></div><div class="stat"><div class="label">连通分�?/div><div class="value '+(r.connectivity_components===1?'green':'pink')+'">'+r.connectivity_components+'</div></div><div class="stat"><div class="label">断裂�?/div><div class="value '+(r.broken_edges.length===0?'green':'pink')+'">'+r.broken_edges.length+'</div></div><div class="stat"><div class="label">孤立节点</div><div class="value '+(r.orphan_nodes.length===0?'green':'pink')+'">'+r.orphan_nodes.length+'</div></div><div class="stat"><div class="label">Face边检�?/div><div class="value">'+r.face_edges_checked+'</div></div><div class="stat"><div class="label">Edge边检�?/div><div class="value">'+r.edge_edges_checked+'</div></div></div><div class="card" style="border-color:'+scoreColor+'"><p style="color:'+scoreColor+'">'+r.details+'</p></div>'+errorHTML;
 }
 
 async function runLatticeCheck(){
@@ -908,13 +908,13 @@ async function renderCrystal(el){
   if(!cs)return;
   const stats=cs.stats||{};
   const top=cs.top_crystals||[];
-  let topHTML=top.length?'<table class="mem-table"><tr><th>节点A</th><th>节点B</th><th>晶体权重</th><th>赫布权重</th><th>传输次数</th><th>年龄(秒)</th></tr>'+top.map(c=>'<tr><td>'+c.nodes[0]+'</td><td>'+c.nodes[1]+'</td><td style="color:#aed581">'+c.crystal_weight+'</td><td>'+c.hebbian_weight+'</td><td>'+c.transmissions+'</td><td>'+c.age_seconds+'</td></tr>').join('')+'</table>':'<p style="color:#888">暂无结晶通路。需要脉冲引擎运行足够长时间，赫布路径权重超过阈值 (3.0) 后自动结晶化。</p>';
-  el.innerHTML='<div style="display:flex;gap:12px;align-items:center;margin-bottom:20px"><h1 style="margin:0;font-size:20px;color:#ffd54f">结晶通路 — 永久结构化快速通道</h1><button onclick="forceCrystallize()" class="btn btn-accent" style="font-size:12px;padding:6px 16px">强制结晶扫描</button></div><div class="stats-grid" style="margin-bottom:20px"><div class="stat"><div class="label">结晶通路数</div><div class="value" style="color:#ffd54f">'+(stats.total_crystals||0)+'</div></div><div class="stat"><div class="label">容量</div><div class="value">'+(stats.capacity||200)+'</div></div><div class="stat"><div class="label">平均权重</div><div class="value">'+(stats.avg_crystal_weight||0)+'</div></div><div class="stat"><div class="label">最大权重</div><div class="value" style="color:#c9a04e">'+(stats.max_crystal_weight||0)+'</div></div><div class="stat"><div class="label">总创建数</div><div class="value">'+(stats.total_created||0)+'</div></div><div class="stat"><div class="label">总传输次数</div><div class="value">'+(stats.total_transmissions||0)+'</div></div><div class="stat"><div class="label">结晶节点数</div><div class="value">'+(force_res.crystal_nodes||0)+'</div></div></div><div class="card"><h2>结晶通路 Top 20</h2>'+topHTML+'</div><div id="crystalResult"></div>';
+  let topHTML=top.length?'<table class="mem-table"><tr><th>节点A</th><th>节点B</th><th>晶体权重</th><th>赫布权重</th><th>传输次数</th><th>年龄(�?</th></tr>'+top.map(c=>'<tr><td>'+c.nodes[0]+'</td><td>'+c.nodes[1]+'</td><td style="color:#aed581">'+c.crystal_weight+'</td><td>'+c.hebbian_weight+'</td><td>'+c.transmissions+'</td><td>'+c.age_seconds+'</td></tr>').join('')+'</table>':'<p style="color:#888">暂无结晶通路。需要脉冲引擎运行足够长时间，赫布路径权重超过阈�?(3.0) 后自动结晶化�?/p>';
+  el.innerHTML='<div style="display:flex;gap:12px;align-items:center;margin-bottom:20px"><h1 style="margin:0;font-size:20px;color:#ffd54f">结晶通路 �?永久结构化快速通道</h1><button onclick="forceCrystallize()" class="btn btn-accent" style="font-size:12px;padding:6px 16px">强制结晶扫描</button></div><div class="stats-grid" style="margin-bottom:20px"><div class="stat"><div class="label">结晶通路�?/div><div class="value" style="color:#ffd54f">'+(stats.total_crystals||0)+'</div></div><div class="stat"><div class="label">容量</div><div class="value">'+(stats.capacity||200)+'</div></div><div class="stat"><div class="label">平均权重</div><div class="value">'+(stats.avg_crystal_weight||0)+'</div></div><div class="stat"><div class="label">最大权�?/div><div class="value" style="color:#c9a04e">'+(stats.max_crystal_weight||0)+'</div></div><div class="stat"><div class="label">总创建数</div><div class="value">'+(stats.total_created||0)+'</div></div><div class="stat"><div class="label">总传输次�?/div><div class="value">'+(stats.total_transmissions||0)+'</div></div><div class="stat"><div class="label">结晶节点�?/div><div class="value">'+(force_res.crystal_nodes||0)+'</div></div></div><div class="card"><h2>结晶通路 Top 20</h2>'+topHTML+'</div><div id="crystalResult"></div>';
 }
 
 async function forceCrystallize(){
   const res=document.getElementById('crystalResult');
-  if(res) res.innerHTML='<div class="card" style="border-color:#ffd54f"><h2 style="color:#ffd54f">结晶扫描中...</h2></div>';
+  if(res) res.innerHTML='<div class="card" style="border-color:#ffd54f"><h2 style="color:#ffd54f">结晶扫描�?..</h2></div>';
   await api('/crystallized/force',{method:'POST'});
   await renderCrystal(document.getElementById('modePanel'));
 }
@@ -925,12 +925,12 @@ async function renderOrganize(el){
   const clusters=status.clusters||[];
   const shortcuts=status.shortcuts||[];
   const histList=hist.history||[];
-  let clusterHTML=clusters.length?'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px">'+clusters.map(c=>'<div class="card" style="padding:12px"><h3 style="color:#ff8a65;font-size:14px;margin:0 0 8px">'+c.cluster_id+'</h3><div style="font-size:12px;color:#888">节点数: <b style="color:#ddd">'+c.node_count+'</b> | 平均权重: <b style="color:#c9a04e">'+c.avg_weight+'</b> | 总激活: <b style="color:#7b8cff">'+c.total_activation+'</b></div><div style="margin-top:6px">'+c.labels.map(l=>'<span class="tag2" style="background:#1a2a1a;color:#aed581;font-size:11px;margin:2px">'+l+'</span>').join('')+'</div></div>').join('')+'</div>':'<p style="color:#888">暂无聚类（运行自组织后自动发现）</p>';
+  let clusterHTML=clusters.length?'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px">'+clusters.map(c=>'<div class="card" style="padding:12px"><h3 style="color:#ff8a65;font-size:14px;margin:0 0 8px">'+c.cluster_id+'</h3><div style="font-size:12px;color:#888">节点�? <b style="color:#ddd">'+c.node_count+'</b> | 平均权重: <b style="color:#c9a04e">'+c.avg_weight+'</b> | 总激�? <b style="color:#7b8cff">'+c.total_activation+'</b></div><div style="margin-top:6px">'+c.labels.map(l=>'<span class="tag2" style="background:#1a2a1a;color:#aed581;font-size:11px;margin:2px">'+l+'</span>').join('')+'</div></div>').join('')+'</div>':'<p style="color:#888">暂无聚类（运行自组织后自动发现）</p>';
   let shortcutHTML=shortcuts.length?'<table class="mem-table"><tr><th>节点A</th><th>节点B</th><th>虚拟连接强度</th></tr>'+shortcuts.map(s=>'<tr><td>'+s.nodes[0]+'</td><td>'+s.nodes[1]+'</td><td style="color:#ff8a65">'+s.strength+'</td></tr>').join('')+'</table>':'<p style="color:#888">暂无捷径（语义相关但拓扑距离远的记忆对自动创建）</p>';
-  let histHTML=histList.length?'<table class="mem-table"><tr><th>时间</th><th>聚类</th><th>合并</th><th>捷径</th><th>熵(前)</th><th>熵(后)</th></tr>'+histList.map(h=>'<tr><td style="font-size:11px">'+new Date(h.organize_time*1000).toLocaleTimeString()+'</td><td>'+h.clusters_found+'</td><td>'+h.consolidations_done+'</td><td>'+h.shortcuts_created+'</td><td>'+h.entropy_before+'</td><td style="color:#5eb88a">'+h.entropy_after+'</td></tr>').join('')+'</table>':'<p style="color:#888">暂无历史记录</p>';
+  let histHTML=histList.length?'<table class="mem-table"><tr><th>时间</th><th>聚类</th><th>合并</th><th>捷径</th><th>�?�?</th><th>�?�?</th></tr>'+histList.map(h=>'<tr><td style="font-size:11px">'+new Date(h.organize_time*1000).toLocaleTimeString()+'</td><td>'+h.clusters_found+'</td><td>'+h.consolidations_done+'</td><td>'+h.shortcuts_created+'</td><td>'+h.entropy_before+'</td><td style="color:#5eb88a">'+h.entropy_after+'</td></tr>').join('')+'</table>':'<p style="color:#888">暂无历史记录</p>';
   const st=status.latest_entropy;
   const entropyColor=st>0.9?'#5eb88a':st>0.7?'#c9a04e':'#ff5555';
-  el.innerHTML='<div style="display:flex;gap:12px;align-items:center;margin-bottom:20px"><h1 style="margin:0;font-size:20px;color:#ff8a65">自组织强化 — 自主拓扑优化</h1><button onclick="runOrganize()" class="btn btn-accent" style="font-size:12px;padding:6px 16px">执行自组织</button></div><div class="stats-grid" style="margin-bottom:20px"><div class="stat"><div class="label">活跃聚类</div><div class="value" style="color:#ff8a65">'+clusters.length+'</div></div><div class="stat"><div class="label">拓扑捷径</div><div class="value" style="color:#64b5f6">'+status.active_shortcuts+'</div></div><div class="stat"><div class="label">当前熵</div><div class="value" style="color:'+entropyColor+'">'+(st!=null?(st*100).toFixed(1)+'%':'-')+'</div></div><div class="stat"><div class="label">累计合并</div><div class="value">'+status.total_consolidations+'</div></div><div class="stat"><div class="label">累计捷径</div><div class="value">'+status.total_shortcuts_created+'</div></div><div class="stat"><div class="label">自组织周期</div><div class="value">'+status.total_organize_cycles+'</div></div></div><div class="card"><h2>语义聚类（标签共现 + 空间邻近）</h2>'+clusterHTML+'</div><div class="card"><h2>拓扑捷径（语义近但拓扑远）</h2>'+shortcutHTML+'</div><div class="card"><h2>自组织历史</h2>'+histHTML+'</div><div id="organizeResult"></div>';
+  el.innerHTML='<div style="display:flex;gap:12px;align-items:center;margin-bottom:20px"><h1 style="margin:0;font-size:20px;color:#ff8a65">自组织强�?�?自主拓扑优化</h1><button onclick="runOrganize()" class="btn btn-accent" style="font-size:12px;padding:6px 16px">执行自组�?/button></div><div class="stats-grid" style="margin-bottom:20px"><div class="stat"><div class="label">活跃聚类</div><div class="value" style="color:#ff8a65">'+clusters.length+'</div></div><div class="stat"><div class="label">拓扑捷径</div><div class="value" style="color:#64b5f6">'+status.active_shortcuts+'</div></div><div class="stat"><div class="label">当前�?/div><div class="value" style="color:'+entropyColor+'">'+(st!=null?(st*100).toFixed(1)+'%':'-')+'</div></div><div class="stat"><div class="label">累计合并</div><div class="value">'+status.total_consolidations+'</div></div><div class="stat"><div class="label">累计捷径</div><div class="value">'+status.total_shortcuts_created+'</div></div><div class="stat"><div class="label">自组织周�?/div><div class="value">'+status.total_organize_cycles+'</div></div></div><div class="card"><h2>语义聚类（标签共�?+ 空间邻近�?/h2>'+clusterHTML+'</div><div class="card"><h2>拓扑捷径（语义近但拓扑远�?/h2>'+shortcutHTML+'</div><div class="card"><h2>自组织历�?/h2>'+histHTML+'</div><div id="organizeResult"></div>';
 }
 
 async function runOrganize(){
@@ -951,9 +951,9 @@ async function renderHoneycomb(el){
   const qColor=q.mean>0.7?'#5eb88a':q.mean>0.4?'#c9a04e':'#ff5555';
   const best=(analysis.best_quality_cells||[]).slice(0,10);
   const dense=(analysis.highest_density_cells||[]).slice(0,10);
-  let bestHTML=best.length?'<table class="mem-table"><tr><th>ID</th><th>质量</th><th>体积</th><th>偏斜</th><th>雅可比</th><th>记忆数</th><th>密度</th></tr>'+best.map(c=>'<tr><td>'+c.cell_id+'</td><td style="color:'+qColor+'">'+c.quality+'</td><td>'+c.volume+'</td><td>'+c.skewness+'</td><td style="color:#5eb88a">'+c.jacobian+'</td><td>'+c.memory_count+'</td><td style="color:#64b5f6">'+c.density+'</td></tr>').join('')+'</table>':'<p style="color:#888">暂无数据</p>';
-  let denseHTML=dense.length?'<table class="mem-table"><tr><th>ID</th><th>体心</th><th>记忆数</th><th>总权重</th><th>密度</th></tr>'+dense.map(c=>'<tr><td>'+c.cell_id+'</td><td>'+c.body_center+'</td><td style="color:#ff8a65">'+c.memory_count+'</td><td style="color:#c9a04e">'+c.total_weight+'</td><td style="color:#64b5f6">'+c.density+'</td></tr>').join('')+'</table>':'<p style="color:#888">暂无数据</p>';
-  el.innerHTML='<div style="margin-bottom:20px"><h1 style="margin:0;font-size:20px;color:#64b5f6">蜂巢结构 — BCC 四面体分解分析</h1><p style="color:#888;font-size:12px;margin:4px 0 0">每个 BCC 单元体分解为 8 个四面体单元格，追踪体积/质量/偏斜度/雅可比/记忆密度</p></div><div class="stats-grid" style="margin-bottom:20px"><div class="stat"><div class="label">四面体单元格</div><div class="value" style="color:#64b5f6;font-size:20px">'+analysis.total_cells+'</div></div><div class="stat"><div class="label">BCC 单元体</div><div class="value">'+analysis.total_bcc_units+'</div></div><div class="stat"><div class="label">质量均值</div><div class="value" style="color:'+qColor+'">'+q.mean+'</div></div><div class="stat"><div class="label">雅可比均值</div><div class="value" style="color:#5eb88a">'+jac.mean+'</div></div><div class="stat"><div class="label">偏斜均值</div><div class="value">'+sk.mean+'</div></div><div class="stat"><div class="label">总体积</div><div class="value">'+v.total+'</div></div><div class="stat"><div class="label">有记忆单元格</div><div class="value" style="color:#ff8a65">'+d.occupied_cells+'</div></div></div><div class="card"><h2>最高质量四面体</h2>'+bestHTML+'</div><div class="card"><h2>最高密度四面体</h2>'+denseHTML+'</div>';
+  let bestHTML=best.length?'<table class="mem-table"><tr><th>ID</th><th>质量</th><th>体积</th><th>偏斜</th><th>雅可�?/th><th>记忆�?/th><th>密度</th></tr>'+best.map(c=>'<tr><td>'+c.cell_id+'</td><td style="color:'+qColor+'">'+c.quality+'</td><td>'+c.volume+'</td><td>'+c.skewness+'</td><td style="color:#5eb88a">'+c.jacobian+'</td><td>'+c.memory_count+'</td><td style="color:#64b5f6">'+c.density+'</td></tr>').join('')+'</table>':'<p style="color:#888">暂无数据</p>';
+  let denseHTML=dense.length?'<table class="mem-table"><tr><th>ID</th><th>体心</th><th>记忆�?/th><th>总权�?/th><th>密度</th></tr>'+dense.map(c=>'<tr><td>'+c.cell_id+'</td><td>'+c.body_center+'</td><td style="color:#ff8a65">'+c.memory_count+'</td><td style="color:#c9a04e">'+c.total_weight+'</td><td style="color:#64b5f6">'+c.density+'</td></tr>').join('')+'</table>':'<p style="color:#888">暂无数据</p>';
+  el.innerHTML='<div style="margin-bottom:20px"><h1 style="margin:0;font-size:20px;color:#64b5f6">蜂巢结构 �?BCC 四面体分解分�?/h1><p style="color:#888;font-size:12px;margin:4px 0 0">每个 BCC 单元体分解为 8 个四面体单元格，追踪体积/质量/偏斜�?雅可�?记忆密度</p></div><div class="stats-grid" style="margin-bottom:20px"><div class="stat"><div class="label">四面体单元格</div><div class="value" style="color:#64b5f6;font-size:20px">'+analysis.total_cells+'</div></div><div class="stat"><div class="label">BCC 单元�?/div><div class="value">'+analysis.total_bcc_units+'</div></div><div class="stat"><div class="label">质量均�?/div><div class="value" style="color:'+qColor+'">'+q.mean+'</div></div><div class="stat"><div class="label">雅可比均�?/div><div class="value" style="color:#5eb88a">'+jac.mean+'</div></div><div class="stat"><div class="label">偏斜均�?/div><div class="value">'+sk.mean+'</div></div><div class="stat"><div class="label">总体�?/div><div class="value">'+v.total+'</div></div><div class="stat"><div class="label">有记忆单元格</div><div class="value" style="color:#ff8a65">'+d.occupied_cells+'</div></div></div><div class="card"><h2>最高质量四面体</h2>'+bestHTML+'</div><div class="card"><h2>最高密度四面体</h2>'+denseHTML+'</div>';
 }
 
 async function renderSpatial(el){
@@ -968,7 +968,7 @@ async function renderSpatial(el){
   const refField=stats.reflection_field||{};
   const honeycomb=stats.honeycomb_cells||{};
   const vacs=vacancy.top_vacancies||[];
-  let vacHTML=vacs.length?'<table><tr><th>节点</th><th>吸引力</th><th>条形</th></tr>'+vacs.map(v=>{
+  let vacHTML=vacs.length?'<table><tr><th>节点</th><th>吸引�?/th><th>条形</th></tr>'+vacs.map(v=>{
     const maxA=vacs[0]?.attraction||1;
     const pct=(v.attraction/maxA*100).toFixed(0);
     const c=v.attraction>10?'#c9a04e':v.attraction>5?'#7b8cff':'#4a5a9a';
@@ -976,20 +976,20 @@ async function renderSpatial(el){
   }).join('')+'</table>':'<p style="color:#4a4a6a">暂无高空位吸引力节点</p>';
 
   el.innerHTML=`
-  <div style="margin-bottom:20px"><h1 style="margin:0;font-size:20px;color:#b08cff">空间几何 — BCC 晶格拓扑分析</h1>
-  <p style="color:#4a4a6a;font-size:11px;margin-top:4px">vertex邻居(第三级) · Moran's I 空间自相关 · BCC单元体一致性 · 空位能量场</p></div>
+  <div style="margin-bottom:20px"><h1 style="margin:0;font-size:20px;color:#b08cff">空间几何 �?BCC 晶格拓扑分析</h1>
+  <p style="color:#4a4a6a;font-size:11px;margin-top:4px">vertex邻居(第三�? · Moran's I 空间自相�?· BCC单元体一致�?· 空位能量�?/p></div>
   <div class="stats-grid" style="margin-bottom:20px">
     <div class="stat"><div class="label">Moran's I</div><div class="value" style="color:${miColor};font-size:24px">${mi.toFixed(4)}</div></div>
     <div class="stat"><div class="label">空间分布</div><div class="value" style="color:${miColor};font-size:14px">${miLabel}</div></div>
     <div class="stat"><div class="label">Vertex边数</div><div class="value" style="color:#b08cff">${stats.vertex_edges||0}</div></div>
     <div class="stat"><div class="label">平均Vertex连接</div><div class="value">${(stats.avg_vertex_connections||0).toFixed(1)}</div></div>
     <div class="stat"><div class="label">BCC单元索引</div><div class="value" style="color:#b08cff">${stats.bcc_unit_index_size||0}</div></div>
-    <div class="stat"><div class="label">反射场相位</div><div class="value" style="color:${refField.phase_state==='crystalline'?'#5eb88a':refField.phase_state==='ordered'?'#7b8cff':'#c9a04e'}">${refField.phase_state||'-'}</div></div>
+    <div class="stat"><div class="label">反射场相�?/div><div class="value" style="color:${refField.phase_state==='crystalline'?'#5eb88a':refField.phase_state==='ordered'?'#7b8cff':'#c9a04e'}">${refField.phase_state||'-'}</div></div>
     <div class="stat"><div class="label">场熵</div><div class="value">${(refField.field_entropy||0).toFixed(4)}</div></div>
     <div class="stat"><div class="label">空位总数</div><div class="value">${vacancy.total_with_attraction||0}</div></div>
   </div>
-  <div class="card"><h2>空间自相关 (Moran's I)</h2>
-  <p style="font-size:11px;color:#3a3a5a;margin-bottom:10px">Moran's I 衡量记忆权重在BCC晶格中的空间分布模式。正值表示相似权重的记忆聚集在一起，负值表示分散，接近零表示随机分布。</p>
+  <div class="card"><h2>空间自相�?(Moran's I)</h2>
+  <p style="font-size:11px;color:#3a3a5a;margin-bottom:10px">Moran's I 衡量记忆权重在BCC晶格中的空间分布模式。正值表示相似权重的记忆聚集在一起，负值表示分散，接近零表示随机分布�?/p>
   <div style="display:flex;gap:20px;align-items:center;margin-bottom:12px">
     <div style="width:300px;height:24px;border-radius:12px;background:linear-gradient(to right,#cf6b6b,#c9a04e,#5eb88a);position:relative">
       <div style="position:absolute;left:${Math.max(0,Math.min(100,(mi+1)/2*100))}%;top:-4px;width:3px;height:32px;background:#fff;border-radius:2px;transform:translateX(-50%)"></div>
@@ -998,8 +998,8 @@ async function renderSpatial(el){
       <div style="position:absolute;right:0;top:28px;font-size:9px;color:#5eb88a">+1 聚集</div>
     </div>
   </div></div>
-  <div class="card"><h2>空位能量场 (Vacancy Attraction Map)</h2>
-  <p style="font-size:11px;color:#3a3a5a;margin-bottom:10px">空节点被高权重邻居包围时产生"吸引力"。高吸引力位置是新记忆放置的最优候选。</p>
+  <div class="card"><h2>空位能量�?(Vacancy Attraction Map)</h2>
+  <p style="font-size:11px;color:#3a3a5a;margin-bottom:10px">空节点被高权重邻居包围时产生"吸引�?。高吸引力位置是新记忆放置的最优候选�?/p>
   ${vacHTML}
   </div>
   <div class="card"><h2>BCC 晶格几何统计</h2>
@@ -1008,8 +1008,8 @@ async function renderSpatial(el){
     <div class="config-item"><div class="key">Edge衰减</div><div class="val">${stats.pcnn_config?.edge_decay||'-'}</div></div>
     <div class="config-item"><div class="key">Vertex衰减</div><div class="val">${((stats.pcnn_config?.face_decay||0.72)*(stats.pcnn_config?.edge_decay||0.50)*0.30).toFixed(3)}</div></div>
     <div class="config-item"><div class="key">四面体单元格</div><div class="val">${honeycomb.total_cells||0}</div></div>
-    <div class="config-item"><div class="key">BCC单元体</div><div class="val">${honeycomb.total_bcc_units||0}</div></div>
-    <div class="config-item"><div class="key">质量均值</div><div class="val">${honeycomb.quality?.mean||'-'}</div></div>
+    <div class="config-item"><div class="key">BCC单元�?/div><div class="val">${honeycomb.total_bcc_units||0}</div></div>
+    <div class="config-item"><div class="key">质量均�?/div><div class="val">${honeycomb.quality?.mean||'-'}</div></div>
   </div></div>`;
 }
 
@@ -1017,13 +1017,13 @@ async function renderDream(el){
   const[status,hist]=await Promise.all([api('/dream/status'),api('/dream/history?n=5')]);
   if(!status)return;
   const hList=hist.history||[];
-  let histHTML=hList.length?'<table class="mem-table"><tr><th>时间</th><th>源记忆</th><th>梦境数</th><th>跨域</th><th>洞察</th></tr>'+hList.map(h=>'<tr><td style="font-size:11px">'+new Date(h.cycle_time*1000).toLocaleTimeString()+'</td><td>'+h.sources_used+'</td><td style="color:#ce93d8">'+h.dreams_created+'</td><td style="color:#ff8a65">'+h.cross_domain+'</td><td>'+(h.insights||[]).map(i=>'<div style="font-size:11px">'+i.domains.join(' × ')+' <span style="color:#c9a04e">'+i.creativity+'</span></div>').join('')+'</td></tr>').join('')+'</table>':'<p style="color:#888">暂无梦境历史</p>';
-  el.innerHTML='<div style="display:flex;gap:12px;align-items:center;margin-bottom:20px"><h1 style="margin:0;font-size:20px;color:#ce93d8">梦境引擎 — 创意记忆重组</h1><button onclick="runDream()" class="btn btn-accent" style="font-size:12px;padding:6px 16px">触发梦境</button></div><div class="stats-grid" style="margin-bottom:20px"><div class="stat"><div class="label">累计梦境</div><div class="value" style="color:#ce93d8">'+status.total_dreams_created+'</div></div><div class="stat"><div class="label">梦境周期</div><div class="value">'+status.dream_cycles_run+'</div></div><div class="stat"><div class="label">近期梦境</div><div class="value">'+status.latest_dreams+'</div></div></div><div class="card"><h2>梦境历史</h2>'+histHTML+'</div><div id="dreamResult"></div>';
+  let histHTML=hList.length?'<table class="mem-table"><tr><th>时间</th><th>源记�?/th><th>梦境�?/th><th>跨域</th><th>洞察</th></tr>'+hList.map(h=>'<tr><td style="font-size:11px">'+new Date(h.cycle_time*1000).toLocaleTimeString()+'</td><td>'+h.sources_used+'</td><td style="color:#ce93d8">'+h.dreams_created+'</td><td style="color:#ff8a65">'+h.cross_domain+'</td><td>'+(h.insights||[]).map(i=>'<div style="font-size:11px">'+i.domains.join(' × ')+' <span style="color:#c9a04e">'+i.creativity+'</span></div>').join('')+'</td></tr>').join('')+'</table>':'<p style="color:#888">暂无梦境历史</p>';
+  el.innerHTML='<div style="display:flex;gap:12px;align-items:center;margin-bottom:20px"><h1 style="margin:0;font-size:20px;color:#ce93d8">梦境引擎 �?创意记忆重组</h1><button onclick="runDream()" class="btn btn-accent" style="font-size:12px;padding:6px 16px">触发梦境</button></div><div class="stats-grid" style="margin-bottom:20px"><div class="stat"><div class="label">累计梦境</div><div class="value" style="color:#ce93d8">'+status.total_dreams_created+'</div></div><div class="stat"><div class="label">梦境周期</div><div class="value">'+status.dream_cycles_run+'</div></div><div class="stat"><div class="label">近期梦境</div><div class="value">'+status.latest_dreams+'</div></div></div><div class="card"><h2>梦境历史</h2>'+histHTML+'</div><div id="dreamResult"></div>';
 }
 
 async function runDream(){
   const res=document.getElementById('dreamResult');
-  if(res) res.innerHTML='<div class="card" style="border-color:#ce93d8"><h2 style="color:#ce93d8">梦境生成中...</h2></div>';
+  if(res) res.innerHTML='<div class="card" style="border-color:#ce93d8"><h2 style="color:#ce93d8">梦境生成�?..</h2></div>';
   await api('/dream',{method:'POST'});
   await renderDream(document.getElementById('modePanel'));
 }
@@ -1044,21 +1044,21 @@ async function renderAgent(el){
   const scOk=scStatus.engine_running;
   const dreamActive=dreamSt.engine_active;
 
-  let html='<div style="margin-bottom:20px"><h1 style="margin:0;font-size:20px;color:#4dd0e1">Agent 驱动 — 主动感知与行动</h1><p style="color:#4a4a6a;font-size:11px;margin-top:4px">记忆系统主动感知状态、发现问题、建议行动、自动执行</p></div>';
+  let html='<div style="margin-bottom:20px"><h1 style="margin:0;font-size:20px;color:#4dd0e1">Agent 驱动 �?主动感知与行�?/h1><p style="color:#4a4a6a;font-size:11px;margin-top:4px">记忆系统主动感知状态、发现问题、建议行动、自动执�?/p></div>';
 
   html+='<div class="card"><h2>实时状态仪表盘</h2><div class="stats-grid">';
   html+='<div class="stat"><div class="label">记忆总量</div><div class="value cyan">'+memCount+'</div></div>';
-  html+='<div class="stat"><div class="label">脉冲引擎</div><div class="value '+(pulseOn?'green':'red')+'">'+(pulseOn?'运行中':'\u5df2\u505c\u6b62')+'</div></div>';
+  html+='<div class="stat"><div class="label">脉冲引擎</div><div class="value '+(pulseOn?'green':'red')+'">'+(pulseOn?'运行�?:'\u5df2\u505c\u6b62')+'</div></div>';
   html+='<div class="stat"><div class="label">结晶通路</div><div class="value purple">'+crystalCount+'</div></div>';
   html+='<div class="stat"><div class="label">反馈总数</div><div class="value pink">'+fbTotal+'</div></div>';
-  html+='<div class="stat"><div class="label">正面率</div><div class="value '+(fbRate>0.7?'green':fbRate>0.3?'yellow':'red')+'">'+(fbTotal>0?(fbRate*100).toFixed(0)+'%':'N/A')+'</div></div>';
-  html+='<div class="stat"><div class="label">自检引擎</div><div class="value '+(scOk?'green':'red')+'">'+(scOk?'运行中':'\u5df2\u505c\u6b62')+'</div></div>';
+  html+='<div class="stat"><div class="label">正面�?/div><div class="value '+(fbRate>0.7?'green':fbRate>0.3?'yellow':'red')+'">'+(fbTotal>0?(fbRate*100).toFixed(0)+'%':'N/A')+'</div></div>';
+  html+='<div class="stat"><div class="label">自检引擎</div><div class="value '+(scOk?'green':'red')+'">'+(scOk?'运行�?:'\u5df2\u505c\u6b62')+'</div></div>';
   html+='<div class="stat"><div class="label">梦境引擎</div><div class="value '+(dreamActive?'green':'#4a4a6a')+'">'+(dreamActive?'活跃':'\u5f85\u89e6\u53d1')+'</div></div>';
   html+='</div></div>';
 
   const sugList=suggestions.suggestions||[];
   html+='<div class="card"><h2>系统主动建议 ('+sugList.length+')</h2>';
-  if(sugList.length===0){html+='<p style="color:#5eb88a;font-size:12px">系统状态良好，暂无紧急建议</p>';}
+  if(sugList.length===0){html+='<p style="color:#5eb88a;font-size:12px">系统状态良好，暂无紧急建�?/p>';}
   else{for(const s of sugList){
     const pc=s.priority==='high'?'#ff5555':s.priority==='medium'?'#c9a04e':'#4a4a6a';
     html+='<div style="padding:10px;margin-bottom:8px;background:#0e0e22;border-left:3px solid '+pc+';border-radius:4px"><div style="display:flex;gap:8px;align-items:center"><span style="color:'+pc+';font-weight:bold;font-size:10px;text-transform:uppercase">'+s.priority+'</span><b style="color:#e0e0ff;font-size:13px">'+esc(s.action||'')+'</b>';
@@ -1067,15 +1067,15 @@ async function renderAgent(el){
   }}
   html+='</div>';
 
-  html+='<div class="card"><h2>上下文探索</h2><div style="display:flex;gap:8px;margin-bottom:10px"><input id="agentTopic" placeholder="输入话题获取记忆上下文..." class="input-field" style="flex:1"><button onclick="agentGetContext()" class="btn btn-accent">获取上下文</button></div><div id="agentContext"></div></div>';
+  html+='<div class="card"><h2>上下文探�?/h2><div style="display:flex;gap:8px;margin-bottom:10px"><input id="agentTopic" placeholder="输入话题获取记忆上下�?.." class="input-field" style="flex:1"><button onclick="agentGetContext()" class="btn btn-accent">获取上下�?/button></div><div id="agentContext"></div></div>';
 
-  html+='<div class="card"><h2>推理链导航</h2><div style="display:flex;gap:8px;margin-bottom:8px"><input id="agentReasonSrc" placeholder="源节点 ID" class="input-field" style="flex:1"><input id="agentReasonTgt" placeholder="目标概念" class="input-field" style="flex:1"><button onclick="agentReasonChain()" class="btn btn-accent">推理</button></div><div id="agentReasonResult"></div></div>';
+  html+='<div class="card"><h2>推理链导�?/h2><div style="display:flex;gap:8px;margin-bottom:8px"><input id="agentReasonSrc" placeholder="源节�?ID" class="input-field" style="flex:1"><input id="agentReasonTgt" placeholder="目标概念" class="input-field" style="flex:1"><button onclick="agentReasonChain()" class="btn btn-accent">推理</button></div><div id="agentReasonResult"></div></div>';
 
-  html+='<div class="card"><h2>一键认知操作</h2><div style="display:flex;gap:8px;flex-wrap:wrap">';
+  html+='<div class="card"><h2>一键认知操�?/h2><div style="display:flex;gap:8px;flex-wrap:wrap">';
   html+='<button onclick="agentAutoAction(\'dream\')" class="btn btn-green">触发梦境</button>';
-  html+='<button onclick="agentAutoAction(\'selforg\')" class="btn btn-green">执行自组织</button>';
+  html+='<button onclick="agentAutoAction(\'selforg\')" class="btn btn-green">执行自组�?/button>';
   html+='<button onclick="agentAutoAction(\'cascade\')" class="btn btn-green">级联脉冲</button>';
-  html+='<button onclick="agentAutoAction(\'crystal\')" class="btn btn-green">结晶化扫描</button>';
+  html+='<button onclick="agentAutoAction(\'crystal\')" class="btn btn-green">结晶化扫�?/button>';
   html+='<button onclick="agentAutoAction(\'selfcheck\')" class="btn btn-warn">运行自检</button>';
   html+='<button onclick="agentAutoAction(\'export\')" class="btn">导出备份</button>';
   html+='</div><div id="agentActionResult" style="margin-top:10px"></div></div>';
@@ -1108,19 +1108,19 @@ async function refreshAgentStatus(){
 
 async function agentAutoAction(action){
   const el=document.getElementById('agentActionResult');
-  el.innerHTML='<p style="color:#4dd0e1;font-size:12px">执行中: '+action+'...</p>';
-  agentLog('ACTION','开始执行: '+action);
+  el.innerHTML='<p style="color:#4dd0e1;font-size:12px">执行�? '+action+'...</p>';
+  agentLog('ACTION','开始执�? '+action);
   let r;
   try{
     if(action==='dream'){r=await api('/dream',{method:'POST'});agentLog('ACTION','梦境完成: '+(r.result?.dreams_created||0)+' 梦境创建');}
-    else if(action==='selforg'){r=await api('/self-organize/run',{method:'POST'});agentLog('ACTION','自组织完成');}
-    else if(action==='cascade'){r=await api('/cascade/trigger',{method:'POST'});agentLog('ACTION','级联脉冲已触发');}
-    else if(action==='crystal'){r=await api('/crystallized/force',{method:'POST'});agentLog('ACTION','结晶化扫描: '+(r.crystallized?.total_crystals||0)+' 通路');}
+    else if(action==='selforg'){r=await api('/self-organize/run',{method:'POST'});agentLog('ACTION','自组织完�?);}
+    else if(action==='cascade'){r=await api('/cascade/trigger',{method:'POST'});agentLog('ACTION','级联脉冲已触�?);}
+    else if(action==='crystal'){r=await api('/crystallized/force',{method:'POST'});agentLog('ACTION','结晶化扫�? '+(r.crystallized?.total_crystals||0)+' 通路');}
     else if(action==='selfcheck'){r=await api('/self-check/run',{method:'POST'});agentLog('ACTION','自检完成: '+(r.anomalies_found||0)+' 异常');}
     else if(action==='export'){r=await api('/export');agentLog('ACTION','导出: '+((r.size||0)/1024).toFixed(1)+'KB');}
-    else if(action==='deepen_context'){r=await api('/agent/suggest',{method:'POST',body:{context:'auto-deepen'}});agentLog('ACTION','深度上下文分析完成');}
+    else if(action==='deepen_context'){r=await api('/agent/suggest',{method:'POST',body:{context:'auto-deepen'}});agentLog('ACTION','深度上下文分析完�?);}
     else if(action==='connect_isolated_memories'){r=await api('/cascade/trigger',{method:'POST',body:{strength:0.8}});agentLog('ACTION','级联脉冲连接孤立记忆');}
-    else if(action==='leverage_clusters'){r=await api('/self-organize/run',{method:'POST'});agentLog('ACTION','自组织利用聚类');}
+    else if(action==='leverage_clusters'){r=await api('/self-organize/run',{method:'POST'});agentLog('ACTION','自组织利用聚�?);}
     else{r={info:'unknown'};}
   }catch(e){r={error:e.message};agentLog('WARN','失败: '+e.message);}
   el.innerHTML='<pre style="color:#a0a0c0;font-size:11px;max-height:120px;overflow-y:auto;background:#0a0a1a;padding:8px;border-radius:4px">'+esc(JSON.stringify(r,null,2))+'</pre>';
@@ -1130,19 +1130,19 @@ async function agentGetContext(){
   const topic=document.getElementById('agentTopic').value;
   if(!topic)return;
   const el=document.getElementById('agentContext');
-  el.innerHTML='<p style="color:#888">加载中...</p>';
-  agentLog('ACTION','获取上下文: '+topic);
+  el.innerHTML='<p style="color:#888">加载�?..</p>';
+  agentLog('ACTION','获取上下�? '+topic);
   const result=await api('/agent/context',{method:'POST',body:{topic:topic,max_memories:12}});
   if(!result||!result.context){el.innerHTML='<p style="color:#ff5555">加载失败</p>';return;}
   let html='<div style="font-size:12px;color:#888;margin-bottom:8px">关联标签: '+(result.related_labels||[]).map(l=>'<span style="background:#1a2a1a;color:#aed581;padding:1px 6px;border-radius:2px;margin:2px;font-size:10px">'+l+'</span>').join('')+'</div>';
-  html+='<table style="width:100%;font-size:11px;border-collapse:collapse"><tr style="color:#3a3a5a"><th>ID</th><th>内容</th><th>相关性</th><th>权重</th><th>梦境</th></tr>';
+  html+='<table style="width:100%;font-size:11px;border-collapse:collapse"><tr style="color:#3a3a5a"><th>ID</th><th>内容</th><th>相关�?/th><th>权重</th><th>梦境</th></tr>';
   for(const m of result.context){
-    html+='<tr style="border-bottom:1px solid rgba(100,120,255,.04)"><td style="color:#7b8cff;font-family:monospace">'+m.id+'</td><td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;color:#a0a0c0">'+esc(m.content||'')+'</td><td style="color:#4dd0e1">'+m.relevance+'</td><td style="color:#c9a04e">'+m.weight+'</td><td>'+(m.is_dream?'<span style="color:#ce93d8">是</span>':'-')+'</td></tr>';
+    html+='<tr style="border-bottom:1px solid rgba(100,120,255,.04)"><td style="color:#7b8cff;font-family:monospace">'+m.id+'</td><td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;color:#a0a0c0">'+esc(m.content||'')+'</td><td style="color:#4dd0e1">'+m.relevance+'</td><td style="color:#c9a04e">'+m.weight+'</td><td>'+(m.is_dream?'<span style="color:#ce93d8">�?/span>':'-')+'</td></tr>';
   }
   html+='</table>';
   if(result.reasoning){html+='<div style="margin-top:10px;padding:10px;background:#0a0a1a;border-radius:4px;border-left:3px solid #4dd0e1"><p style="white-space:pre-wrap;font-size:12px;color:#8a8aa0">'+esc(result.reasoning)+'</p></div>';}
   el.innerHTML=html;
-  agentLog('ACTION','上下文: '+result.context_count+' 条记忆');
+  agentLog('ACTION','上下�? '+result.context_count+' 条记�?);
 }
 
 async function agentReasonChain(){
@@ -1150,33 +1150,33 @@ async function agentReasonChain(){
   const tgt=document.getElementById('agentReasonTgt').value;
   if(!src||!tgt)return;
   const el=document.getElementById('agentReasonResult');
-  el.innerHTML='<p style="color:#888">推理中...</p>';
-  agentLog('ACTION','推理链: '+src+' -> '+tgt);
+  el.innerHTML='<p style="color:#888">推理�?..</p>';
+  agentLog('ACTION','推理�? '+src+' -> '+tgt);
   const r=await api('/agent/reasoning',{method:'POST',body:{source_id:src,target_query:tgt,max_hops:5}});
-  if(!r||!r.chain||r.chain.length===0){el.innerHTML='<p style="color:#c9a04e">未找到推理路径</p>';return;}
+  if(!r||!r.chain||r.chain.length===0){el.innerHTML='<p style="color:#c9a04e">未找到推理路�?/p>';return;}
   let html='<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap">';
   for(let i=0;i<r.chain.length;i++){
     const n=r.chain[i];
     html+='<div style="padding:6px 10px;background:#0e0e22;border:1px solid rgba(100,120,255,.1);border-radius:4px;font-size:11px;max-width:200px"><span style="color:#7b8cff;font-family:monospace;font-size:9px">'+n.id+'</span><p style="color:#a0a0c0;margin:2px 0 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(n.content||'')+'</p></div>';
-    if(i<r.chain.length-1)html+='<span style="color:#3a3a5a;font-size:16px">→</span>';
+    if(i<r.chain.length-1)html+='<span style="color:#3a3a5a;font-size:16px">�?/span>';
   }
   html+='</div>';
   if(r.conclusion)html+='<p style="margin-top:8px;color:#5eb88a;font-size:12px">结论: '+esc(r.conclusion)+'</p>';
   el.innerHTML=html;
-  agentLog('ACTION','推理完成: '+r.chain_length+' 跳');
+  agentLog('ACTION','推理完成: '+r.chain_length+' �?);
 }
 
 async function renderFeedback(el){
   const stats=await api('/feedback/stats').catch(()=>({}));
   const insights=await api('/feedback/insights').catch(()=>({insights:[]}));
-  let html='<div style="margin-bottom:20px"><h1 style="margin:0;font-size:20px;color:#ec4899">反馈闭环 — Agent 决策学习</h1><p style="color:#4a4a6a;font-size:11px;margin-top:4px">记忆永不删除，只整合。negative 不降权重，只标记低优先级。</p></div>';
+  let html='<div style="margin-bottom:20px"><h1 style="margin:0;font-size:20px;color:#ec4899">反馈闭环 �?Agent 决策学习</h1><p style="color:#4a4a6a;font-size:11px;margin-top:4px">记忆永不删除，只整合。negative 不降权重，只标记低优先级�?/p></div>';
   html+='<div class="card"><h2>反馈统计</h2><div class="stats-grid">';
   html+='<div class="stat"><div class="label">总反馈数</div><div class="value pink">'+((stats.total_feedback||0))+'</div></div>';
-  html+='<div class="stat"><div class="label">正面率</div><div class="value green">'+((stats.positive_rate||0)*100).toFixed(1)+'%</div></div>';
+  html+='<div class="stat"><div class="label">正面�?/div><div class="value green">'+((stats.positive_rate||0)*100).toFixed(1)+'%</div></div>';
   const oc=stats.outcome_counts||{};
   html+='<div class="stat"><div class="label">正面</div><div class="value green">'+(oc.positive||0)+'</div></div>';
   html+='<div class="stat"><div class="label">负面</div><div class="value red">'+(oc.negative||0)+'</div></div>';
-  html+='<div class="stat"><div class="label">中性</div><div class="value yellow">'+(oc.neutral||0)+'</div></div>';
+  html+='<div class="stat"><div class="label">中�?/div><div class="value yellow">'+(oc.neutral||0)+'</div></div>';
   html+='</div></div>';
   html+='<div class="card"><h2>记录反馈</h2><div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">';
   html+='<input id="fbAction" placeholder="action (query/navigate/...)" class="input-field" style="flex:1;min-width:120px">';
@@ -1192,7 +1192,7 @@ async function renderFeedback(el){
   if(ins.length===0){html+='<p style="color:#4a4a6a;font-size:12px">暂无洞察数据</p>';}
   else{for(const i of ins){const c=i.insight==='highly_effective'?'#5eb88a':'#c9a04e';html+='<div style="padding:8px;margin-bottom:6px;background:#0e0e22;border-left:3px solid '+c+';border-radius:4px"><span style="color:#7b8cff;font-size:11px">'+i.node_id+'</span> <span style="color:'+c+';font-size:11px">'+i.insight+'</span> <span style="color:#4a4a6a;font-size:10px">pos:'+i.positive_count+' neg:'+i.negative_count+'</span></div>';}}
   html+='</div></div>';
-  html+='<div class="card"><h2>最近记录</h2><div id="fbRecent">';
+  html+='<div class="card"><h2>最近记�?/h2><div id="fbRecent">';
   const recent=stats.recent_records||[];
   if(recent.length===0){html+='<p style="color:#4a4a6a;font-size:12px">暂无记录</p>';}
   else{for(const r of recent){const oc2=r.outcome==='positive'?'#5eb88a':r.outcome==='negative'?'#cf6b6b':'#c9a04e';html+='<div style="padding:6px;margin-bottom:4px;background:#0e0e22;border-radius:4px;font-size:11px"><span style="color:'+oc2+'">'+r.outcome+'</span> <span style="color:#7b8cff">'+r.action+'</span> <span style="color:#4a4a6a">'+r.context_id+'</span> <span style="color:#2a2a4a">'+new Date(r.timestamp*1000).toLocaleTimeString()+'</span></div>';}}
@@ -1206,23 +1206,23 @@ async function doFeedbackRecord(){
   const outcome=document.getElementById('fbOutcome').value;
   const confidence=parseFloat(document.getElementById('fbConfidence').value)||0.5;
   const reasoning=document.getElementById('fbReasoning').value;
-  if(!action||!contextId){alert('action 和 context_id 必填');return;}
+  if(!action||!contextId){alert('action �?context_id 必填');return;}
   const r=await api('/feedback/record',{method:'POST',body:{action:action,context_id:contextId,outcome:outcome,confidence:confidence,reasoning:reasoning}}).catch(e=>({error:e.message}));
-  document.getElementById('fbResult').innerHTML='<p style="color:'+(r.recorded?'#5eb88a':'#cf6b6b')+';font-size:12px">'+(r.recorded?'已记录: '+r.action_taken:'失败: '+(r.error||'unknown'))+'</p>';
+  document.getElementById('fbResult').innerHTML='<p style="color:'+(r.recorded?'#5eb88a':'#cf6b6b')+';font-size:12px">'+(r.recorded?'已记�? '+r.action_taken:'失败: '+(r.error||'unknown'))+'</p>';
   setTimeout(()=>renderFeedback(document.getElementById('modePanel')),1000);
 }
 
 async function renderSession(el){
   const list=await api('/session/list').catch(()=>({sessions:[]}));
-  let html='<div style="margin-bottom:20px"><h1 style="margin:0;font-size:20px;color:#06b6d4">会话管理 — 对话记忆生命周期</h1><p style="color:#4a4a6a;font-size:11px;margin-top:4px">ephemeral(临时) → short-term(短期) → long-term(长期) → eternal(永恒)</p></div>';
-  html+='<div class="card"><h2>创建新会话</h2><div style="display:flex;gap:8px">';
+  let html='<div style="margin-bottom:20px"><h1 style="margin:0;font-size:20px;color:#06b6d4">会话管理 �?对话记忆生命周期</h1><p style="color:#4a4a6a;font-size:11px;margin-top:4px">ephemeral(临时) �?short-term(短期) �?long-term(长期) �?eternal(永恒)</p></div>';
+  html+='<div class="card"><h2>创建新会�?/h2><div style="display:flex;gap:8px">';
   html+='<input id="sessAgent" placeholder="agent_id" class="input-field" style="flex:1" value="default">';
   html+='<button onclick="doSessionCreate()" class="btn btn-accent">创建</button></div>';
   html+='<div id="sessCreateResult"></div></div>';
   html+='<div class="card"><h2>活跃会话 ('+((list.sessions||[]).length)+')</h2>';
   const sessions=list.sessions||[];
   if(sessions.length===0){html+='<p style="color:#4a4a6a;font-size:12px">暂无活跃会话</p>';}
-  else{html+='<table style="width:100%;font-size:11px"><tr style="color:#3a3a5a"><th>Session ID</th><th>Agent</th><th>记录数</th><th>最后活跃</th><th>操作</th></tr>';
+  else{html+='<table style="width:100%;font-size:11px"><tr style="color:#3a3a5a"><th>Session ID</th><th>Agent</th><th>记录�?/th><th>最后活�?/th><th>操作</th></tr>';
   for(const s of sessions){html+='<tr><td style="color:#7b8cff;font-family:monospace">'+s.session_id+'</td><td>'+s.agent_id+'</td><td>'+s.record_count+'</td><td style="color:#4a4a6a">'+new Date(s.last_active*1000).toLocaleTimeString()+'</td><td><button onclick="showSessionDetail(\''+s.session_id+'\')" class="btn" style="font-size:10px;padding:2px 8px">查看</button> <button onclick="doSessionConsolidate(\''+s.session_id+'\')" class="btn btn-green" style="font-size:10px;padding:2px 8px">整合</button></td></tr>';}
   html+='</table>';}
   html+='</div>';
@@ -1233,7 +1233,7 @@ async function renderSession(el){
 async function doSessionCreate(){
   const agentId=document.getElementById('sessAgent').value||'default';
   const r=await api('/session/create',{method:'POST',body:{agent_id:agentId}}).catch(e=>({error:e.message}));
-  document.getElementById('sessCreateResult').innerHTML='<p style="color:'+(r.session_id?'#5eb88a':'#cf6b6b')+';font-size:12px">'+(r.session_id?'会话已创建: '+r.session_id:'失败: '+(r.error||'unknown'))+'</p>';
+  document.getElementById('sessCreateResult').innerHTML='<p style="color:'+(r.session_id?'#5eb88a':'#cf6b6b')+';font-size:12px">'+(r.session_id?'会话已创�? '+r.session_id:'失败: '+(r.error||'unknown'))+'</p>';
   if(r.session_id)showSessionDetail(r.session_id);
 }
 
@@ -1260,15 +1260,15 @@ async function doSessionAdd(sid){
 
 async function doSessionConsolidate(sid){
   const r=await api('/session/'+sid+'/consolidate',{method:'POST'}).catch(e=>({error:e.message}));
-  alert(r.promoted_to_permanent!==undefined?'整合完成: 晋升 '+r.promoted_to_permanent+' 条, 保留 '+r.soft_kept+' 条':'失败: '+(r.error||'unknown'));
+  alert(r.promoted_to_permanent!==undefined?'整合完成: 晋升 '+r.promoted_to_permanent+' �? 保留 '+r.soft_kept+' �?:'失败: '+(r.error||'unknown'));
   renderSession(document.getElementById('modePanel'));
 }
 
 async function renderEvents(el){
-  let html='<div style="margin-bottom:20px"><h1 style="margin:0;font-size:20px;color:#b08cff">SSE 事件流 — 实时记忆系统通知</h1><p style="color:#4a4a6a;font-size:11px;margin-top:4px">订阅记忆系统事件：反馈学习、会话变更、心跳</p></div>';
-  html+='<div class="card"><h2>连接状态</h2><div id="sseStatus" style="display:flex;align-items:center;gap:8px"><div style="width:8px;height:8px;border-radius:50%;background:#4a4a6a" id="sseDot"></div><span style="color:#4a4a6a;font-size:12px" id="sseStatusText">未连接</span> <button onclick="connectSSE()" class="btn btn-accent" style="font-size:11px;padding:4px 12px">连接</button> <button onclick="disconnectSSE()" class="btn btn-danger" style="font-size:11px;padding:4px 12px">断开</button></div></div>';
+  let html='<div style="margin-bottom:20px"><h1 style="margin:0;font-size:20px;color:#b08cff">SSE 事件�?�?实时记忆系统通知</h1><p style="color:#4a4a6a;font-size:11px;margin-top:4px">订阅记忆系统事件：反馈学习、会话变更、心�?/p></div>';
+  html+='<div class="card"><h2>连接状�?/h2><div id="sseStatus" style="display:flex;align-items:center;gap:8px"><div style="width:8px;height:8px;border-radius:50%;background:#4a4a6a" id="sseDot"></div><span style="color:#4a4a6a;font-size:12px" id="sseStatusText">未连�?/span> <button onclick="connectSSE()" class="btn btn-accent" style="font-size:11px;padding:4px 12px">连接</button> <button onclick="disconnectSSE()" class="btn btn-danger" style="font-size:11px;padding:4px 12px">断开</button></div></div>';
   html+='<div class="card"><h2>事件日志</h2><div id="sseLog" style="max-height:500px;overflow-y:auto;font-family:monospace;font-size:11px">';
-  html+='<p style="color:#4a4a6a">点击"连接"开始接收事件...</p>';
+  html+='<p style="color:#4a4a6a">点击"连接"开始接收事�?..</p>';
   html+='</div></div>';
   el.innerHTML=html;
 }
@@ -1279,7 +1279,7 @@ function connectSSE(){
   const url='/api/v1/events';
   sseConn=new EventSource(url);
   document.getElementById('sseDot').style.background='#5eb88a';
-  document.getElementById('sseStatusText').textContent='已连接';
+  document.getElementById('sseStatusText').textContent='已连�?;
   document.getElementById('sseStatusText').style.color='#5eb88a';
   sseConn.onmessage=function(e){
     try{
