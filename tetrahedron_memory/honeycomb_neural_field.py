@@ -2840,6 +2840,9 @@ class HoneycombNeuralField:
         self._bcc_unit_index: Dict[str, List[str]] = defaultdict(list)
         self._spatial_autocorrelation: float = 0.0
         self._autocorrelation_history: List[float] = []
+        self._current_phase: str = "fluid"
+        self._resonance_events: List[Dict] = []
+        self._propagation_source: str = ""
 
     def initialize(self) -> Dict[str, Any]:
         with self._lock:
@@ -3404,9 +3407,9 @@ class HoneycombNeuralField:
                 weight_score = min(node.weight / 5.0, 1.0)
 
                 hebbian_boost = 0.0
-                if qtokens and ctokens:
-                    for ct in ctokens:
-                        bias = self._hebbian.get_path_bias(nid, nid)
+                if qtokens:
+                    for nnid in node.face_neighbors[:6] + node.edge_neighbors[:4]:
+                        bias = self._hebbian.get_path_bias(nid, nnid)
                         if bias > 0.05:
                             hebbian_boost = min(0.15, bias * 0.5)
                             break
@@ -3446,6 +3449,16 @@ class HoneycombNeuralField:
                 if "__dream__" in node.labels:
                     dream_bonus = 0.03
 
+                low_priority_penalty = 0.0
+                if "__low_priority__" in node.labels:
+                    low_priority_penalty = 0.05
+
+                shortcut_boost = 0.0
+                for sc_nodes, sc_str in self._shortcuts:
+                    if nid in sc_nodes:
+                        shortcut_boost = min(0.08, sc_str * 0.3)
+                        break
+
                 final = (
                     0.18 * text_score
                     + 0.05 * trigram_score
@@ -3463,6 +3476,8 @@ class HoneycombNeuralField:
                     + 0.05 * bcc_coherence
                     + 0.02 * autocorr_bonus
                     + 0.01 * dream_bonus
+                    + shortcut_boost
+                    - low_priority_penalty
                 )
                 scored.append((nid, final))
 
@@ -3554,41 +3569,40 @@ class HoneycombNeuralField:
         self._pulse_type_counts[pulse_type] = self._pulse_type_counts.get(pulse_type, 0) + 1
 
     def _bias_exploratory(self, candidates: List[Tuple[str, float, str]]) -> List[Tuple[str, float, str]]:
-        """Equal weight propagation for broad scanning."""
-        return [(nid, strength * random.uniform(0.8, 1.2), ctype) for nid, strength, ctype in candidates]
+        src = getattr(self, '_propagation_source', '')
+        biased = []
+        for nid, strength, ctype in candidates:
+            h = self._hebbian.get_path_bias(src, nid)
+            biased.append((nid, strength * random.uniform(0.8, 1.2) * (1.0 + h * 0.5), ctype))
+        return biased
 
     def _bias_reinforcing(self, candidates: List[Tuple[str, float, str]]) -> List[Tuple[str, float, str]]:
-        """Bias toward high-weight and Hebbian-reinforced paths."""
+        src = getattr(self, '_propagation_source', '')
         biased = []
         for nid, strength, ctype in candidates:
             node = self._nodes.get(nid)
             weight_boost = (node.weight * 0.5 + 1.0) if node else 1.0
-
-            hebbian_w = self._hebbian.get_path_bias(self._nodes.get(candidates[0][0]).id if candidates else "", nid)
+            hebbian_w = self._hebbian.get_path_bias(src, nid)
             hebbian_boost = 1.0 + hebbian_w * 2.0
-
             biased.append((nid, strength * weight_boost * hebbian_boost, ctype))
         return biased
 
     def _bias_tension_sensing(self, candidates: List[Tuple[str, float, str]]) -> List[Tuple[str, float, str]]:
-        """Bias toward low-connectivity / high-tension regions."""
+        src = getattr(self, '_propagation_source', '')
         biased = []
         for nid, strength, ctype in candidates:
             node = self._nodes.get(nid)
             if node is None:
                 biased.append((nid, strength, ctype))
                 continue
-
             connectivity = len(node.face_neighbors) + len(node.edge_neighbors)
             tension_factor = 1.0
             if connectivity < 6:
                 tension_factor = 2.0
             elif connectivity < 10:
                 tension_factor = 1.5
-
             if not node.is_occupied:
                 tension_factor *= 1.3
-
             neighbor_weights = []
             for fnid in node.face_neighbors[:6]:
                 fn = self._nodes.get(fnid)
@@ -3597,19 +3611,23 @@ class HoneycombNeuralField:
             if neighbor_weights:
                 w_var = float(np.var(neighbor_weights))
                 tension_factor *= (1.0 + w_var * 0.5)
-
+            h = self._hebbian.get_path_bias(src, nid)
+            tension_factor *= (1.0 + h * 0.3)
             biased.append((nid, strength * tension_factor, ctype))
         return biased
 
     def _bias_self_check(self, candidates: List[Tuple[str, float, str]]) -> List[Tuple[str, float, str]]:
+        src = getattr(self, '_propagation_source', '')
         biased = []
         for nid, strength, ctype in candidates:
             node = self._nodes.get(nid)
             if node is None:
                 biased.append((nid, strength, ctype))
                 continue
+            h = self._hebbian.get_path_bias(src, nid)
+            h_factor = 1.0 + h * 0.3
             if not node.is_occupied:
-                biased.append((nid, strength * 1.5, ctype))
+                biased.append((nid, strength * 1.5 * h_factor, ctype))
             else:
                 occupied_neighbors = 0
                 for fnid in node.face_neighbors[:8]:
@@ -3617,12 +3635,13 @@ class HoneycombNeuralField:
                     if fn and fn.is_occupied:
                         occupied_neighbors += 1
                 if occupied_neighbors == 0:
-                    biased.append((nid, strength * 2.0, ctype))
+                    biased.append((nid, strength * 2.0 * h_factor, ctype))
                 else:
-                    biased.append((nid, strength * 0.5, ctype))
+                    biased.append((nid, strength * 0.5 * h_factor, ctype))
         return biased
 
     def _bias_cascade(self, candidates: List[Tuple[str, float, str]]) -> List[Tuple[str, float, str]]:
+        src = getattr(self, '_propagation_source', '')
         biased = []
         for nid, strength, ctype in candidates:
             node = self._nodes.get(nid)
@@ -3630,14 +3649,16 @@ class HoneycombNeuralField:
                 biased.append((nid, strength, ctype))
                 continue
             crystal_boost = 1.0
-            source_node = self._nodes.get(candidates[0][0]) if candidates else None
+            source_node = self._nodes.get(src)
             if source_node:
                 crystal_boost = self._crystallized.get_boost(source_node.id, nid)
             weight_factor = 1.0 + (node.weight * 0.3 if node.is_occupied else 0.1)
-            biased.append((nid, strength * weight_factor * crystal_boost, ctype))
+            h = self._hebbian.get_path_bias(src, nid)
+            biased.append((nid, strength * weight_factor * crystal_boost * (1.0 + h * 0.5), ctype))
         return biased
 
     def _bias_structure(self, candidates: List[Tuple[str, float, str]]) -> List[Tuple[str, float, str]]:
+        src = getattr(self, '_propagation_source', '')
         biased = []
         for nid, strength, ctype in candidates:
             node = self._nodes.get(nid)
@@ -3645,12 +3666,14 @@ class HoneycombNeuralField:
                 biased.append((nid, strength * 0.5, ctype))
                 continue
             total_neighbors = len(node.face_neighbors) + len(node.edge_neighbors)
+            h = self._hebbian.get_path_bias(src, nid)
+            h_factor = 1.0 + h * 0.3
             if total_neighbors < 6:
-                biased.append((nid, strength * 2.5, ctype))
+                biased.append((nid, strength * 2.5 * h_factor, ctype))
             elif total_neighbors < 10:
-                biased.append((nid, strength * 1.5, ctype))
+                biased.append((nid, strength * 1.5 * h_factor, ctype))
             else:
-                biased.append((nid, strength * 0.8, ctype))
+                biased.append((nid, strength * 0.8 * h_factor, ctype))
         return biased
 
     def _propagate_pulse(self, pulse: NeuralPulse):
@@ -3696,6 +3719,7 @@ class HoneycombNeuralField:
         if not raw_candidates:
             return
 
+        self._propagation_source = current_id
         if pulse.bias_fn is not None:
             biased = pulse.bias_fn(raw_candidates)
         else:
@@ -3740,12 +3764,33 @@ class HoneycombNeuralField:
             if nid not in pulse.path:
                 base_strength = pulse.strength * cfg.FACE_DECAY
                 crystal_boost = self._crystallized.get_boost(current_id, nid)
-                raw_candidates.append((nid, base_strength * crystal_boost, "face"))
+                nn = self._nodes.get(nid)
+                spatial_bias = 1.0
+                bcc_dir = 1.0
+                if nn and self._reflection_field:
+                    spatial_bias = self._reflection_field.get_pulse_direction_bias(self, current_id, nid)
+                if nn:
+                    bcc_dir = self._bcc_direction_factor(current.position, nn.position)
+                raw_candidates.append((nid, base_strength * crystal_boost * spatial_bias * bcc_dir, "face"))
         for nid in current.edge_neighbors:
             if nid not in pulse.path:
                 base_strength = pulse.strength * cfg.FACE_DECAY * cfg.EDGE_DECAY_FACTOR
                 crystal_boost = self._crystallized.get_boost(current_id, nid)
-                raw_candidates.append((nid, base_strength * crystal_boost, "edge"))
+                nn = self._nodes.get(nid)
+                spatial_bias = 1.0
+                bcc_dir = 1.0
+                if nn and self._reflection_field:
+                    spatial_bias = self._reflection_field.get_pulse_direction_bias(self, current_id, nid)
+                if nn:
+                    bcc_dir = self._bcc_direction_factor(current.position, nn.position)
+                raw_candidates.append((nid, base_strength * crystal_boost * spatial_bias * bcc_dir, "edge"))
+        for nid in current.vertex_neighbors[:4]:
+            if nid not in pulse.path:
+                nn = self._nodes.get(nid)
+                if nn and nn.is_occupied:
+                    base_strength = pulse.strength * cfg.FACE_DECAY * cfg.EDGE_DECAY_FACTOR * 0.3
+                    crystal_boost = self._crystallized.get_boost(current_id, nid)
+                    raw_candidates.append((nid, base_strength * crystal_boost, "vertex"))
 
         if not raw_candidates:
             return
@@ -3838,9 +3883,11 @@ class HoneycombNeuralField:
 
                 if cycle % 150 == 0 and self._reflection_field:
                     self._reflection_field.run_reflection_cycle(self)
+                    self._apply_phase_behavior()
 
                 if cycle % 300 == 0:
                     self.compute_spatial_autocorrelation()
+                    self._detect_resonance()
 
             except Exception as e:
                 logger.error("Pulse cycle error: %s", e, exc_info=True)
@@ -4045,7 +4092,92 @@ class HoneycombNeuralField:
             target = cfg.BASE_PULSE_INTERVAL
             self._adaptive_interval = 0.9 * self._adaptive_interval + 0.1 * target
 
-    def _crystal_maintenance(self):
+    def _apply_phase_behavior(self):
+        """
+        Phase state drives actual system behavior:
+        - crystalline: reduce pulse frequency, deepen self-org
+        - ordered: normal operation
+        - turbulent: increase pulse frequency, boost self-check
+        - fluid: normal with slight exploration boost
+        """
+        if not self._reflection_field:
+            return
+        phase = self._reflection_field._phase_state
+        if phase == "crystalline":
+            self._adaptive_interval = min(
+                PCNNConfig.MAX_PULSE_INTERVAL,
+                self._adaptive_interval * 1.1
+            )
+        elif phase == "turbulent":
+            self._adaptive_interval = max(
+                PCNNConfig.MIN_PULSE_INTERVAL,
+                self._adaptive_interval * 0.85
+            )
+        self._current_phase = phase
+
+    def _detect_resonance(self):
+        """
+        Resonance Propagation: detect synchronized firing patterns across
+        the BCC lattice. When multiple distant nodes fire simultaneously
+        along the same crystallographic direction, it indicates a
+        "standing wave" — a coherent pattern that can be crystallized.
+
+        Based on Eckhorn PCNN synchronization theory: coupled oscillators
+        naturally synchronize when their coupling strength exceeds a threshold.
+        In BCC lattice, <111> directions provide the strongest coupling.
+        """
+        occupied = [(nid, n) for nid, n in self._nodes.items()
+                     if n.is_occupied and n.fired]
+        if len(occupied) < 3:
+            self._resonance_events = []
+            return
+
+        directions = {
+            (1,1,1): [], (1,1,-1): [], (1,-1,1): [], (1,-1,-1): [],
+            (-1,1,1): [], (-1,1,-1): [], (-1,-1,1): [], (-1,-1,-1): [],
+        }
+        for nid, node in occupied:
+            pos = node.position
+            for dkey in directions:
+                proj = float(np.dot(pos, np.array(dkey, dtype=np.float32)))
+                directions[dkey].append((nid, proj))
+
+        resonance_events = []
+        for dkey, nodes_proj in directions.items():
+            if len(nodes_proj) < 2:
+                continue
+            nodes_proj.sort(key=lambda x: x[1])
+            clusters = []
+            current_cluster = [nodes_proj[0]]
+            for i in range(1, len(nodes_proj)):
+                if nodes_proj[i][1] - nodes_proj[i-1][1] < self._spacing * 1.5:
+                    current_cluster.append(nodes_proj[i])
+                else:
+                    if len(current_cluster) >= 3:
+                        clusters.append(current_cluster)
+                    current_cluster = [nodes_proj[i]]
+            if len(current_cluster) >= 3:
+                clusters.append(current_cluster)
+
+            for cluster in clusters:
+                ids = [nid for nid, _ in cluster]
+                avg_weight = np.mean([self._nodes[nid].weight for nid in ids])
+                resonance_strength = len(cluster) * avg_weight / 10.0
+                if resonance_strength > 0.5:
+                    resonance_events.append({
+                        "direction": list(dkey),
+                        "node_count": len(cluster),
+                        "strength": round(float(resonance_strength), 3),
+                        "node_ids": [nid[:8] for nid in ids[:5]],
+                    })
+                    for i in range(len(ids) - 1):
+                        self._hebbian.record_path(
+                            [ids[i], ids[i+1]],
+                            success=True,
+                            strength=resonance_strength * 0.3,
+                        )
+
+        self._resonance_events = resonance_events[-10:]
         with self._lock:
             new_crystals = self._crystallized.scan_and_crystallize(self._hebbian._edges)
 
@@ -4231,6 +4363,8 @@ class HoneycombNeuralField:
                     "history_len": len(self._autocorrelation_history),
                 },
                 "bcc_unit_index_size": len(self._bcc_unit_index),
+                "current_phase": self._current_phase,
+                "resonance_events": self._resonance_events,
                 "pcnn_config": {
                     "face_decay": PCNNConfig.FACE_DECAY,
                     "edge_decay": round(PCNNConfig.FACE_DECAY * PCNNConfig.EDGE_DECAY_FACTOR, 3),
