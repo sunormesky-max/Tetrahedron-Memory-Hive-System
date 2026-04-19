@@ -1073,6 +1073,7 @@ class TetrahedralCell:
         "cell_id", "vertex_ids", "vertex_positions", "body_center_id",
         "volume", "quality", "skewness", "jacobian",
         "centroid", "memory_count", "total_weight", "density",
+        "avg_activation", "label_diversity", "weight_variance", "effective_quality",
     )
 
     def __init__(self, cell_id: str, vertex_ids: List[str],
@@ -1089,6 +1090,10 @@ class TetrahedralCell:
         self.memory_count: int = 0
         self.total_weight: float = 0.0
         self.density: float = 0.0
+        self.avg_activation: float = 0.0
+        self.label_diversity: int = 0
+        self.weight_variance: float = 0.0
+        self.effective_quality: float = 0.0
         self._compute_metrics()
 
     def _compute_metrics(self):
@@ -1167,18 +1172,40 @@ class TetrahedralCell:
     def update_density(self, nodes: Dict[str, Any]):
         count = 0
         total_w = 0.0
+        total_act = 0.0
+        label_diversity = set()
         for vid in self.vertex_ids:
             node = nodes.get(vid)
             if node and node.is_occupied:
                 count += 1
                 total_w += node.weight
+                total_act += node.activation
+                label_diversity.update(node.labels)
         bc_node = nodes.get(self.body_center_id)
         if bc_node and bc_node.is_occupied:
             count += 1
             total_w += bc_node.weight
+            total_act += bc_node.activation
+            label_diversity.update(bc_node.labels)
         self.memory_count = count
         self.total_weight = total_w
         self.density = count / 5.0 if self.volume > 1e-10 else 0.0
+        self.avg_activation = total_act / max(count, 1)
+        self.label_diversity = len([l for l in label_diversity if not l.startswith("__")])
+        if count >= 2:
+            weights = []
+            for vid in self.vertex_ids:
+                node = nodes.get(vid)
+                if node and node.is_occupied:
+                    weights.append(node.weight)
+            bc_node2 = nodes.get(self.body_center_id)
+            if bc_node2 and bc_node2.is_occupied:
+                weights.append(bc_node2.weight)
+            if len(weights) >= 2:
+                avg = sum(weights) / len(weights)
+                variance = sum((w - avg) ** 2 for w in weights) / len(weights)
+                self.weight_variance = min(1.0, variance / max(avg ** 2, 0.01))
+        self.effective_quality = self.quality * (1.0 + 0.1 * self.label_diversity) * (1.0 - 0.3 * self.weight_variance)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -1193,6 +1220,10 @@ class TetrahedralCell:
             "memory_count": self.memory_count,
             "total_weight": round(self.total_weight, 3),
             "density": round(self.density, 3),
+            "avg_activation": round(self.avg_activation, 3),
+            "label_diversity": self.label_diversity,
+            "weight_variance": round(self.weight_variance, 3),
+            "effective_quality": round(self.effective_quality, 4),
         }
 
 
@@ -1911,8 +1942,59 @@ class DreamEngine:
         cross_bonus = cfg.DREAM_CROSS_DOMAIN_BONUS if domain_a != domain_b else 1.0
         weight_factor = (node_a.weight * node_b.weight) / 25.0
         activation_factor = (node_a.activation + node_b.activation) / 10.0
-        creativity = (cross_bonus * weight_factor * activation_factor) / (cross_bonus + 1)
+        novelty = self._novelty_score(node_a, node_b)
+        structural = self._structural_distance(node_a, node_b)
+        base = (cross_bonus * weight_factor * activation_factor) / (cross_bonus + 1)
+        creativity = base * (0.6 + 0.3 * novelty + 0.1 * structural)
         return min(1.0, creativity)
+
+    def _novelty_score(self, node_a, node_b) -> float:
+        field = self._field
+        tokens_a = field._extract_tokens(node_a.content)
+        tokens_b = field._extract_tokens(node_b.content)
+        if not tokens_a or not tokens_b:
+            return 0.5
+        overlap = len(tokens_a & tokens_b)
+        union = len(tokens_a | tokens_b)
+        return 1.0 - (overlap / max(union, 1))
+
+    def _structural_distance(self, node_a, node_b) -> float:
+        try:
+            dist = float(np.linalg.norm(node_a.position - node_b.position))
+            return min(1.0, dist / (self._field._spacing * 8))
+        except Exception:
+            return 0.5
+
+    def _is_duplicate_dream(self, field, dream_content: str) -> bool:
+        tokens = field._extract_tokens(dream_content)
+        if not tokens:
+            return False
+        for nid, node in field._nodes.items():
+            if node.is_occupied and "__dream__" in node.labels:
+                existing_tokens = field._extract_tokens(node.content)
+                if existing_tokens:
+                    overlap = len(tokens & existing_tokens)
+                    union = len(tokens | existing_tokens)
+                    if union > 0 and overlap / union > 0.8:
+                        return True
+        return False
+
+    def _multi_source_dream(self, field, sources: List, domain_names: List[str]) -> Optional[Dict]:
+        if len(sources) < 3:
+            return None
+        sampled = random.sample(sources, min(3, len(sources)))
+        all_tokens = []
+        all_labels = set()
+        for node, domain in zip(sampled, domain_names[:len(sampled)]):
+            tokens = field._extract_tokens(node.content)
+            if tokens:
+                all_tokens.append((domain, random.sample(list(tokens), min(2, len(tokens)))))
+            all_labels.add(domain)
+        parts = [f"{d}: {' '.join(t)}" for d, t in all_tokens if t]
+        if len(parts) < 3:
+            return None
+        content = "[dream:fusion] " + " + ".join(parts)
+        return {"content": content, "labels": list(all_labels) + ["__dream__", "__dream_fusion__"]}
 
     def get_history(self, n: int = 10) -> List[Dict]:
         return [r.to_dict() for r in self._history[-n:]]
@@ -2358,6 +2440,19 @@ class HoneycombNeuralField:
                 existing = self._nodes.get(existing_id)
                 if existing and existing.is_occupied:
                     existing.reinforce(weight * 0.1)
+                    if labels:
+                        new_labels = set(existing.labels) | set(labels)
+                        for lbl in new_labels - set(existing.labels):
+                            existing.labels.append(lbl)
+                            self._label_index[lbl].add(existing_id)
+                    if metadata:
+                        merged_meta = {**existing.metadata, **metadata}
+                        for k, v in metadata.items():
+                            if k in existing.metadata and isinstance(existing.metadata[k], list) and isinstance(v, list):
+                                merged_meta[k] = list(set(existing.metadata[k] + v))
+                        existing.metadata = merged_meta
+                    if weight > existing.weight:
+                        existing.weight = min(10.0, existing.weight + (weight - existing.weight) * 0.3)
                     return existing_id
 
             nid = self._find_nearest_empty_node(content, labels)
@@ -2485,20 +2580,46 @@ class HoneycombNeuralField:
     def query(self, text: str, k: int = 5, labels=None) -> List[Dict]:
         with self._lock:
             qtokens = self._extract_tokens(text) if text else set()
+            qtrigrams = self._extract_ngrams(text, 3) if text else set()
+
+            pre_hit_ids = set()
+            if qtokens:
+                for t in qtokens:
+                    if t in self._label_index:
+                        pre_hit_ids.update(self._label_index[t])
 
             scored = []
-            for nid, node in self._nodes.items():
-                if not node.is_occupied:
+            checked = 0
+            candidate_ids = list(pre_hit_ids) if pre_hit_ids else [nid for nid, n in self._nodes.items() if n.is_occupied]
+            if len(candidate_ids) < k:
+                extra = [nid for nid, n in self._nodes.items() if n.is_occupied and nid not in set(candidate_ids)]
+                candidate_ids.extend(extra[:k * 3])
+
+            for nid in candidate_ids:
+                node = self._nodes.get(nid)
+                if not node or not node.is_occupied:
                     continue
                 if labels and not any(l in node.labels for l in labels):
                     continue
 
                 text_score = 0.0
+                ctokens = set()
                 if qtokens:
                     ctokens = self._extract_tokens(node.content)
                     if ctokens:
                         overlap = len(qtokens & ctokens)
                         text_score = overlap / max(len(qtokens), 1)
+                        if text_score > 0:
+                            for qt in qtokens & ctokens:
+                                tf = sum(1 for _ in [1 for c in node.content.lower().split() if qt in c])
+                                if tf > 1:
+                                    text_score += 0.05 * min(tf, 3)
+
+                trigram_score = 0.0
+                if qtrigrams and text_score > 0:
+                    ctrigrams = self._extract_ngrams(node.content, 3)
+                    if ctrigrams:
+                        trigram_score = len(qtrigrams & ctrigrams) / max(len(qtrigrams), 1)
 
                 label_score = 0.0
                 if labels:
@@ -2509,18 +2630,35 @@ class HoneycombNeuralField:
                 weight_score = min(node.weight / 5.0, 1.0)
 
                 hebbian_boost = 0.0
-                if qtokens:
+                if qtokens and ctokens:
                     for ct in ctokens:
-                        if self._hebbian.get_path_bias(nid, nid) > 0.05:
-                            hebbian_boost = 0.05
+                        bias = self._hebbian.get_path_bias(nid, nid)
+                        if bias > 0.05:
+                            hebbian_boost = min(0.15, bias * 0.5)
                             break
 
+                crystal_boost = 0.0
+                if node.crystal_channels:
+                    crystal_boost = min(0.10, len(node.crystal_channels) * 0.02)
+
+                pulse_boost = 0.0
+                if node.pulse_accumulator > 0.1:
+                    pulse_boost = min(0.05, node.pulse_accumulator * 0.1)
+
+                dream_bonus = 0.0
+                if "__dream__" in node.labels:
+                    dream_bonus = 0.03
+
                 final = (
-                    0.40 * text_score
-                    + 0.25 * label_score
-                    + 0.20 * activation_score
-                    + 0.10 * weight_score
+                    0.35 * text_score
+                    + 0.10 * trigram_score
+                    + 0.20 * label_score
+                    + 0.15 * activation_score
+                    + 0.08 * weight_score
                     + 0.05 * hebbian_boost
+                    + 0.04 * crystal_boost
+                    + 0.02 * pulse_boost
+                    + 0.01 * dream_bonus
                 )
                 scored.append((nid, final))
 
@@ -2546,6 +2684,20 @@ class HoneycombNeuralField:
                 self._emit_pulse(best_id, strength=0.3, pulse_type=PulseType.REINFORCING)
 
             return results
+
+    def _extract_ngrams(self, text: str, n: int = 3) -> set:
+        import re
+        ngrams = set()
+        clean = re.sub(r'[^\w\s]', '', text.lower())
+        words = clean.split()
+        for i in range(max(1, len(words) - n + 1)):
+            ng = ' '.join(words[i:i+n])
+            if len(ng) >= n:
+                ngrams.add(ng)
+        for char_group in re.findall(r'[\u4e00-\u9fff]+', text):
+            for i in range(max(1, len(char_group) - n + 1)):
+                ngrams.add(char_group[i:i+n])
+        return ngrams
 
     def _extract_tokens(self, text: str) -> set:
         import re
