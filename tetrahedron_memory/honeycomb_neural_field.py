@@ -2264,6 +2264,8 @@ class HoneycombNeuralField:
         self._cell_map: HoneycombCellMap = HoneycombCellMap()
         self._dream_engine: Optional[DreamEngine] = None
         self._agent_driver: Optional[AgentMemoryDriver] = None
+        self._feedback_loop: Optional[FeedbackLoop] = None
+        self._session_manager: Optional[SessionManager] = None
 
     def initialize(self) -> Dict[str, Any]:
         with self._lock:
@@ -2822,8 +2824,10 @@ class HoneycombNeuralField:
         self._self_organize = SelfOrganizeEngine(self)
         self._dream_engine = DreamEngine(self)
         self._agent_driver = AgentMemoryDriver(self)
+        self._feedback_loop = FeedbackLoop(self)
+        self._session_manager = SessionManager(self)
         logger.info(
-            "PCNN pulse engine started (v5.3) — face_decay=%.2f, edge_decay=%.2f, cascade=on, dream=on, agent=on",
+            "PCNN pulse engine started (v6.0) — face_decay=%.2f, edge_decay=%.2f, cascade=on, dream=on, agent=on, feedback=on, session=on",
             PCNNConfig.FACE_DECAY, PCNNConfig.FACE_DECAY * PCNNConfig.EDGE_DECAY_FACTOR,
         )
 
@@ -3652,3 +3656,409 @@ class HoneycombNeuralField:
         if self._agent_driver is None:
             self._agent_driver = AgentMemoryDriver(self)
         return self._agent_driver.navigate(source_id, target_id, max_hops)
+
+    def feedback_record(self, action: str, context_id: str, outcome: str,
+                        confidence: float = 0.5, reasoning: str = "",
+                        metadata: Dict[str, Any] = None) -> Dict[str, Any]:
+        if self._feedback_loop is None:
+            self._feedback_loop = FeedbackLoop(self)
+        return self._feedback_loop.record_outcome(action, context_id, outcome, confidence, reasoning, metadata)
+
+    def feedback_learn(self, action: str, source_id: str, target_id: str,
+                       success: bool, confidence: float = 0.5) -> Dict[str, Any]:
+        if self._feedback_loop is None:
+            self._feedback_loop = FeedbackLoop(self)
+        return self._feedback_loop.learn_from_action(action, source_id, target_id, success, confidence)
+
+    def feedback_stats(self) -> Dict[str, Any]:
+        if self._feedback_loop is None:
+            return {"total_feedback": 0}
+        return self._feedback_loop.get_stats()
+
+    def feedback_insights(self) -> List[Dict[str, Any]]:
+        if self._feedback_loop is None:
+            return []
+        return self._feedback_loop.get_learning_insights()
+
+    def session_create(self, agent_id: str, metadata: Dict = None) -> str:
+        if self._session_manager is None:
+            self._session_manager = SessionManager(self)
+        return self._session_manager.create_session(agent_id, metadata)
+
+    def session_add(self, session_id: str, role: str, content: str,
+                    metadata: Dict = None) -> Dict[str, Any]:
+        if self._session_manager is None:
+            self._session_manager = SessionManager(self)
+        return self._session_manager.add_to_session(session_id, role, content, metadata)
+
+    def session_recall(self, session_id: str, n: int = 20) -> Dict[str, Any]:
+        if self._session_manager is None:
+            self._session_manager = SessionManager(self)
+        return self._session_manager.recall_session(session_id, n)
+
+    def session_consolidate(self, session_id: str) -> Dict[str, Any]:
+        if self._session_manager is None:
+            self._session_manager = SessionManager(self)
+        return self._session_manager.consolidate_session(session_id)
+
+    def session_list(self) -> List[Dict[str, Any]]:
+        if self._session_manager is None:
+            return []
+        return self._session_manager.list_sessions()
+
+    def session_get(self, session_id: str) -> Optional[Dict[str, Any]]:
+        if self._session_manager is None:
+            return None
+        return self._session_manager.get_session(session_id)
+
+
+class FeedbackRecord:
+    __slots__ = ("action", "context_id", "outcome", "confidence", "reasoning", "timestamp", "metadata")
+
+    def __init__(self, action: str, context_id: str, outcome: str,
+                 confidence: float, reasoning: str, metadata: Dict[str, Any] = None):
+        self.action = action
+        self.context_id = context_id
+        self.outcome = outcome
+        self.confidence = max(0.0, min(1.0, confidence))
+        self.reasoning = reasoning
+        self.timestamp = time.time()
+        self.metadata = metadata or {}
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "action": self.action,
+            "context_id": self.context_id[:12],
+            "outcome": self.outcome,
+            "confidence": round(self.confidence, 3),
+            "reasoning": self.reasoning[:200],
+            "timestamp": self.timestamp,
+            "metadata": self.metadata,
+        }
+
+
+class FeedbackLoop:
+    """
+    Agent decision feedback loop — learns from agent actions to strengthen
+    or deprioritize memory associations. Never deletes, only adjusts priority.
+
+    Core principle: negative outcomes do NOT reduce weight.
+    Instead they tag as __low_priority__ and reduce Hebbian path strength slightly.
+    Positive outcomes strengthen weight + crystallize candidate paths.
+    """
+
+    def __init__(self, field: "HoneycombNeuralField"):
+        self._field = field
+        self._records: List[FeedbackRecord] = []
+        self._max_records = 500
+        self._lock = threading.RLock()
+        self._outcome_counts: Dict[str, int] = {"positive": 0, "negative": 0, "neutral": 0}
+        self._action_counts: Dict[str, int] = defaultdict(int)
+        self._consecutive_positive: Dict[str, int] = defaultdict(int)
+
+    def record_outcome(self, action: str, context_id: str, outcome: str,
+                       confidence: float = 0.5, reasoning: str = "",
+                       metadata: Dict[str, Any] = None) -> Dict[str, Any]:
+        if outcome not in ("positive", "negative", "neutral"):
+            outcome = "neutral"
+
+        record = FeedbackRecord(action, context_id, outcome, confidence, reasoning, metadata)
+
+        with self._lock:
+            self._records.append(record)
+            if len(self._records) > self._max_records:
+                self._records = self._records[-self._max_records // 2:]
+            self._outcome_counts[outcome] += 1
+            self._action_counts[action] += 1
+
+        field = self._field
+        with field._lock:
+            node = field._nodes.get(context_id)
+            if node is None:
+                for nid, n in field._nodes.items():
+                    if nid.startswith(context_id) and n.is_occupied:
+                        node = n
+                        context_id = nid
+                        break
+
+            if node is None or not node.is_occupied:
+                return {"recorded": True, "action_taken": "no_node_found"}
+
+            adjustments = []
+
+            if outcome == "positive":
+                boost = confidence * 0.2
+                node.weight = min(10.0, node.weight + boost)
+                node.activation = min(10.0, node.activation + boost * 0.5)
+                if "__low_priority__" in node.labels:
+                    node.labels.remove("__low_priority__")
+
+                self._consecutive_positive[context_id] = self._consecutive_positive.get(context_id, 0) + 1
+                if self._consecutive_positive[context_id] >= 3:
+                    if field._hebbian:
+                        for fnid in node.face_neighbors[:8]:
+                            fn = field._nodes.get(fnid)
+                            if fn and fn.is_occupied:
+                                field._hebbian.reinforce(context_id, fnid, 0.5)
+                    adjustments.append("hebbian_reinforced")
+
+                adjustments.append(f"weight_boosted:+{boost:.3f}")
+
+            elif outcome == "negative":
+                if "__low_priority__" not in node.labels:
+                    node.labels.append("__low_priority__")
+                node.metadata["negative_feedback_count"] = node.metadata.get("negative_feedback_count", 0) + 1
+                self._consecutive_positive[context_id] = 0
+                adjustments.append("tagged_low_priority")
+
+            else:
+                node.activation = max(0.0, node.activation - 0.01)
+                adjustments.append("activation_nudged:-0.01")
+
+        return {"recorded": True, "action_taken": "; ".join(adjustments)}
+
+    def learn_from_action(self, action: str, source_id: str, target_id: str,
+                          success: bool, confidence: float = 0.5) -> Dict[str, Any]:
+        field = self._field
+        learning_result = {"action": action, "success": success}
+
+        with field._lock:
+            src = field._nodes.get(source_id)
+            tgt = field._nodes.get(target_id)
+
+            if src and tgt and success:
+                if field._hebbian:
+                    field._hebbian.reinforce(source_id, target_id, 0.3 * confidence)
+                    learning_result["hebbian_reinforced"] = True
+
+                if action == "navigate" and field._crystallized:
+                    path_weight = field._hebbian.get_path_bias(source_id, target_id) if field._hebbian else 0
+                    if path_weight > PCNNConfig.CRYSTALLIZE_THRESHOLD * 0.5:
+                        field._crystallized.add_crystal(source_id, target_id, path_weight)
+                        learning_result["crystal_candidate"] = True
+
+            elif src and tgt and not success:
+                if field._hebbian:
+                    field._hebbian._edges.pop((source_id, target_id), None)
+                    learning_result["hebbian_weakened"] = True
+
+        return learning_result
+
+    def get_stats(self) -> Dict[str, Any]:
+        with self._lock:
+            total = sum(self._outcome_counts.values())
+            positive_rate = self._outcome_counts["positive"] / max(1, total)
+            return {
+                "total_feedback": total,
+                "outcome_counts": dict(self._outcome_counts),
+                "action_counts": dict(self._action_counts),
+                "positive_rate": round(positive_rate, 3),
+                "recent_records": [r.to_dict() for r in self._records[-5:]],
+            }
+
+    def get_learning_insights(self) -> List[Dict[str, Any]]:
+        insights = []
+        with self._lock:
+            node_positive = defaultdict(int)
+            node_negative = defaultdict(int)
+            for r in self._records:
+                if r.outcome == "positive":
+                    node_positive[r.context_id] += 1
+                elif r.outcome == "negative":
+                    node_negative[r.context_id] += 1
+
+            for nid, pos_count in sorted(node_positive.items(), key=lambda x: -x[1])[:10]:
+                neg_count = node_negative.get(nid, 0)
+                insights.append({
+                    "node_id": nid[:12],
+                    "positive_count": pos_count,
+                    "negative_count": neg_count,
+                    "insight": "highly_effective" if pos_count > neg_count * 3 else "balanced",
+                })
+
+        return insights
+
+
+class SessionRecord:
+    __slots__ = ("role", "content", "timestamp", "memory_id", "metadata")
+
+    def __init__(self, role: str, content: str, memory_id: str = None, metadata: Dict = None):
+        self.role = role
+        self.content = content
+        self.timestamp = time.time()
+        self.memory_id = memory_id
+        self.metadata = metadata or {}
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "role": self.role,
+            "content": self.content[:200],
+            "timestamp": self.timestamp,
+            "memory_id": self.memory_id[:12] if self.memory_id else None,
+            "metadata": self.metadata,
+        }
+
+
+class Session:
+    def __init__(self, session_id: str, agent_id: str, metadata: Dict = None):
+        self.session_id = session_id
+        self.agent_id = agent_id
+        self.created_at = time.time()
+        self.last_active = time.time()
+        self.records: List[SessionRecord] = []
+        self.metadata = metadata or {}
+        self.ephemeral_ids: List[str] = []
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "session_id": self.session_id,
+            "agent_id": self.agent_id,
+            "created_at": self.created_at,
+            "last_active": self.last_active,
+            "record_count": len(self.records),
+            "metadata": self.metadata,
+        }
+
+
+class SessionManager:
+    """
+    Conversation memory management — distinguishes ephemeral (temporary)
+    from permanent memories. Ephemeral memories are session-scoped context
+    that can be consolidated into permanent memories when the session ends.
+    """
+
+    def __init__(self, field: "HoneycombNeuralField"):
+        self._field = field
+        self._sessions: Dict[str, Session] = {}
+        self._lock = threading.RLock()
+        self._max_sessions = 50
+
+    def create_session(self, agent_id: str, metadata: Dict = None) -> str:
+        session_id = hashlib.sha256(f"{agent_id}:{time.time()}:{random.random()}".encode()).hexdigest()[:16]
+        session = Session(session_id, agent_id, metadata)
+
+        with self._lock:
+            if len(self._sessions) >= self._max_sessions:
+                oldest_id = min(self._sessions, key=lambda k: self._sessions[k].last_active)
+                self.consolidate_session(oldest_id)
+                del self._sessions[oldest_id]
+
+            self._sessions[session_id] = session
+
+        return session_id
+
+    def add_to_session(self, session_id: str, role: str, content: str,
+                       metadata: Dict = None) -> Dict[str, Any]:
+        with self._lock:
+            session = self._sessions.get(session_id)
+            if session is None:
+                return {"error": "session not found"}
+
+        field = self._field
+        memory_id = None
+        if content and len(content.strip()) > 0:
+            ephemeral_labels = ["__ephemeral__", f"__session_{session_id[:8]}__"]
+            if metadata and metadata.get("labels"):
+                ephemeral_labels.extend(metadata["labels"])
+
+            with field._lock:
+                memory_id = field.store(
+                    content=content,
+                    labels=ephemeral_labels,
+                    weight=0.5,
+                    metadata={"session_id": session_id, "role": role, "ephemeral": True},
+                )
+
+        record = SessionRecord(role, content, memory_id, metadata)
+
+        with self._lock:
+            session.records.append(record)
+            session.last_active = time.time()
+            if memory_id:
+                session.ephemeral_ids.append(memory_id)
+
+        return {"added": True, "memory_id": memory_id[:12] if memory_id else None}
+
+    def recall_session(self, session_id: str, n: int = 20) -> Dict[str, Any]:
+        with self._lock:
+            session = self._sessions.get(session_id)
+            if session is None:
+                return {"error": "session not found"}
+            records = session.records[-n:]
+            return {
+                "session_id": session_id,
+                "records": [r.to_dict() for r in records],
+                "total_records": len(session.records),
+                "agent_id": session.agent_id,
+            }
+
+    def consolidate_session(self, session_id: str) -> Dict[str, Any]:
+        with self._lock:
+            session = self._sessions.get(session_id)
+            if session is None:
+                return {"error": "session not found"}
+
+        field = self._field
+        consolidated = 0
+        promoted = 0
+
+        with field._lock:
+            for mid in session.ephemeral_ids:
+                node = field._nodes.get(mid)
+                if node is None:
+                    continue
+
+                if node.weight >= 0.8:
+                    node.labels = [l for l in node.labels if l.startswith("__session_") or l == "__ephemeral__"]
+                    if "__ephemeral__" in node.labels:
+                        node.labels.remove("__ephemeral__")
+                    node.labels.append("__consolidated__")
+                    node.weight = min(10.0, node.weight + 0.3)
+                    if "ephemeral" in node.metadata:
+                        del node.metadata["ephemeral"]
+                    field._emit_pulse(mid, strength=0.5, pulse_type=PulseType.REINFORCING)
+                    promoted += 1
+                else:
+                    node.base_activation = max(node.base_activation, 0.02)
+                    consolidated += 1
+
+        with self._lock:
+            session.metadata["consolidated_at"] = time.time()
+            session.metadata["promoted"] = promoted
+            session.metadata["soft_kept"] = consolidated
+
+        return {
+            "session_id": session_id,
+            "total_ephemeral": len(session.ephemeral_ids),
+            "promoted_to_permanent": promoted,
+            "soft_kept": consolidated,
+        }
+
+    def list_sessions(self) -> List[Dict[str, Any]]:
+        with self._lock:
+            return [s.to_dict() for s in sorted(self._sessions.values(), key=lambda s: -s.last_active)]
+
+    def expire_sessions(self, max_age: int = 3600) -> Dict[str, Any]:
+        now = time.time()
+        expired = []
+        with self._lock:
+            to_remove = []
+            for sid, session in self._sessions.items():
+                if now - session.last_active > max_age:
+                    self.consolidate_session(sid)
+                    to_remove.append(sid)
+                    expired.append(sid)
+            for sid in to_remove:
+                del self._sessions[sid]
+
+        return {"expired_sessions": len(expired), "session_ids": [s[:12] for s in expired]}
+
+    def get_session(self, session_id: str) -> Optional[Dict[str, Any]]:
+        with self._lock:
+            session = self._sessions.get(session_id)
+            if session is None:
+                return None
+            return {
+                **session.to_dict(),
+                "recent_records": [r.to_dict() for r in session.records[-10:]],
+            }
