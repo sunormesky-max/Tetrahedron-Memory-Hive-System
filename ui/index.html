@@ -1,0 +1,1242 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TetraMem-XL v6.0</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔷</text></svg>">
+<link rel="stylesheet" href="/libs/index.css">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;font-family:'Inter','SF Mono',Consolas,system-ui,sans-serif;background:#06060f;color:#c8c8e0}
+
+.login-wrap{display:flex;align-items:center;justify-content:center;height:100vh;background:radial-gradient(ellipse at 50% 30%,#1a2744 0%,#06060f 70%)}
+.login-box{background:#0e0e22;border:1px solid rgba(100,120,255,.08);border-radius:16px;padding:48px 40px;width:400px;text-align:center}
+.login-box h1{font-size:28px;margin-bottom:6px;background:linear-gradient(135deg,#7b8cff,#b08cff);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.login-box .sub{color:#4a4a6a;font-size:13px;margin-bottom:32px;letter-spacing:1px}
+.login-box input{width:100%;padding:12px 16px;margin-bottom:16px;background:#08081a;border:1px solid rgba(100,120,255,.08);border-radius:8px;color:#c8c8e0;font-size:14px;font-family:inherit;outline:none;transition:border .2s}
+.login-box input:focus{border-color:#7b8cff}
+.login-box button{width:100%;padding:12px;background:linear-gradient(135deg,#7b8cff,#b08cff);border:none;border-radius:8px;color:#fff;font-size:15px;cursor:pointer;font-family:inherit;transition:transform .1s}
+.login-box button:hover{transform:scale(1.02)}
+.login-error{color:#cf6b6b;font-size:12px;margin-top:12px;min-height:18px}
+.hidden{display:none!important}
+
+.app-layout{display:flex;flex-direction:column;height:100%}
+.top-bar{display:flex;align-items:center;padding:0 20px;background:linear-gradient(180deg,#0c0c1e,#08081a);border-bottom:1px solid rgba(100,120,255,.08);height:48px;flex-shrink:0;gap:12px}
+.top-bar h1{font-size:15px;color:#e0e0ff;font-weight:300;letter-spacing:2px;white-space:nowrap}
+.top-bar h1 span{color:#7b8cff;font-weight:500}
+.top-bar .version{font-size:10px;color:#4a4a6a;padding:2px 8px;background:#0a0a1a;border-radius:4px;letter-spacing:.5px}
+.stats-bar{display:flex;gap:16px;font-size:10px;color:#4a4a6a;letter-spacing:.5px;flex:1;justify-content:center}
+.stats-bar b{color:#7b8cff;font-size:13px;font-weight:500;display:block}
+.top-bar .pulse-ind{display:flex;align-items:center;gap:5px;font-size:11px;color:#5eb88a}
+.top-bar .pulse-dot{width:7px;height:7px;border-radius:50%;background:#5eb88a;animation:pg 1.5s ease-in-out infinite}
+@keyframes pg{0%,100%{opacity:.4}50%{opacity:1}}
+.top-bar .logout-btn{background:none;border:1px solid rgba(100,120,255,.1);color:#4a4a6a;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:11px;font-family:inherit}
+.top-bar .logout-btn:hover{border-color:#7b8cff;color:#7b8cff}
+
+.main-area{display:flex;flex:1;overflow:hidden}
+
+.mode-tabs{display:flex;flex-direction:column;background:#08081a;border-right:1px solid rgba(100,120,255,.06);width:140px;flex-shrink:0;padding:8px 6px}
+.mode-tabs .section{font-size:9px;color:#2a2a4a;text-transform:uppercase;letter-spacing:1.5px;padding:14px 10px 6px}
+.mode-tabs button{display:block;width:100%;text-align:left;padding:8px 10px;margin-bottom:2px;background:none;border:none;color:#4a4a6a;font-size:12px;cursor:pointer;border-radius:4px;font-family:inherit;transition:all .15s}
+.mode-tabs button:hover{background:#0e0e22;color:#7b8cff}
+.mode-tabs button.active{background:#0e0e22;color:#7b8cff;border-left:2px solid #7b8cff}
+
+.content-3d{display:flex;flex:1;overflow:hidden}
+.canvas-wrap{flex:1;position:relative}
+.canvas-wrap canvas{display:block}
+.legend{position:absolute;bottom:8px;left:12px;background:rgba(6,6,15,.92);backdrop-filter:blur(8px);padding:10px 14px;border-radius:4px;border:1px solid rgba(100,120,255,.05);font-size:10px;color:#4a4a6a}
+.legend-item{display:flex;align-items:center;gap:5px;margin:3px 0}
+.legend-dot{width:7px;height:7px;border-radius:1px}
+.right-panel{width:320px;background:linear-gradient(180deg,#0a0a1a,#080816);border-left:1px solid rgba(100,120,255,.06);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0}
+.panel-header{padding:12px 16px;font-size:11px;font-weight:400;border-bottom:1px solid rgba(100,120,255,.06);color:#3a3a5a;letter-spacing:2px;text-transform:uppercase}
+.panel-body{flex:1;overflow-y:auto;padding:12px 16px}
+.panel-body::-webkit-scrollbar{width:4px}
+.panel-body::-webkit-scrollbar-track{background:transparent}
+.panel-body::-webkit-scrollbar-thumb{background:#1a1a3a;border-radius:2px}
+.toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:8px 16px;background:#0a0a1a;border-top:1px solid rgba(100,120,255,.06);flex-shrink:0}
+
+.mem-card{background:linear-gradient(135deg,#0e0e22,#0a0a1a);border:1px solid rgba(100,120,255,.06);border-radius:6px;padding:10px 12px;margin-bottom:6px;cursor:pointer;transition:all .3s}
+.mem-card:hover{border-color:rgba(100,120,255,.2)}
+.mem-card.active{border-color:rgba(123,140,255,.4);box-shadow:0 0 12px rgba(123,140,255,.08)}
+.mem-card .mem-id{font-size:10px;color:#2a2a4a;font-family:monospace}
+.mem-card .mem-content{font-size:12px;margin:4px 0;line-height:1.5;color:#a0a0c0}
+.mem-card .mem-meta{display:flex;gap:8px;font-size:10px;align-items:center}
+.mem-card .mem-meta .weight{color:#c9a04e;font-weight:500}
+.tag-list{display:flex;flex-wrap:wrap;gap:3px}
+.tag-item{background:rgba(100,120,255,.06);color:#5a5a8a;padding:1px 6px;border-radius:2px;font-size:10px}
+.tag-item.dream{background:rgba(0,230,118,.06);color:#4caf7a}
+.detail-field{margin-bottom:14px}
+.detail-field label{font-size:9px;color:#3a3a5a;display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:1.5px}
+.detail-field .val{font-size:12px;color:#a0a0c0}
+
+.btn{background:rgba(100,120,255,.08);color:#7b8cff;border:1px solid rgba(100,120,255,.1);padding:5px 14px;border-radius:3px;font-size:11px;cursor:pointer;transition:all .2s;font-family:inherit}
+.btn:hover{background:rgba(100,120,255,.15)}
+.btn-accent{color:#9aa0ff;border-color:rgba(123,140,255,.2);background:rgba(123,140,255,.12)}
+.btn-accent:hover{background:rgba(123,140,255,.25)}
+.btn-warn{color:#c9a04e;border-color:rgba(201,160,78,.15);background:rgba(201,160,78,.06)}
+.btn-warn:hover{background:rgba(201,160,78,.15)}
+.btn-danger{color:#cf6b6b;border-color:rgba(207,107,107,.15);background:rgba(207,107,107,.06)}
+.btn-danger:hover{background:rgba(207,107,107,.15)}
+.btn-green{color:#5eb88a;border-color:rgba(94,184,138,.15);background:rgba(94,184,138,.06)}
+.btn-green:hover{background:rgba(94,184,138,.15)}
+.input-field{background:rgba(10,10,26,.8);color:#a0a0c0;border:1px solid rgba(100,120,255,.06);padding:6px 10px;border-radius:3px;font-size:11px;font-family:inherit;outline:none}
+.input-field:focus{border-color:rgba(123,140,255,.2)}
+.input-field::placeholder{color:#2a2a4a}
+textarea.input-field{resize:none}
+input[type="range"]{-webkit-appearance:none;background:rgba(100,120,255,.06);height:3px;border-radius:2px;outline:none}
+input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:#7b8cff;cursor:pointer;border:none}
+
+.content-panel{flex:1;overflow-y:auto;padding:20px 24px}
+.card{background:#0e0e22;border:1px solid rgba(100,120,255,.06);border-radius:8px;padding:18px;margin-bottom:14px}
+.card h2{font-size:13px;color:#4a4a6a;margin-bottom:14px;letter-spacing:1px;text-transform:uppercase}
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.stat{background:#0a0a1a;padding:12px;border-radius:6px}
+.stat .label{font-size:9px;color:#3a3a5a;text-transform:uppercase;letter-spacing:1px;margin-bottom:3px}
+.stat .value{font-size:20px;font-weight:700;color:#7b8cff}
+.stat .value.green{color:#5eb88a}.stat .value.purple{color:#b08cff}.stat .value.cyan{color:#06b6d4}.stat .value.yellow{color:#c9a04e}.stat .value.pink{color:#ec4899}.stat .value.red{color:#cf6b6b}
+
+table{width:100%;border-collapse:collapse;font-size:11px}
+th{text-align:left;padding:7px 10px;color:#3a3a5a;border-bottom:1px solid rgba(100,120,255,.06);font-weight:500;text-transform:uppercase;letter-spacing:.5px;font-size:9px}
+td{padding:7px 10px;border-bottom:1px solid rgba(100,120,255,.03)}
+tr:hover td{background:rgba(100,120,255,.02)}
+
+.tag2{display:inline-block;padding:1px 7px;border-radius:3px;font-size:9px;margin-right:3px}
+.tag2.face{background:rgba(123,140,255,.1);color:#7b8cff}.tag2.edge{background:rgba(176,140,255,.1);color:#b08cff}
+.tag2.explore{background:rgba(6,182,212,.1);color:#06b6d4}.tag2.reinforce{background:rgba(201,160,78,.1);color:#c9a04e}
+.tag2.tension{background:rgba(207,107,107,.1);color:#cf6b6b}.tag2.bridge{background:rgba(94,184,138,.1);color:#5eb88a}
+.tag2.dream{background:rgba(0,230,118,.1);color:#4caf7a}.tag2.insight{background:rgba(176,140,255,.1);color:#b08cff}
+
+.config-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px}
+.config-item{background:#0a0a1a;padding:10px 14px;border-radius:6px}
+.config-item .key{font-size:9px;color:#3a3a5a;letter-spacing:.5px}.config-item .val{font-size:16px;font-weight:600;margin-top:2px;color:#7b8cff}
+
+.tension-bar{height:5px;border-radius:3px;background:#0a0a1a;overflow:hidden;margin-top:3px}
+.tension-fill{height:100%;border-radius:3px;transition:width .3s}
+
+.el-dialog{background:#0e0e22!important;border:1px solid rgba(100,120,255,.08)!important;border-radius:6px!important}
+.el-dialog__title{color:#7b8cff!important}
+.el-dialog__headerbtn .el-dialog__close{color:#4a4a6a!important}
+.el-overlay{background-color:rgba(6,6,15,.85)!important}
+
+@keyframes pulse-glow{0%,100%{opacity:.4}50%{opacity:1}}
+.system-pulse{animation:pulse-glow 2s ease-in-out infinite;color:#7b8cff}
+.refresh-info{font-size:10px;color:#2a2a4a;text-align:right;margin-bottom:6px}
+</style>
+</head>
+<body>
+
+<div id="loginPage" class="login-wrap">
+<div class="login-box">
+  <h1>TetraMem-XL</h1>
+  <div class="sub">PCNN 神经脉冲引擎 v4.1 — 主动意识</div>
+  <input id="user" placeholder="用户名" autocomplete="off">
+  <input id="pass" type="password" placeholder="密码">
+  <button onclick="doLogin()">登 录</button>
+  <div id="loginErr" class="login-error"></div>
+</div>
+</div>
+
+<div id="appPage" class="app-layout hidden">
+<div class="top-bar">
+  <h1>Tetra<span>Mem</span>-XL</h1>
+  <span class="version">v4.0 PCNN</span>
+  <div class="stats-bar">
+    <span>节点<b id="sNodes">-</b></span>
+    <span>记忆<b id="sMem">-</b></span>
+    <span>面边<b id="sFaces">-</b></span>
+    <span>脉冲<b class="system-pulse" id="sPulse">-</b></span>
+    <span>桥接<b id="sBridge" style="color:#5eb88a">-</b></span>
+    <span>激发<b id="sFired" style="color:#ec4899">-</b></span>
+  </div>
+  <div class="pulse-ind"><div class="pulse-dot"></div><span id="sInterval">-</span></div>
+  <button class="logout-btn" onclick="doLogout()">退出</button>
+</div>
+
+<div class="main-area">
+<div class="mode-tabs">
+  <div class="section">视图</div>
+  <button class="active" onclick="switchMode('3d',this)">3D 拓扑</button>
+  <button onclick="switchMode('dashboard',this)">总览面板</button>
+  <button onclick="switchMode('pcnn',this)">PCNN 引擎</button>
+  <div class="section">数据</div>
+  <button onclick="switchMode('memories',this)">记忆浏览</button>
+  <button onclick="switchMode('tension',this)">张力图谱</button>
+  <button onclick="switchMode('hebbian',this)">赫布路径</button>
+  <div class="section">系统</div>
+  <button onclick="switchMode('config',this)">参数配置</button>
+  <button onclick="switchMode('phase',this)">相变检测</button>
+  <button onclick="switchMode('selfcheck',this)">自检脉冲</button>
+  <button onclick="switchMode('cascade',this)">级联脉冲</button>
+  <button onclick="switchMode('lattice',this)">晶格完整性</button>
+  <button onclick="switchMode('crystal',this)">结晶通路</button>
+  <button onclick="switchMode('organize',this)">自组织</button>
+  <button onclick="switchMode('honeycomb',this)">蜂巢结构</button>
+  <button onclick="switchMode('dream',this)">梦境引擎</button>
+  <button onclick="switchMode('agent',this)">Agent驱动</button>
+  <button onclick="switchMode('feedback',this)">反馈闭环</button>
+  <button onclick="switchMode('session',this)">会话管理</button>
+  <button onclick="switchMode('events',this)">事件流</button>
+</div>
+
+<div id="mode3d" class="content-3d">
+  <div class="canvas-wrap" id="canvasWrap">
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:#7b8cff"></div>记忆节点</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#c9a04e"></div>高权重</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#5eb88a"></div>梦境 / 桥接</div>
+      <div class="legend-item"><div class="legend-dot" style="background:rgba(123,140,255,.4)"></div>神经脉冲</div>
+      <div style="margin-top:4px;color:#2a2a4a;font-size:9px">BCC 晶格 · PCNN v6.0</div>
+    </div>
+  </div>
+  <div class="right-panel">
+    <div class="panel-header" id="rpHeader">记忆集群</div>
+    <div class="panel-body" id="rpBody"></div>
+  </div>
+</div>
+
+<div id="modePanel" class="content-panel hidden"></div>
+</div>
+
+<div class="toolbar" id="toolbar3d">
+  <input id="queryText" placeholder="搜索记忆..." class="input-field" style="width:130px">
+  <button onclick="doQuery()" class="btn btn-accent">查询</button>
+  <button onclick="triggerDream()" class="btn btn-green">梦境</button>
+  <button onclick="doSelfOrg()" class="btn btn-warn">自组织</button>
+  <button onclick="doPhaseTrigger()" class="btn">相变</button>
+  <button onclick="exportData()" class="btn">导出</button>
+  <button onclick="refreshAll();rebuildScene()" class="btn">刷新</button>
+  <button onclick="showImportDialog()" class="btn btn-green">导入</button>
+</div>
+</div>
+
+<link rel="stylesheet" href="/libs/index.css">
+<script src="/libs/vue.global.prod.js"></script>
+<script src="/libs/index.full.min.js"></script>
+<script src="/libs/three.min.js"></script>
+<script>
+window.onerror=function(m,u,l){document.title='ERROR:'+m+' L'+l};
+if(!window.Vue){document.body.innerHTML='<h2 style="color:red;padding:40px">Vue.js failed</h2>';}
+if(!window.THREE){document.body.innerHTML='<h2 style="color:red;padding:40px">Three.js failed</h2>';}
+</script>
+<script>
+var s=document.createElement('script');s.src='/libs/OrbitControls.js';
+s.onload=function(){window._ocReady=true;};
+s.onerror=function(){window._ocReady=false;};
+document.head.appendChild(s);
+
+const CREDS={tetramem:'Hive@2026',admin:'TetraMem2026!'};
+const API='/api/v1/';
+let refreshTimer=null;
+let currentMode='3d';
+let _sceneInited=false;
+let _sceneBuilt=false;
+let G={stats:{},memories:[],selectedId:null,detail:{},associations:[]};
+let scene,camera,renderer,controls,meshGroup,edgeGroup,pulseGroup,tetraMeshMap={},raycaster,mouse,pulseFetchTimer=0;
+
+function doLogin(){
+  const u=document.getElementById('user').value,p=document.getElementById('pass').value;
+  if(CREDS[u]&&CREDS[u]===p){
+    document.getElementById('loginPage').classList.add('hidden');
+    document.getElementById('appPage').classList.remove('hidden');
+    sessionStorage.setItem('auth',btoa(u+':'+p));
+    initApp();
+  }else{document.getElementById('loginErr').textContent='用户名或密码错误';}
+}
+document.getElementById('pass').onkeydown=function(e){if(e.key==='Enter')doLogin()};
+function doLogout(){
+  sessionStorage.removeItem('auth');
+  document.getElementById('appPage').classList.add('hidden');
+  document.getElementById('loginPage').classList.remove('hidden');
+  if(refreshTimer)clearInterval(refreshTimer);
+}
+
+async function api(path,opts={}){
+  const url=API+path.replace(/^\/+/,'');const method=opts.method||(opts.body?'POST':'GET');
+  const headers=opts.body?{'Content-Type':'application/json'}:{};
+  const r=await fetch(url,{method,headers,body:opts.body?JSON.stringify(opts.body):undefined});
+  if(!r.ok)throw new Error(r.status+' '+await r.text());
+  return r.json();
+}
+
+function initApp(){
+  refreshTimer=setInterval(refreshTopbar,3000);
+  refreshTopbar();
+  showRightPanelList();
+  var tryInit=function(){
+    if(!window._ocReady){setTimeout(tryInit,100);return;}
+    if(_sceneInited)return;
+    _sceneInited=true;
+    try{initScene(document.getElementById('canvasWrap'));}catch(e){console.error('initScene:',e);}
+    refreshAll();
+  };
+  setTimeout(tryInit,200);
+}
+
+async function refreshTopbar(){
+  try{
+    const s=await api('/stats');
+    G.stats=s;
+    document.getElementById('sNodes').textContent=s.total_nodes||0;
+    document.getElementById('sMem').textContent=s.occupied_nodes||0;
+    document.getElementById('sFaces').textContent=s.face_edges||0;
+    document.getElementById('sPulse').textContent=s.pulse_count||0;
+    document.getElementById('sBridge').textContent=s.bridge_count||0;
+    document.getElementById('sFired').textContent=s.fired_nodes||0;
+    document.getElementById('sInterval').textContent=(s.adaptive_interval||0.5).toFixed(2)+'s';
+  }catch(e){}
+}
+
+async function refreshAll(){
+  try{
+    const[s,d]=await Promise.all([api('/stats'),api('/tetrahedra')]);
+    G.stats=s;G.memories=d.tetrahedra||[];
+    if(!_sceneBuilt&&renderer){
+      _sceneBuilt=true;
+      updateScene(G.memories);
+    }
+    if(!G.selectedId)showRightPanelList();
+  }catch(e){console.error('refreshAll:',e);}
+}
+function rebuildScene(){
+  _sceneBuilt=true;
+  if(renderer)updateScene(G.memories);
+}
+
+function switchMode(mode,btn){
+  currentMode=mode;
+  document.querySelectorAll('.mode-tabs button').forEach(b=>b.classList.remove('active'));
+  if(btn)btn.classList.add('active');
+  const m3=document.getElementById('mode3d');
+  const mp=document.getElementById('modePanel');
+  const tb=document.getElementById('toolbar3d');
+  if(mode==='3d'){
+    m3.classList.remove('hidden');mp.classList.add('hidden');tb.classList.remove('hidden');
+  }else{
+    m3.classList.add('hidden');mp.classList.remove('hidden');tb.classList.add('hidden');
+    renderPanelMode(mode);
+  }
+}
+
+async function renderPanelMode(mode){
+  const el=document.getElementById('modePanel');
+  el.innerHTML='<div class="card"><h2>加载中...</h2></div>';
+  switch(mode){
+    case 'dashboard':await renderDashboard(el);break;
+    case 'pcnn':await renderPCNN(el);break;
+    case 'memories':renderMemories(el);break;
+    case 'tension':await renderTension(el);break;
+    case 'hebbian':await renderHebbian(el);break;
+    case 'config':await renderConfig(el);break;
+    case 'selfcheck':await renderSelfCheck(el);break;
+    case 'cascade':await renderCascade(el);break;
+    case 'lattice':await renderLattice(el);break;
+    case 'crystal':await renderCrystal(el);break;
+    case 'organize':await renderOrganize(el);break;
+    case 'honeycomb':await renderHoneycomb(el);break;
+    case 'dream':await renderDream(el);break;
+    case 'agent':await renderAgent(el);break;
+    case 'feedback':await renderFeedback(el);break;
+    case 'session':await renderSession(el);break;
+    case 'events':await renderEvents(el);break;
+    case 'phase':await renderPhase(el);break;
+  }
+}
+
+async function renderDashboard(el){
+  const[s,ps]=await Promise.all([api('/stats'),api('/pulse-status')]);
+  if(!s)return;
+  const pt=ps?.pulse_type_counts||{};
+  const hb=s.hebbian||{};
+  const total=(pt.exploratory||0)+(pt.reinforcing||0)+(pt.tension_sensing||0)||1;
+  el.innerHTML=`
+  <div class="card"><h2>系统总览</h2>
+  <div class="stats-grid">
+    <div class="stat"><div class="label">总节点数</div><div class="value">${s.total_nodes}</div></div>
+    <div class="stat"><div class="label">已占用</div><div class="value green">${s.occupied_nodes}</div></div>
+    <div class="stat"><div class="label">桥接节点</div><div class="value cyan">${s.bridge_nodes||0}</div></div>
+    <div class="stat"><div class="label">面边连接</div><div class="value">${s.face_edges}</div></div>
+    <div class="stat"><div class="label">棱边连接</div><div class="value purple">${s.edge_edges}</div></div>
+    <div class="stat"><div class="label">脉冲总数</div><div class="value yellow">${s.pulse_count}</div></div>
+    <div class="stat"><div class="label">桥接计数</div><div class="value green">${s.bridge_count}</div></div>
+    <div class="stat"><div class="label">激发节点</div><div class="value pink">${s.fired_nodes||0}</div></div>
+    <div class="stat"><div class="label">平均激活</div><div class="value cyan">${(s.avg_activation||0).toFixed(4)}</div></div>
+    <div class="stat"><div class="label">自适应间隔</div><div class="value yellow">${(s.adaptive_interval||0).toFixed(3)}s</div></div>
+    <div class="stat"><div class="label">桥接率</div><div class="value">${((s.bridge_rate||0)*100).toFixed(3)}%</div></div>
+  </div></div>
+  <div class="card"><h2>脉冲类型分布</h2>
+  <div style="display:flex;gap:24px;align-items:center;flex-wrap:wrap">
+    <div style="display:flex;gap:16px;flex-wrap:wrap">
+      <div><span class="tag2 explore">探索脉冲</span> <b style="color:#06b6d4">${pt.exploratory||0}</b> <small style="color:#2a2a4a">(${((pt.exploratory||0)/total*100).toFixed(0)}%)</small></div>
+      <div><span class="tag2 reinforce">强化脉冲</span> <b style="color:#c9a04e">${pt.reinforcing||0}</b> <small style="color:#2a2a4a">(${((pt.reinforcing||0)/total*100).toFixed(0)}%)</small></div>
+      <div><span class="tag2 tension">张力感应</span> <b style="color:#cf6b6b">${pt.tension_sensing||0}</b> <small style="color:#2a2a4a">(${((pt.tension_sensing||0)/total*100).toFixed(0)}%)</small></div>
+      <div><span class="tag2" style="background:#2a1a3a;color:#b388ff">自检脉冲</span> <b style="color:#b388ff">${pt.self_check||0}</b> <small style="color:#2a2a4a">(${((pt.self_check||0)/total*100).toFixed(0)}%)</small></div>
+      <div><span class="tag2" style="background:#1a2a3a;color:#64b5f6">级联脉冲</span> <b style="color:#64b5f6">${pt.cascade||0}</b> <small style="color:#2a2a4a">(${((pt.cascade||0)/total*100).toFixed(0)}%)</small></div>
+      <div><span class="tag2" style="background:#2a3a1a;color:#aed581">结构脉冲</span> <b style="color:#aed581">${pt.structure||0}</b> <small style="color:#2a2a4a">(${((pt.structure||0)/total*100).toFixed(0)}%)</small></div>
+    </div>
+  </div></div>
+  <div class="card"><h2>赫布路径记忆</h2>
+  <div class="stats-grid">
+    <div class="stat"><div class="label">路径段数</div><div class="value">${hb.total_path_segments||0}</div></div>
+    <div class="stat"><div class="label">成功次数</div><div class="value green">${hb.success_count||0}</div></div>
+    <div class="stat"><div class="label">平均权重</div><div class="value cyan">${(hb.avg_path_weight||0).toFixed(4)}</div></div>
+    <div class="stat"><div class="label">最大权重</div><div class="value yellow">${(hb.max_path_weight||0).toFixed(4)}</div></div>
+  </div></div>
+  <div class="card"><h2>PCNN 配置参数</h2>
+  <div class="config-grid">
+    ${Object.entries(s.pcnn_config||{}).map(([k,v])=>`<div class="config-item"><div class="key">${k}</div><div class="val">${typeof v==='number'?v:v}</div></div>`).join('')}
+  </div></div>`;
+}
+
+async function renderPCNN(el){
+  const[states,ps]=await Promise.all([api('pcnn/states'),api('pulse-status')]);
+  const st=states?.states||[];
+  const hot=ps?.hot_nodes||[];
+  el.innerHTML=`
+  <div class="refresh-info">数据快照 — 切换其他面板再切回可刷新</div>
+  <div class="card"><h2>PCNN 节点动力学 (${st.length} 个活跃节点)</h2>
+  <p style="font-size:11px;color:#3a3a5a;margin-bottom:10px">F=馈送 &middot; L=耦合 &middot; U=内部活性 &middot; Th=阈值 &middot; Eckhorn PCNN 模型</p>
+  <table><tr><th>ID</th><th>F</th><th>L</th><th>U</th><th>Th</th><th>激发</th><th>激活值</th></tr>
+  ${st.map(s=>`<tr><td style="font-size:10px">${s.id}</td><td>${s.feeding.toFixed(3)}</td><td>${s.linking.toFixed(3)}</td><td>${s.internal_activity.toFixed(3)}</td><td>${s.threshold.toFixed(3)}</td><td>${s.fired?'<span style="color:#5eb88a">FIRE</span>':'-'}</td><td>${s.activation.toFixed(3)}</td></tr>`).join('')}
+  </table></div>
+  <div class="card"><h2>热点节点（脉冲累加器）</h2>
+  <table><tr><th>ID</th><th>累加值</th></tr>
+  ${hot.map(([id,a])=>`<tr><td>${id}</td><td>${a.toFixed(3)}</td></tr>`).join('')}
+  </table></div>`;
+}
+
+function renderMemories(el){
+  el.innerHTML=`<div class="card"><h2>记忆浏览器</h2>
+  <div style="display:flex;gap:8px;margin-bottom:14px">
+    <input id="panelSearch" placeholder="搜索记忆..." class="input-field" style="flex:1">
+    <button onclick="panelDoSearch()" class="btn btn-accent">搜索</button>
+  </div></div><div id="panelMemResults"></div>`;
+  panelDoSearch();
+}
+async function panelDoSearch(){
+  const q=document.getElementById('panelSearch')?.value||'';
+  const el=document.getElementById('panelMemResults');if(!el)return;
+  if(q){
+    const r=await api('/query',{body:{query:q,k:30}});
+    const items=r?.results||[];
+    el.innerHTML=memTable('查询结果 ('+items.length+')',items);
+  }else{
+    const r=await api('/timeline',{body:{direction:'newest',limit:40}});
+    const items=r?.items||[];
+    el.innerHTML=memTable('最新记忆 ('+items.length+')',items);
+  }
+}
+function memTable(title,items){
+  return `<div class="card"><h2>${title}</h2><table><tr><th>内容</th><th>权重</th><th>激活</th><th>标签</th></tr>
+  ${items.map(m=>`<tr><td style="max-width:350px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(m.content)}">${esc(m.content)}</td>
+  <td>${(m.weight||0).toFixed(1)}</td><td>${(m.activation||0).toFixed(3)}</td>
+  <td>${(m.labels||[]).map(l=>{const c=l==='__pulse_bridge__'?'bridge':l==='__dream__'?'dream':l==='__insight__'?'insight':'face';return `<span class="tag2 ${c}">${esc(l)}</span>`;}).join('')}</td></tr>`).join('')}
+  </table></div>`;
+}
+
+async function renderTension(el){
+  const[t,tm]=await Promise.all([api('/tension'),api('pcnn/tension-map')]);
+  const detailed=tm?.tension_map||[];
+  const maxT=detailed.length?Math.max(...detailed.map(d=>d.tension)):1;
+  el.innerHTML=`
+  <div class="card"><h2>全局张力: ${(t?.global_tension||0).toFixed(2)}</h2>
+  <div class="stats-grid">
+    <div class="stat"><div class="label">已评分节点</div><div class="value">${t?.total_scored||0}</div></div>
+    <div class="stat"><div class="label">最大局部张力</div><div class="value red">${maxT.toFixed(3)}</div></div>
+  </div></div>
+  <div class="card"><h2>张力分布详情 (${detailed.length})</h2>
+  <table><tr><th>ID</th><th>权重</th><th>邻居均权</th><th>方差</th><th>张力</th><th></th></tr>
+  ${detailed.map(d=>`<tr><td style="font-size:10px">${d.id}</td><td>${d.weight}</td><td>${d.avg_neighbor_weight}</td><td>${d.weight_variance}</td><td>${d.tension}</td>
+  <td><div class="tension-bar" style="width:100px"><div class="tension-fill" style="width:${Math.min(d.tension/maxT*100,100)}%;background:${d.tension>maxT*.7?'#cf6b6b':d.tension>maxT*.4?'#c9a04e':'#5eb88a'}"></div></div></td></tr>`).join('')}
+  </table></div>`;
+}
+
+async function renderHebbian(el){
+  const h=await api('pcnn/hebbian');
+  const info=h?.hebbian||{};
+  const paths=h?.top_paths||[];
+  el.innerHTML=`
+  <div class="card"><h2>赫布路径记忆</h2>
+  <p style="font-size:11px;color:#3a3a5a;margin-bottom:14px">当脉冲路径成功形成桥接或命中高权重节点时，路径段被强化。未来脉冲优先沿已验证路径传播（赫布学习法则）。</p>
+  <div class="stats-grid">
+    <div class="stat"><div class="label">路径段数</div><div class="value">${info.total_path_segments||0}</div></div>
+    <div class="stat"><div class="label">成功次数</div><div class="value green">${info.success_count||0}</div></div>
+    <div class="stat"><div class="label">平均权重</div><div class="value cyan">${(info.avg_path_weight||0).toFixed(4)}</div></div>
+    <div class="stat"><div class="label">最大权重</div><div class="value yellow">${(info.max_path_weight||0).toFixed(4)}</div></div>
+    <div class="stat"><div class="label">衰减周期</div><div class="value">${info.decay_cycles||0}</div></div>
+  </div></div>
+  <div class="card"><h2>热门路径段</h2>
+  <table><tr><th>起点</th><th>终点</th><th>权重</th></tr>
+  ${paths.map(([f,t,w])=>`<tr><td>${f}</td><td>${t}</td><td>${w}</td></tr>`).join('')}
+  </table></div>`;
+}
+
+async function renderConfig(el){
+  const c=await api('pcnn/config');
+  if(!c){el.innerHTML='<div class="card"><h2>加载失败</h2></div>';return;}
+  const probs=c.pulse_type_probabilities||{};
+  el.innerHTML=`
+  <div class="card"><h2>PCNN 参数（BCC 晶格 + Eckhorn 模型推导）</h2>
+  <div class="config-grid">
+    ${Object.entries(c).filter(([k])=>k!=='pulse_type_probabilities').map(([k,v])=>`<div class="config-item"><div class="key">${k}</div><div class="val">${v}</div></div>`).join('')}
+  </div></div>
+  <div class="card"><h2>脉冲类型概率</h2>
+  <div class="stats-grid">
+    <div class="stat"><div class="label"><span class="tag2 explore">探索脉冲</span></div><div class="value cyan">${(probs.exploratory||0)*100}%</div></div>
+    <div class="stat"><div class="label"><span class="tag2 reinforce">强化脉冲</span></div><div class="value yellow">${(probs.reinforcing||0)*100}%</div></div>
+    <div class="stat"><div class="label"><span class="tag2 tension">张力感应</span></div><div class="value pink">${(probs.tension_sensing||0)*100}%</div></div>
+  </div></div>`;
+}
+
+async function renderPhase(el){
+  const st=await api('phase-transition/status');
+  el.innerHTML=`
+  <div class="card"><h2>相变检测状态</h2>
+  <div class="stats-grid">
+    <div class="stat"><div class="label">全局张力</div><div class="value ${(st?.global_tension||0)>100?'red':'green'}">${(st?.global_tension||0).toFixed(2)}</div></div>
+    <div class="stat"><div class="label">含张力节点</div><div class="value">${st?.nodes_with_tension||0}</div></div>
+    <div class="stat"><div class="label">趋势</div><div class="value yellow">${{rising:'上升',falling:'下降',stable:'稳定',insufficient_data:'数据不足'}[st?.trend]||st?.trend||'-'}</div></div>
+    <div class="stat"><div class="label">相变次数</div><div class="value">${st?.total_transitions||0}</div></div>
+  </div></div>
+  <div class="card"><h2>手动触发</h2>
+  <p style="font-size:11px;color:#3a3a5a;margin-bottom:10px">强制执行全局相变（忽略阈值和冷却时间）。</p>
+  <button onclick="triggerPhaseUI()" class="btn btn-danger">触发相变</button>
+  <pre id="phaseResult" style="margin-top:12px;font-size:10px;color:#4a4a6a;max-height:300px;overflow:auto"></pre>
+  </div>`;
+}
+async function triggerPhaseUI(){
+  document.getElementById('phaseResult').textContent='正在触发...';
+  const r=await api('/phase-transition/trigger',{body:{}});
+  document.getElementById('phaseResult').textContent=JSON.stringify(r,null,2);
+}
+
+let _importRunning=false;
+function showImportDialog(){
+  if(typeof ElementPlus==='undefined'){alert('需要 Element Plus');return;}
+  const h=`<div style="max-height:500px">
+    <p style="font-size:12px;color:#a0a0c0;margin-bottom:12px">支持 JSON 格式，结构：{"tetrahedra":[{"content":"...","labels":["..."],"weight":1.0}]}</p>
+    <textarea id="importData" rows="10" class="input-field" style="width:100%;margin-bottom:10px" placeholder='粘贴 JSON 数据或选择文件...'></textarea>
+    <input type="file" id="importFile" accept=".json" style="margin-bottom:10px;color:#a0a0c0;font-size:12px">
+    <div id="importProgress" style="font-size:11px;color:#4a4a6a;margin-top:8px"></div>
+  </div>`;
+  ElementPlus.ElMessageBox({title:'导入记忆',dangerouslyUseHTMLString:true,message:h,confirmButtonText:'开始导入',cancelButtonText:'取消',beforeClose:async(action,instance,done)=>{
+    if(action==='confirm'){
+      const fileInput=document.getElementById('importFile');
+      const textArea=document.getElementById('importData');
+      let data=null;
+      if(fileInput&&fileInput.files.length>0){
+        data=JSON.parse(await fileInput.files[0].text());
+      }else if(textArea&&textArea.value.trim()){
+        data=JSON.parse(textArea.value.trim());
+      }
+      if(!data||!data.tetrahedra){ElementPlus.ElMessage.error('无效数据格式');done();return;}
+      const items=data.tetrahedra;
+      let ok=0,fail=0;
+      document.getElementById('importProgress').textContent=`导入中 0/${items.length}...`;
+      for(let i=0;i<items.length;i++){
+        const t=items[i];
+        if(!t.content){continue;}
+        try{
+          await api('/store',{body:{content:t.content,labels:t.labels||[],weight:t.weight||1.0,metadata:t.metadata||{}}});
+          ok++;
+        }catch(e){fail++;}
+        if(i%10===0)document.getElementById('importProgress').textContent=`导入中 ${i+1}/${items.length} (成功:${ok} 失败:${fail})...`;
+      }
+      document.getElementById('importProgress').textContent=`完成！成功:${ok} 失败:${fail} 总计:${items.length}`;
+      refreshAll();
+      setTimeout(done,800);
+    }else{done();}
+  }}).catch(()=>{});
+}
+
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+/* ===== Right Panel (3D mode) ===== */
+function showRightPanelList(){
+  const body=document.getElementById('rpBody');
+  const hdr=document.getElementById('rpHeader');
+  hdr.textContent='记忆集群 ('+G.memories.length+')';
+  body.innerHTML=`<input id="rpFilter" placeholder="筛选记忆..." class="input-field" style="width:100%;margin-bottom:8px" oninput="filterRightPanel()">
+  <div id="rpList"></div>`;
+  filterRightPanel();
+}
+function filterRightPanel(){
+  const ft=(document.getElementById('rpFilter')?.value||'').toLowerCase();
+  const list=document.getElementById('rpList');if(!list)return;
+  const filtered=ft?G.memories.filter(m=>(m.content||'').toLowerCase().includes(ft)||(m.labels||[]).some(l=>l.toLowerCase().includes(ft))):G.memories;
+  list.innerHTML=filtered.slice(0,50).map(m=>`<div class="mem-card" onclick="selectMemory('${m.id}')">
+    <div class="mem-id">${(m.id||'').slice(0,12)}</div>
+    <div class="mem-content">${(m.content||'').slice(0,70)}</div>
+    <div class="mem-meta"><span class="weight">w=${(m.weight||0).toFixed(1)}</span>
+    <div class="tag-list">${(m.labels||[]).slice(0,3).map(l=>`<span class="tag-item ${l==='__dream__'||l==='__pulse_bridge__'?'dream':''}">${l}</span>`).join('')}</div></div>
+  </div>`).join('');
+}
+
+async function selectMemory(id){
+  G.selectedId=id;
+  try{
+    const d=await api('/tetrahedra/'+id);
+    G.detail=d;
+    const hdr=document.getElementById('rpHeader');
+    const body=document.getElementById('rpBody');
+    hdr.textContent='记忆详情';
+    body.innerHTML=`<button onclick="G.selectedId=null;showRightPanelList()" class="btn" style="margin-bottom:10px">&larr; 返回列表</button>
+    <div class="detail-field"><label>标识</label><div class="val" style="font-size:10px;color:#2a2a4a;font-family:monospace">${d.id}</div></div>
+    <div class="detail-field"><label>权重</label><div class="val"><input type="range" id="editW" min="0.5" max="10" step="0.5" value="${d.weight||1}"> <span style="color:#c9a04e" id="editWVal">${(d.weight||1).toFixed(1)}</span></div></div>
+    <div class="detail-field"><label>激活值</label><div class="val" style="color:#06b6d4">${(d.activation||0).toFixed(4)}</div></div>
+    <div class="detail-field"><label>标签</label><div class="val"><div class="tag-list">${(d.labels||[]).map(l=>`<span class="tag-item ${l.startsWith('__')?'dream':''}">${l}</span>`).join('')}</div></div></div>
+    <div class="detail-field"><label>内容</label><textarea id="editC" rows="4" class="input-field" style="width:100%;margin-top:4px">${d.content||''}</textarea></div>
+    <div class="detail-field"><label>元信息</label><div class="val" style="font-size:10px;color:#2a2a4a">创建时间: ${fmtTime(d.creation_time)}<br>访问次数: ${d.access_count||0}</div></div>
+    <div style="display:flex;gap:6px;margin-top:12px">
+      <button onclick="saveEdit()" class="btn btn-accent">保存</button>
+      <button onclick="deleteMemory()" class="btn btn-danger">删除</button>
+    </div>
+    <div id="assocArea" style="margin-top:14px"></div>`;
+    document.getElementById('editW').oninput=function(){document.getElementById('editWVal').textContent=parseFloat(this.value).toFixed(1);};
+    highlightTetra(id);
+    loadAssociations(id);
+  }catch(e){console.error('selectMemory:',e);}
+}
+
+async function loadAssociations(id){
+  try{
+    const r=await api('/associate',{body:{tetra_id:id}});
+    const a=r.associations||[];
+    const el=document.getElementById('assocArea');
+    if(!el||!a.length)return;
+    el.innerHTML=`<div class="detail-field"><label>拓扑邻居 (${a.length})</label>
+    ${a.map(n=>`<div class="mem-card" style="padding:8px" onclick="selectMemory('${n.id}')">
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:#3a3a5a;margin-bottom:2px"><span>${n.type}</span><span style="color:#c9a04e">w=${n.weight.toFixed(1)}</span></div>
+      <div style="font-size:11px;color:#a0a0c0">${(n.content||'').slice(0,50)}</div>
+    </div>`).join('')}</div>`;
+  }catch(e){}
+}
+
+async function saveEdit(){
+  try{
+    const w=parseFloat(document.getElementById('editW').value);
+    const c=document.getElementById('editC').value;
+    await api('/tetrahedra/'+G.selectedId,{method:'PUT',body:{content:c,weight:w}});
+    if(typeof ElementPlus!=='undefined')ElementPlus.ElMessage.success('已保存');
+    refreshAll();
+  }catch(e){if(typeof ElementPlus!=='undefined')ElementPlus.ElMessage.error('保存失败: '+e.message);}
+}
+async function deleteMemory(){
+  try{
+    if(typeof ElementPlus!=='undefined')await ElementPlus.ElMessageBox.confirm('确定删除这条记忆？此操作不可恢复。','确认删除',{type:'warning'});
+    await api('/tetrahedra/'+G.selectedId,{method:'DELETE'});
+    if(typeof ElementPlus!=='undefined')ElementPlus.ElMessage.success('已删除');
+    G.selectedId=null;showRightPanelList();refreshAll();
+  }catch(e){}
+}
+
+async function doQuery(){
+  const q=document.getElementById('queryText').value;if(!q)return;
+  try{
+    const r=await api('/query',{body:{query:q,k:10}});
+    const results=r.results||[];
+    if(typeof ElementPlus!=='undefined'&&results.length){
+      let html='<div style="max-height:400px;overflow:auto">';
+      results.forEach(r=>{
+        html+=`<div class="mem-card" onclick="selectMemory('${r.id}');document.querySelector('.el-overlay').click()">
+          <div style="display:flex;justify-content:space-between;font-size:10px;color:#3a3a5a;margin-bottom:3px"><span>得分 ${(r.distance||0).toFixed(3)}</span><span style="color:#c9a04e">权重=${r.weight.toFixed(1)}</span></div>
+          <div style="font-size:12px;color:#a0a0c0">${(r.content||'').slice(0,100)}</div></div>`;
+      });
+      html+='</div>';
+      ElementPlus.ElMessageBox({title:'查询结果',dangerouslyUseHTMLString:true,message:html,showConfirmButton:false,showClose:true}).catch(()=>{});
+    }
+    highlightResults(results);
+  }catch(e){if(typeof ElementPlus!=='undefined')ElementPlus.ElMessage.error('查询失败');}
+}
+async function triggerDream(){
+  if(typeof ElementPlus!=='undefined')ElementPlus.ElMessage.info('梦境周期触发中...');
+  const r=await api('/dream',{body:{force:true}});
+  if(typeof ElementPlus!=='undefined')ElementPlus.ElMessage.success('梦境完成: '+(r.result?.phase||'完成'));
+  refreshAll();
+}
+async function doSelfOrg(){
+  await api('/self-organize',{body:{}});
+  if(typeof ElementPlus!=='undefined')ElementPlus.ElMessage.success('自组织完成');
+  refreshAll();
+}
+async function doPhaseTrigger(){
+  if(typeof ElementPlus!=='undefined')ElementPlus.ElMessage.info('相变触发中...');
+  const r=await api('/phase-transition/trigger',{body:{}});
+  if(typeof ElementPlus!=='undefined')ElementPlus.ElMessage.success('结果: '+(r.status||'完成'));
+  refreshAll();
+}
+async function exportData(){
+  await api('/export');
+  if(typeof ElementPlus!=='undefined')ElementPlus.ElMessage.success('已导出');
+}
+
+function fmtTime(ts){if(!ts)return'-';return new Date(ts*1000).toLocaleString('zh-CN');}
+
+/* ===== Three.js 3D Scene ===== */
+function initScene(container){
+  const w=container.clientWidth||800,h=container.clientHeight||600;
+  scene=new THREE.Scene();scene.background=new THREE.Color(0x06060f);scene.fog=new THREE.FogExp2(0x06060f,0.03);
+  camera=new THREE.PerspectiveCamera(55,w/h,0.01,200);
+  camera.position.set(8,6,10);camera.lookAt(0,0,0);
+  renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});
+  renderer.setSize(w,h);renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  container.appendChild(renderer.domElement);
+  controls=new THREE.OrbitControls(camera,renderer.domElement);
+  controls.enableDamping=true;controls.dampingFactor=0.08;controls.maxDistance=25;controls.minDistance=1;controls.autoRotate=true;controls.autoRotateSpeed=0.3;
+  scene.add(new THREE.AmbientLight(0x303060,2.0));
+  const dl1=new THREE.DirectionalLight(0xe0e0ff,0.7);dl1.position.set(5,8,5);scene.add(dl1);
+  const dl2=new THREE.DirectionalLight(0x7b8cff,0.3);dl2.position.set(-5,-3,-5);scene.add(dl2);
+  meshGroup=new THREE.Group();edgeGroup=new THREE.Group();pulseGroup=new THREE.Group();
+  scene.add(edgeGroup);scene.add(meshGroup);scene.add(pulseGroup);
+  raycaster=new THREE.Raycaster();mouse=new THREE.Vector2();
+  renderer.domElement.addEventListener('click',onCanvasClick);
+  window.addEventListener('resize',()=>{
+    const cw=container.clientWidth||800,ch=container.clientHeight||600;
+    camera.aspect=cw/ch;camera.updateProjectionMatrix();renderer.setSize(cw,ch);
+  });
+  animate();
+}
+
+function animate(){
+  requestAnimationFrame(animate);
+  if(!renderer||!scene)return;
+  try{
+    controls.update();const t=Date.now()*0.001;
+    for(const id in tetraMeshMap){const obj=tetraMeshMap[id];if(obj&&obj._hl&&obj.material)try{obj.material.emissiveIntensity=0.3+0.2*Math.sin(t*3);}catch(e){}}
+    try{pulseGroup.children.forEach(p=>{if(p.userData?.strength&&p.material){p.material.opacity=Math.max(0,p.userData.strength*(0.5+0.5*Math.sin(t*4+p.userData.phase)));p.scale.setScalar(0.04+p.userData.strength*0.06);}});}catch(e){}
+    pulseFetchTimer++;if(pulseFetchTimer>90){pulseFetchTimer=0;fetchPulses();}
+    renderer.render(scene,camera);
+  }catch(e){console.error('animate error:',e);}
+}
+
+function fetchPulses(){
+  fetch(API+'/pulse-snapshot').then(r=>r.json()).then(data=>{
+    if(!data.pulses)return;
+    pulseGroup.traverse(c=>{if(c.geometry)c.geometry.dispose();if(c.material)c.material.dispose();});
+    while(pulseGroup.children.length)pulseGroup.remove(pulseGroup.children[0]);
+    const sc=0.8;
+    data.pulses.slice(0,80).forEach(p=>{if(!p.centroid)return;
+      const pos=new THREE.Vector3(p.centroid[0]*sc,p.centroid[1]*sc,p.centroid[2]*sc);
+      const geo=new THREE.SphereGeometry(0.1,6,6);
+      const mat=new THREE.MeshBasicMaterial({color:p.occupied?0xc9a04e:0x7b8cff,transparent:true,opacity:Math.min(p.strength,1)*0.5});
+      const dot=new THREE.Mesh(geo,mat);dot.position.copy(pos);
+      const vs=Math.min(p.strength,2.0);
+      dot.userData={strength:vs,phase:Math.random()*6.28};
+      pulseGroup.add(dot);
+    });
+  }).catch(()=>{});
+}
+
+function weightToColor(w,isDream){
+  if(isDream)return new THREE.Color(0x5eb88a);
+  if(w>=7)return new THREE.Color(0xcf6b6b);if(w>=4)return new THREE.Color(0xc9a04e);
+  if(w>=2)return new THREE.Color(0x7b8cff);return new THREE.Color(0x4a5a9a);
+}
+
+function updateScene(tetras){
+  meshGroup.traverse(c=>{if(c.geometry)c.geometry.dispose();if(c.material){if(c.material.map)c.material.map.dispose();c.material.dispose();}});
+  edgeGroup.traverse(c=>{if(c.geometry)c.geometry.dispose();if(c.material)c.material.dispose();});
+  meshGroup.clear();edgeGroup.clear();tetraMeshMap={};
+  api('/lattice-info').then(data=>{if(renderer)buildScene(data);}).catch(()=>{if(renderer)buildFallback(tetras);});
+}
+
+function buildScene(data){
+  const res=data.resolution||5;const sp=data.spacing||1.0;const sc=0.8;
+  const memMap={};(data.memories||[]).forEach(m=>{memMap[m.id]=m;});
+  const memEntries=Object.entries(memMap);
+  if(memEntries.length===0)return;
+
+  const neighborVerts=[];
+  for(const[id,m]of memEntries){
+    const p=new THREE.Vector3(m.pos[0]*sc,m.pos[1]*sc,m.pos[2]*sc);
+    for(const[id2,m2]of memEntries){
+      if(id===id2)continue;
+      const p2=new THREE.Vector3(m2.pos[0]*sc,m2.pos[1]*sc,m2.pos[2]*sc);
+      const d=p.distanceTo(p2);
+      if(d<sp*sc*2.5){
+        neighborVerts.push(p.x,p.y,p.z,p2.x,p2.y,p2.z);
+      }
+    }
+  }
+  if(neighborVerts.length>0){
+    const geo=new THREE.BufferGeometry();
+    geo.setAttribute('position',new THREE.Float32BufferAttribute(neighborVerts,3));
+    edgeGroup.add(new THREE.LineSegments(geo,new THREE.LineBasicMaterial({color:0x1a1a3a,transparent:true,opacity:0.2})));
+  }
+
+  for(const[id,m]of memEntries){
+    const p=new THREE.Vector3(m.pos[0]*sc,m.pos[1]*sc,m.pos[2]*sc);
+    const isDream=m.is_dream;const color=weightToColor(m.weight||1,isDream);
+    const s=0.25,h=s*1.2,a=s*1.5;
+    const tGeo=new THREE.BufferGeometry();
+    const tV=new Float32Array([0,h*.75,0,-a,-h*.25,a*.5,a,-h*.25,a*.5,0,-h*.25,-a]);
+    tGeo.setAttribute('position',new THREE.BufferAttribute(tV,3));
+    tGeo.setIndex(new THREE.BufferAttribute(new Uint16Array([0,1,2,0,2,3,0,3,1,1,3,2]),1));
+    tGeo.computeVertexNormals();
+    const tMat=new THREE.MeshPhongMaterial({color,transparent:true,opacity:0.9,emissive:color.clone().multiplyScalar(0.4),emissiveIntensity:0.6,shininess:80});
+    const tMesh=new THREE.Mesh(tGeo,tMat);tMesh.position.copy(p);tMesh.userData={id:m.id,weight:m.weight||1,isDream};
+    meshGroup.add(tMesh);tetraMeshMap[m.id]=tMesh;
+    const wGeo=new THREE.EdgesGeometry(tGeo);
+    const wire=new THREE.LineSegments(wGeo,new THREE.LineBasicMaterial({color:isDream?0x5eb88a:0x3a4a7a,transparent:true,opacity:0.6}));
+    wire.position.copy(p);meshGroup.add(wire);
+    if(m.content&&(m.weight||0)>=2){
+      const lc=document.createElement('canvas');lc.width=512;lc.height=64;const ctx=lc.getContext('2d');
+      ctx.fillStyle=isDream?'#5eb88a':'#7b8cff';ctx.font='22px sans-serif';ctx.fillText(m.content.slice(0,20),4,36);
+      const tex=new THREE.CanvasTexture(lc);
+      const sprite=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,opacity:0.85}));
+      sprite.position.copy(p);sprite.position.y+=0.18;sprite.scale.set(0.6,0.1,1);meshGroup.add(sprite);
+    }
+  }
+}
+
+function buildFallback(tetras){
+  if(!tetras||!tetras.length)return;
+  const centroids=tetras.map(t=>new THREE.Vector3(t.centroid[0],t.centroid[1],t.centroid[2]));
+  const center=new THREE.Vector3();centroids.forEach(c=>center.add(c));center.divideScalar(centroids.length);
+  let maxD=0;centroids.forEach(c=>{maxD=Math.max(maxD,c.distanceTo(center));});const sc=4/Math.max(maxD,0.5);
+  tetras.forEach(t=>{
+    const pos=new THREE.Vector3(t.centroid[0],t.centroid[1],t.centroid[2]).sub(center).multiplyScalar(sc);
+    const isDream=t.labels&&(t.labels.includes('__dream__')||t.labels.includes('__pulse_bridge__'));
+    const color=weightToColor(t.weight||1,isDream);
+    const dot=new THREE.Mesh(new THREE.SphereGeometry(0.08,8,8),new THREE.MeshBasicMaterial({color}));
+    dot.position.copy(pos);dot.userData={id:t.id,weight:t.weight||1,isDream};
+    meshGroup.add(dot);tetraMeshMap[t.id]=dot;
+  });
+}
+
+function onCanvasClick(event){
+  const rect=renderer.domElement.getBoundingClientRect();
+  mouse.x=((event.clientX-rect.left)/rect.width)*2-1;mouse.y=-((event.clientY-rect.top)/rect.height)*2+1;
+  raycaster.setFromCamera(mouse,camera);
+  const targets=meshGroup.children.filter(c=>c.isMesh&&c.userData?.id);
+  const hits=raycaster.intersectObjects(targets);
+  if(hits.length>0&&hits[0].object.userData.id)selectMemory(hits[0].object.userData.id);
+}
+
+function highlightTetra(id){
+  Object.values(tetraMeshMap).forEach(m=>{m._hl=false;m.material.emissiveIntensity=0;});
+  const obj=tetraMeshMap[id];
+  if(obj){obj._hl=true;obj.material.emissive=new THREE.Color(0xffffff);obj.material.emissiveIntensity=0.5;}
+}
+function highlightResults(results){
+  Object.values(tetraMeshMap).forEach(m=>{m._hl=false;m.material.emissiveIntensity=0;});
+  results.forEach(r=>{const obj=tetraMeshMap[r.id];if(obj){obj._hl=true;obj.material.emissive=new THREE.Color(0x4fc3f7);obj.material.emissiveIntensity=0.5;}});
+}
+
+async function renderSelfCheck(el){
+  let [status,dupes,iso] = await Promise.all([
+    api('self-check/status'),
+    api('duplicates'),
+    api('isolated')
+  ]);
+  let sc = status || {};
+  let dup = dupes?.duplicates || [];
+  let isoList = iso?.isolated || [];
+
+  let dupHTML = dup.length === 0 
+    ? '<div style="color:#3a5a3a;padding:12px">未检测到重复记忆</div>'
+    : dup.map(d => '<div style=\"background:rgba(255,180,50,.06);border:1px solid rgba(255,180,50,.1);border-radius:8px;padding:12px;margin-bottom:8px\"><div style=\"display:flex;justify-content:space-between;align-items:center;margin-bottom:6px\"><span style=\"color:#ffa726;font-weight:600\">' + (d.similarity*100).toFixed(1) + '%</span><span style=\"color:#3a3a5a;font-size:11px\">' + d.node_a + ' ↔ ' + d.node_b + '</span></div><div style=\"font-size:12px;color:#7a7a9a;margin-bottom:4px\">A: ' + d.content_a + '</div><div style=\"font-size:12px;color:#7a7a9a\">B: ' + d.content_b + '</div><div style=\"margin-top:6px;font-size:11px;color:#4a4a6a\">权重: ' + (d.weight_a||0).toFixed(2) + ' / ' + (d.weight_b||0).toFixed(2) + '</div></div>').join('');
+
+  let isoHTML = isoList.length === 0
+    ? '<div style=\"color:#3a5a3a;padding:12px\">未检测到孤立节点 — 网络连通性良好</div>'
+    : isoList.map(n => '<div style=\"background:rgba(255,80,80,.06);border:1px solid rgba(255,80,80,.1);border-radius:8px;padding:12px;margin-bottom:8px\"><div style=\"display:flex;justify-content:space-between;align-items:center\"><span style=\"color:#ff6b6b;font-weight:600\">' + n.id + '</span><span style=\"color:#3a3a5a;font-size:11px\">权重 ' + (n.weight||0).toFixed(2) + '</span></div><div style=\"font-size:12px;color:#7a7a9a;margin-top:4px\">' + n.content + '</div></div>').join('');
+
+  let latestHTML = '';
+  if(sc.latest_check){
+    let lc = sc.latest_check;
+    let t = new Date(lc.check_time*1000).toLocaleString('zh-CN');
+    latestHTML = '<div class=\"card\"><h2>最近一次检查</h2><div style=\"font-size:12px;color:#5a5a7a\">时间: ' + t + '</div><div style=\"font-size:12px;color:#5a5a7a\">异常: ' + lc.anomalies_found + ' | 修复: ' + lc.repairs_succeeded + '/' + lc.repairs_attempted + '</div><div style=\"font-size:12px;color:' + (lc.pulse_triggered?'#b388ff':'#3a3a5a') + '\">脉冲触发: ' + (lc.pulse_triggered?'是':'否') + '</div></div>';
+  }
+
+  el.innerHTML = '<div style=\"display:flex;gap:12px;align-items:center;margin-bottom:20px\"><h1 style=\"margin:0;font-size:20px;color:#b388ff\">自检脉冲 — 主动意识</h1><button onclick=\"runSelfCheck()\" class=\"btn btn-accent\" style=\"font-size:12px;padding:6px 16px\">立即自检</button></div><div class=\"stats-grid\" style=\"margin-bottom:20px\"><div class=\"stat\"><div class=\"label\">总检查次数</div><div class=\"value\">' + (sc.total_checks||0) + '</div></div><div class=\"stat\"><div class=\"label\">发现异常</div><div class=\"value yellow\">' + (sc.total_anomalies_found||0) + '</div></div><div class=\"stat\"><div class=\"label\">自动修复</div><div class=\"value green\">' + (sc.total_repairs_done||0) + '</div></div><div class=\"stat\"><div class=\"label\">引擎状态</div><div class=\"value ' + (sc.engine_running?'green':'pink') + '\">' + (sc.engine_running?'运行中':'停止') + '</div></div><div class=\"stat\"><div class=\"label\">检查间隔</div><div class=\"value\">' + (sc.check_interval||60) + 's</div></div><div class=\"stat\"><div class=\"label\">重复对数</div><div class=\"value yellow\">' + dup.length + '</div></div><div class=\"stat\"><div class=\"label\">孤立节点</div><div class=\"value ' + (isoList.length>0?'pink':'green') + '\">' + isoList.length + '</div></div></div>' + latestHTML + '<div class=\"card\"><h2>重复记忆检测（相似度 >= 70%）</h2>' + dupHTML + '</div><div class=\"card\"><h2>孤立节点检测（无已占用邻居）</h2>' + isoHTML + '</div><div id=\"selfCheckResult\"></div>';
+}
+
+async function runSelfCheck(){
+  const res=document.getElementById('selfCheckResult');
+  if(res) res.innerHTML='<div class="card" style="border-color:#b388ff"><h2 style="color:#b388ff">自检中...</h2></div>';
+  await api('self-check/run',{method:'POST'});
+  await renderSelfCheck(document.getElementById('modePanel'));
+}
+
+async function renderCascade(el){
+  const[ps,s]=await Promise.all([api('/pulse-status'),api('/stats')]);
+  if(!ps)return;
+  const cc=ps.cascade_count||0;
+  const cs=ps.crystallized||{};
+  const tc=ps.crystallized_top||[];
+  let crystalHTML=tc.length?'<table class="mem-table"><tr><th>节点A</th><th>节点B</th><th>晶体权重</th><th>传输次数</th><th>年龄(秒)</th></tr>'+tc.map(c=>'<tr><td>'+c.nodes[0]+'</td><td>'+c.nodes[1]+'</td><td>'+c.crystal_weight+'</td><td>'+c.transmissions+'</td><td>'+c.age_seconds+'</td></tr>').join('')+'</table>':'<p style="color:#888">暂无结晶通路（需脉冲运行一段时间后自动生成）</p>';
+  el.innerHTML='<div style="display:flex;gap:12px;align-items:center;margin-bottom:20px"><h1 style="margin:0;font-size:20px;color:#64b5f6">级联脉冲 — 多方向分支传播</h1><button onclick="triggerCascade()" class="btn btn-accent" style="font-size:12px;padding:6px 16px">触发级联</button></div><div class="stats-grid" style="margin-bottom:20px"><div class="stat"><div class="label">级联脉冲总数</div><div class="value" style="color:#64b5f6">'+cc+'</div></div><div class="stat"><div class="label">总脉冲数</div><div class="value">'+ps.pulse_count+'</div></div><div class="stat"><div class="label">桥接数</div><div class="value green">'+ps.bridge_count+'</div></div><div class="stat"><div class="label">结晶通路数</div><div class="value" style="color:#aed581">'+(cs.total_crystals||0)+'</div></div><div class="stat"><div class="label">结晶传输次数</div><div class="value">'+(cs.total_transmissions||0)+'</div></div></div><div class="card"><h2>赫布路径 Top 10</h2>'+(ps.hebbian_top_paths?ps.hebbian_top_paths.map(p=>'<div style="padding:4px 0;border-bottom:1px solid #333"><span style="color:#7b8cff">'+p[0]+'</span> → <span style="color:#7b8cff">'+p[1]+'</span> <span style="color:#c9a04e">w='+p[2]+'</span></div>').join(''):'<p style="color:#888">暂无数据</p>')+'</div><div class="card"><h2>结晶通路 Top 10</h2>'+crystalHTML+'</div><div id="cascadeResult"></div>';
+}
+
+async function triggerCascade(){
+  const res=document.getElementById('cascadeResult');
+  if(res) res.innerHTML='<div class="card" style="border-color:#64b5f6"><h2 style="color:#64b5f6">级联脉冲触发中...</h2></div>';
+  await api('/cascade/trigger',{method:'POST',body:{strength:0.5}});
+  await renderCascade(document.getElementById('modePanel'));
+}
+
+async function renderLattice(el){
+  const r=await api('/lattice-integrity/check');
+  if(!r)return;
+  const scoreColor=r.integrity_score>0.9?'#5eb88a':r.integrity_score>0.5?'#c9a04e':'#ff5555';
+  let errorHTML='';
+  if(r.coordination_errors&&r.coordination_errors.length>0){
+    errorHTML='<div class="card"><h2>配位数异常节点（边界效应，属正常现象）</h2><p style="color:#888;font-size:12px">BCC晶格边界节点自然无法达到理想配位数8，此为正常拓扑边界效应</p><div style="max-height:200px;overflow-y:auto"><table class="mem-table"><tr><th>节点</th><th>类型</th><th>实际face</th><th>实际edge</th></tr>'+r.coordination_errors.slice(0,30).map(e=>'<tr><td>'+e.node+'</td><td>'+e.type+'</td><td>'+e.actual_face+'</td><td>'+(e.actual_edge||'-')+'</td></tr>').join('')+'</table></div></div>';
+  }
+  el.innerHTML='<div style="display:flex;gap:12px;align-items:center;margin-bottom:20px"><h1 style="margin:0;font-size:20px;color:#aed581">BCC晶格完整性验证</h1><button onclick="runLatticeCheck()" class="btn btn-accent" style="font-size:12px;padding:6px 16px">重新检测</button></div><div class="stats-grid" style="margin-bottom:20px"><div class="stat"><div class="label">完整性评分</div><div class="value" style="color:'+scoreColor+';font-size:24px">'+(r.integrity_score*100).toFixed(1)+'%</div></div><div class="stat"><div class="label">总节点数</div><div class="value">'+r.total_nodes+'</div></div><div class="stat"><div class="label">连通分量</div><div class="value '+(r.connectivity_components===1?'green':'pink')+'">'+r.connectivity_components+'</div></div><div class="stat"><div class="label">断裂边</div><div class="value '+(r.broken_edges.length===0?'green':'pink')+'">'+r.broken_edges.length+'</div></div><div class="stat"><div class="label">孤立节点</div><div class="value '+(r.orphan_nodes.length===0?'green':'pink')+'">'+r.orphan_nodes.length+'</div></div><div class="stat"><div class="label">Face边检查</div><div class="value">'+r.face_edges_checked+'</div></div><div class="stat"><div class="label">Edge边检查</div><div class="value">'+r.edge_edges_checked+'</div></div></div><div class="card" style="border-color:'+scoreColor+'"><p style="color:'+scoreColor+'">'+r.details+'</p></div>'+errorHTML;
+}
+
+async function runLatticeCheck(){
+  await api('/lattice-integrity/check');
+  await renderLattice(document.getElementById('modePanel'));
+}
+
+async function renderCrystal(el){
+  const[cs,force_res]=await Promise.all([api('/crystallized/status'),api('/stats')]);
+  if(!cs)return;
+  const stats=cs.stats||{};
+  const top=cs.top_crystals||[];
+  let topHTML=top.length?'<table class="mem-table"><tr><th>节点A</th><th>节点B</th><th>晶体权重</th><th>赫布权重</th><th>传输次数</th><th>年龄(秒)</th></tr>'+top.map(c=>'<tr><td>'+c.nodes[0]+'</td><td>'+c.nodes[1]+'</td><td style="color:#aed581">'+c.crystal_weight+'</td><td>'+c.hebbian_weight+'</td><td>'+c.transmissions+'</td><td>'+c.age_seconds+'</td></tr>').join('')+'</table>':'<p style="color:#888">暂无结晶通路。需要脉冲引擎运行足够长时间，赫布路径权重超过阈值 (3.0) 后自动结晶化。</p>';
+  el.innerHTML='<div style="display:flex;gap:12px;align-items:center;margin-bottom:20px"><h1 style="margin:0;font-size:20px;color:#ffd54f">结晶通路 — 永久结构化快速通道</h1><button onclick="forceCrystallize()" class="btn btn-accent" style="font-size:12px;padding:6px 16px">强制结晶扫描</button></div><div class="stats-grid" style="margin-bottom:20px"><div class="stat"><div class="label">结晶通路数</div><div class="value" style="color:#ffd54f">'+(stats.total_crystals||0)+'</div></div><div class="stat"><div class="label">容量</div><div class="value">'+(stats.capacity||200)+'</div></div><div class="stat"><div class="label">平均权重</div><div class="value">'+(stats.avg_crystal_weight||0)+'</div></div><div class="stat"><div class="label">最大权重</div><div class="value" style="color:#c9a04e">'+(stats.max_crystal_weight||0)+'</div></div><div class="stat"><div class="label">总创建数</div><div class="value">'+(stats.total_created||0)+'</div></div><div class="stat"><div class="label">总传输次数</div><div class="value">'+(stats.total_transmissions||0)+'</div></div><div class="stat"><div class="label">结晶节点数</div><div class="value">'+(force_res.crystal_nodes||0)+'</div></div></div><div class="card"><h2>结晶通路 Top 20</h2>'+topHTML+'</div><div id="crystalResult"></div>';
+}
+
+async function forceCrystallize(){
+  const res=document.getElementById('crystalResult');
+  if(res) res.innerHTML='<div class="card" style="border-color:#ffd54f"><h2 style="color:#ffd54f">结晶扫描中...</h2></div>';
+  await api('/crystallized/force',{method:'POST'});
+  await renderCrystal(document.getElementById('modePanel'));
+}
+
+async function renderOrganize(el){
+  const[status,hist]=await Promise.all([api('/self-organize/status'),api('/self-organize/history?n=5')]);
+  if(!status)return;
+  const clusters=status.clusters||[];
+  const shortcuts=status.shortcuts||[];
+  const histList=hist.history||[];
+  let clusterHTML=clusters.length?'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px">'+clusters.map(c=>'<div class="card" style="padding:12px"><h3 style="color:#ff8a65;font-size:14px;margin:0 0 8px">'+c.cluster_id+'</h3><div style="font-size:12px;color:#888">节点数: <b style="color:#ddd">'+c.node_count+'</b> | 平均权重: <b style="color:#c9a04e">'+c.avg_weight+'</b> | 总激活: <b style="color:#7b8cff">'+c.total_activation+'</b></div><div style="margin-top:6px">'+c.labels.map(l=>'<span class="tag2" style="background:#1a2a1a;color:#aed581;font-size:11px;margin:2px">'+l+'</span>').join('')+'</div></div>').join('')+'</div>':'<p style="color:#888">暂无聚类（运行自组织后自动发现）</p>';
+  let shortcutHTML=shortcuts.length?'<table class="mem-table"><tr><th>节点A</th><th>节点B</th><th>虚拟连接强度</th></tr>'+shortcuts.map(s=>'<tr><td>'+s.nodes[0]+'</td><td>'+s.nodes[1]+'</td><td style="color:#ff8a65">'+s.strength+'</td></tr>').join('')+'</table>':'<p style="color:#888">暂无捷径（语义相关但拓扑距离远的记忆对自动创建）</p>';
+  let histHTML=histList.length?'<table class="mem-table"><tr><th>时间</th><th>聚类</th><th>合并</th><th>捷径</th><th>熵(前)</th><th>熵(后)</th></tr>'+histList.map(h=>'<tr><td style="font-size:11px">'+new Date(h.organize_time*1000).toLocaleTimeString()+'</td><td>'+h.clusters_found+'</td><td>'+h.consolidations_done+'</td><td>'+h.shortcuts_created+'</td><td>'+h.entropy_before+'</td><td style="color:#5eb88a">'+h.entropy_after+'</td></tr>').join('')+'</table>':'<p style="color:#888">暂无历史记录</p>';
+  const st=status.latest_entropy;
+  const entropyColor=st>0.9?'#5eb88a':st>0.7?'#c9a04e':'#ff5555';
+  el.innerHTML='<div style="display:flex;gap:12px;align-items:center;margin-bottom:20px"><h1 style="margin:0;font-size:20px;color:#ff8a65">自组织强化 — 自主拓扑优化</h1><button onclick="runOrganize()" class="btn btn-accent" style="font-size:12px;padding:6px 16px">执行自组织</button></div><div class="stats-grid" style="margin-bottom:20px"><div class="stat"><div class="label">活跃聚类</div><div class="value" style="color:#ff8a65">'+clusters.length+'</div></div><div class="stat"><div class="label">拓扑捷径</div><div class="value" style="color:#64b5f6">'+status.active_shortcuts+'</div></div><div class="stat"><div class="label">当前熵</div><div class="value" style="color:'+entropyColor+'">'+(st!=null?(st*100).toFixed(1)+'%':'-')+'</div></div><div class="stat"><div class="label">累计合并</div><div class="value">'+status.total_consolidations+'</div></div><div class="stat"><div class="label">累计捷径</div><div class="value">'+status.total_shortcuts_created+'</div></div><div class="stat"><div class="label">自组织周期</div><div class="value">'+status.total_organize_cycles+'</div></div></div><div class="card"><h2>语义聚类（标签共现 + 空间邻近）</h2>'+clusterHTML+'</div><div class="card"><h2>拓扑捷径（语义近但拓扑远）</h2>'+shortcutHTML+'</div><div class="card"><h2>自组织历史</h2>'+histHTML+'</div><div id="organizeResult"></div>';
+}
+
+async function runOrganize(){
+  const res=document.getElementById('organizeResult');
+  if(res) res.innerHTML='<div class="card" style="border-color:#ff8a65"><h2 style="color:#ff8a65">自组织执行中...</h2></div>';
+  await api('/self-organize/run',{method:'POST'});
+  await renderOrganize(document.getElementById('modePanel'));
+}
+
+async function renderHoneycomb(el){
+  const analysis=await api('/honeycomb/analysis');
+  if(!analysis)return;
+  const q=analysis.quality||{};
+  const v=analysis.volume||{};
+  const sk=analysis.skewness||{};
+  const jac=analysis.jacobian||{};
+  const d=analysis.density||{};
+  const qColor=q.mean>0.7?'#5eb88a':q.mean>0.4?'#c9a04e':'#ff5555';
+  const best=(analysis.best_quality_cells||[]).slice(0,10);
+  const dense=(analysis.highest_density_cells||[]).slice(0,10);
+  let bestHTML=best.length?'<table class="mem-table"><tr><th>ID</th><th>质量</th><th>体积</th><th>偏斜</th><th>雅可比</th><th>记忆数</th><th>密度</th></tr>'+best.map(c=>'<tr><td>'+c.cell_id+'</td><td style="color:'+qColor+'">'+c.quality+'</td><td>'+c.volume+'</td><td>'+c.skewness+'</td><td style="color:#5eb88a">'+c.jacobian+'</td><td>'+c.memory_count+'</td><td style="color:#64b5f6">'+c.density+'</td></tr>').join('')+'</table>':'<p style="color:#888">暂无数据</p>';
+  let denseHTML=dense.length?'<table class="mem-table"><tr><th>ID</th><th>体心</th><th>记忆数</th><th>总权重</th><th>密度</th></tr>'+dense.map(c=>'<tr><td>'+c.cell_id+'</td><td>'+c.body_center+'</td><td style="color:#ff8a65">'+c.memory_count+'</td><td style="color:#c9a04e">'+c.total_weight+'</td><td style="color:#64b5f6">'+c.density+'</td></tr>').join('')+'</table>':'<p style="color:#888">暂无数据</p>';
+  el.innerHTML='<div style="margin-bottom:20px"><h1 style="margin:0;font-size:20px;color:#64b5f6">蜂巢结构 — BCC 四面体分解分析</h1><p style="color:#888;font-size:12px;margin:4px 0 0">每个 BCC 单元体分解为 8 个四面体单元格，追踪体积/质量/偏斜度/雅可比/记忆密度</p></div><div class="stats-grid" style="margin-bottom:20px"><div class="stat"><div class="label">四面体单元格</div><div class="value" style="color:#64b5f6;font-size:20px">'+analysis.total_cells+'</div></div><div class="stat"><div class="label">BCC 单元体</div><div class="value">'+analysis.total_bcc_units+'</div></div><div class="stat"><div class="label">质量均值</div><div class="value" style="color:'+qColor+'">'+q.mean+'</div></div><div class="stat"><div class="label">雅可比均值</div><div class="value" style="color:#5eb88a">'+jac.mean+'</div></div><div class="stat"><div class="label">偏斜均值</div><div class="value">'+sk.mean+'</div></div><div class="stat"><div class="label">总体积</div><div class="value">'+v.total+'</div></div><div class="stat"><div class="label">有记忆单元格</div><div class="value" style="color:#ff8a65">'+d.occupied_cells+'</div></div></div><div class="card"><h2>最高质量四面体</h2>'+bestHTML+'</div><div class="card"><h2>最高密度四面体</h2>'+denseHTML+'</div>';
+}
+
+async function renderDream(el){
+  const[status,hist]=await Promise.all([api('/dream/status'),api('/dream/history?n=5')]);
+  if(!status)return;
+  const hList=hist.history||[];
+  let histHTML=hList.length?'<table class="mem-table"><tr><th>时间</th><th>源记忆</th><th>梦境数</th><th>跨域</th><th>洞察</th></tr>'+hList.map(h=>'<tr><td style="font-size:11px">'+new Date(h.cycle_time*1000).toLocaleTimeString()+'</td><td>'+h.sources_used+'</td><td style="color:#ce93d8">'+h.dreams_created+'</td><td style="color:#ff8a65">'+h.cross_domain+'</td><td>'+(h.insights||[]).map(i=>'<div style="font-size:11px">'+i.domains.join(' × ')+' <span style="color:#c9a04e">'+i.creativity+'</span></div>').join('')+'</td></tr>').join('')+'</table>':'<p style="color:#888">暂无梦境历史</p>';
+  el.innerHTML='<div style="display:flex;gap:12px;align-items:center;margin-bottom:20px"><h1 style="margin:0;font-size:20px;color:#ce93d8">梦境引擎 — 创意记忆重组</h1><button onclick="runDream()" class="btn btn-accent" style="font-size:12px;padding:6px 16px">触发梦境</button></div><div class="stats-grid" style="margin-bottom:20px"><div class="stat"><div class="label">累计梦境</div><div class="value" style="color:#ce93d8">'+status.total_dreams_created+'</div></div><div class="stat"><div class="label">梦境周期</div><div class="value">'+status.dream_cycles_run+'</div></div><div class="stat"><div class="label">近期梦境</div><div class="value">'+status.latest_dreams+'</div></div></div><div class="card"><h2>梦境历史</h2>'+histHTML+'</div><div id="dreamResult"></div>';
+}
+
+async function runDream(){
+  const res=document.getElementById('dreamResult');
+  if(res) res.innerHTML='<div class="card" style="border-color:#ce93d8"><h2 style="color:#ce93d8">梦境生成中...</h2></div>';
+  await api('/dream',{method:'POST'});
+  await renderDream(document.getElementById('modePanel'));
+}
+
+async function renderAgent(el){
+  _agentTimer && clearInterval(_agentTimer);
+  const stats=await api('/stats').catch(()=>({}));
+  const fbStats=await api('/feedback/stats').catch(()=>({}));
+  const suggestions=await api('/agent/suggest',{method:'POST',body:{context:''}}).catch(()=>({suggestions:[]}));
+  const scStatus=await api('/self-check/status').catch(()=>({}));
+  const dreamSt=await api('/dream/status').catch(()=>({}));
+
+  const pulseOn=stats.pulse_engine_running;
+  const memCount=stats.occupied_nodes||0;
+  const crystalCount=stats.crystal_nodes||0;
+  const fbTotal=fbStats.total_feedback||0;
+  const fbRate=fbStats.positive_rate||0;
+  const scOk=scStatus.engine_running;
+  const dreamActive=dreamSt.engine_active;
+
+  let html='<div style="margin-bottom:20px"><h1 style="margin:0;font-size:20px;color:#4dd0e1">Agent 驱动 — 主动感知与行动</h1><p style="color:#4a4a6a;font-size:11px;margin-top:4px">记忆系统主动感知状态、发现问题、建议行动、自动执行</p></div>';
+
+  html+='<div class="card"><h2>实时状态仪表盘</h2><div class="stats-grid">';
+  html+='<div class="stat"><div class="label">记忆总量</div><div class="value cyan">'+memCount+'</div></div>';
+  html+='<div class="stat"><div class="label">脉冲引擎</div><div class="value '+(pulseOn?'green':'red')+'">'+(pulseOn?'运行中':'\u5df2\u505c\u6b62')+'</div></div>';
+  html+='<div class="stat"><div class="label">结晶通路</div><div class="value purple">'+crystalCount+'</div></div>';
+  html+='<div class="stat"><div class="label">反馈总数</div><div class="value pink">'+fbTotal+'</div></div>';
+  html+='<div class="stat"><div class="label">正面率</div><div class="value '+(fbRate>0.7?'green':fbRate>0.3?'yellow':'red')+'">'+(fbTotal>0?(fbRate*100).toFixed(0)+'%':'N/A')+'</div></div>';
+  html+='<div class="stat"><div class="label">自检引擎</div><div class="value '+(scOk?'green':'red')+'">'+(scOk?'运行中':'\u5df2\u505c\u6b62')+'</div></div>';
+  html+='<div class="stat"><div class="label">梦境引擎</div><div class="value '+(dreamActive?'green':'#4a4a6a')+'">'+(dreamActive?'活跃':'\u5f85\u89e6\u53d1')+'</div></div>';
+  html+='</div></div>';
+
+  const sugList=suggestions.suggestions||[];
+  html+='<div class="card"><h2>系统主动建议 ('+sugList.length+')</h2>';
+  if(sugList.length===0){html+='<p style="color:#5eb88a;font-size:12px">系统状态良好，暂无紧急建议</p>';}
+  else{for(const s of sugList){
+    const pc=s.priority==='high'?'#ff5555':s.priority==='medium'?'#c9a04e':'#4a4a6a';
+    html+='<div style="padding:10px;margin-bottom:8px;background:#0e0e22;border-left:3px solid '+pc+';border-radius:4px"><div style="display:flex;gap:8px;align-items:center"><span style="color:'+pc+';font-weight:bold;font-size:10px;text-transform:uppercase">'+s.priority+'</span><b style="color:#e0e0ff;font-size:13px">'+esc(s.action||'')+'</b>';
+    if(s.action==='deepen_context'||s.action==='connect_isolated_memories'||s.action==='leverage_clusters'){html+=' <button onclick="agentAutoAction(\''+s.action+'\')" class="btn btn-accent" style="font-size:10px;padding:2px 10px">执行</button>';}
+    html+='</div><p style="color:#8a8aa0;font-size:12px;margin:4px 0 0">'+esc(s.description||'')+'</p></div>';
+  }}
+  html+='</div>';
+
+  html+='<div class="card"><h2>上下文探索</h2><div style="display:flex;gap:8px;margin-bottom:10px"><input id="agentTopic" placeholder="输入话题获取记忆上下文..." class="input-field" style="flex:1"><button onclick="agentGetContext()" class="btn btn-accent">获取上下文</button></div><div id="agentContext"></div></div>';
+
+  html+='<div class="card"><h2>推理链导航</h2><div style="display:flex;gap:8px;margin-bottom:8px"><input id="agentReasonSrc" placeholder="源节点 ID" class="input-field" style="flex:1"><input id="agentReasonTgt" placeholder="目标概念" class="input-field" style="flex:1"><button onclick="agentReasonChain()" class="btn btn-accent">推理</button></div><div id="agentReasonResult"></div></div>';
+
+  html+='<div class="card"><h2>一键认知操作</h2><div style="display:flex;gap:8px;flex-wrap:wrap">';
+  html+='<button onclick="agentAutoAction(\'dream\')" class="btn btn-green">触发梦境</button>';
+  html+='<button onclick="agentAutoAction(\'selforg\')" class="btn btn-green">执行自组织</button>';
+  html+='<button onclick="agentAutoAction(\'cascade\')" class="btn btn-green">级联脉冲</button>';
+  html+='<button onclick="agentAutoAction(\'crystal\')" class="btn btn-green">结晶化扫描</button>';
+  html+='<button onclick="agentAutoAction(\'selfcheck\')" class="btn btn-warn">运行自检</button>';
+  html+='<button onclick="agentAutoAction(\'export\')" class="btn">导出备份</button>';
+  html+='</div><div id="agentActionResult" style="margin-top:10px"></div></div>';
+
+  html+='<div class="card"><h2>Agent 活动日志</h2><div id="agentLog" style="max-height:200px;overflow-y:auto;font-family:monospace;font-size:11px"></div></div>';
+
+  el.innerHTML=html;
+  _agentLog=[];
+  _agentTimer=setInterval(()=>refreshAgentStatus(),15000);
+  agentLog('INIT','Agent 面板已加载，状态监控已启动（每15秒自动刷新）');
+}
+
+let _agentTimer=null;
+let _agentLog=[];
+
+function agentLog(type,msg){
+  const now=new Date().toLocaleTimeString();
+  const tc=type==='ACTION'?'#5eb88a':type==='AUTO'?'#4dd0e1':type==='WARN'?'#c9a04e':'#7b8cff';
+  _agentLog.unshift('<div style="padding:2px 0;border-bottom:1px solid rgba(100,120,255,.03)"><span style="color:#2a2a4a">'+now+'</span> <span style="color:'+tc+';font-weight:bold">['+type+']</span> <span style="color:#a0a0c0">'+esc(msg)+'</span></div>');
+  if(_agentLog.length>50)_agentLog.length=50;
+  const el=document.getElementById('agentLog');
+  if(el)el.innerHTML=_agentLog.join('');
+}
+
+async function refreshAgentStatus(){
+  const s=await api('/stats').catch(()=>null);
+  if(!s)return;
+  agentLog('AUTO','心跳: '+s.occupied_nodes+' 记忆, 脉冲='+(s.pulse_engine_running?'ON':'OFF')+', 结晶='+s.crystal_nodes);
+}
+
+async function agentAutoAction(action){
+  const el=document.getElementById('agentActionResult');
+  el.innerHTML='<p style="color:#4dd0e1;font-size:12px">执行中: '+action+'...</p>';
+  agentLog('ACTION','开始执行: '+action);
+  let r;
+  try{
+    if(action==='dream'){r=await api('/dream',{method:'POST'});agentLog('ACTION','梦境完成: '+(r.result?.dreams_created||0)+' 梦境创建');}
+    else if(action==='selforg'){r=await api('/self-organize/run',{method:'POST'});agentLog('ACTION','自组织完成');}
+    else if(action==='cascade'){r=await api('/cascade/trigger',{method:'POST'});agentLog('ACTION','级联脉冲已触发');}
+    else if(action==='crystal'){r=await api('/crystallized/force',{method:'POST'});agentLog('ACTION','结晶化扫描: '+(r.crystallized?.total_crystals||0)+' 通路');}
+    else if(action==='selfcheck'){r=await api('/self-check/run',{method:'POST'});agentLog('ACTION','自检完成: '+(r.anomalies_found||0)+' 异常');}
+    else if(action==='export'){r=await api('/export');agentLog('ACTION','导出: '+((r.size||0)/1024).toFixed(1)+'KB');}
+    else if(action==='deepen_context'){r=await api('/agent/suggest',{method:'POST',body:{context:'auto-deepen'}});agentLog('ACTION','深度上下文分析完成');}
+    else if(action==='connect_isolated_memories'){r=await api('/cascade/trigger',{method:'POST',body:{strength:0.8}});agentLog('ACTION','级联脉冲连接孤立记忆');}
+    else if(action==='leverage_clusters'){r=await api('/self-organize/run',{method:'POST'});agentLog('ACTION','自组织利用聚类');}
+    else{r={info:'unknown'};}
+  }catch(e){r={error:e.message};agentLog('WARN','失败: '+e.message);}
+  el.innerHTML='<pre style="color:#a0a0c0;font-size:11px;max-height:120px;overflow-y:auto;background:#0a0a1a;padding:8px;border-radius:4px">'+esc(JSON.stringify(r,null,2))+'</pre>';
+}
+
+async function agentGetContext(){
+  const topic=document.getElementById('agentTopic').value;
+  if(!topic)return;
+  const el=document.getElementById('agentContext');
+  el.innerHTML='<p style="color:#888">加载中...</p>';
+  agentLog('ACTION','获取上下文: '+topic);
+  const result=await api('/agent/context',{method:'POST',body:{topic:topic,max_memories:12}});
+  if(!result||!result.context){el.innerHTML='<p style="color:#ff5555">加载失败</p>';return;}
+  let html='<div style="font-size:12px;color:#888;margin-bottom:8px">关联标签: '+(result.related_labels||[]).map(l=>'<span style="background:#1a2a1a;color:#aed581;padding:1px 6px;border-radius:2px;margin:2px;font-size:10px">'+l+'</span>').join('')+'</div>';
+  html+='<table style="width:100%;font-size:11px;border-collapse:collapse"><tr style="color:#3a3a5a"><th>ID</th><th>内容</th><th>相关性</th><th>权重</th><th>梦境</th></tr>';
+  for(const m of result.context){
+    html+='<tr style="border-bottom:1px solid rgba(100,120,255,.04)"><td style="color:#7b8cff;font-family:monospace">'+m.id+'</td><td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;color:#a0a0c0">'+esc(m.content||'')+'</td><td style="color:#4dd0e1">'+m.relevance+'</td><td style="color:#c9a04e">'+m.weight+'</td><td>'+(m.is_dream?'<span style="color:#ce93d8">是</span>':'-')+'</td></tr>';
+  }
+  html+='</table>';
+  if(result.reasoning){html+='<div style="margin-top:10px;padding:10px;background:#0a0a1a;border-radius:4px;border-left:3px solid #4dd0e1"><p style="white-space:pre-wrap;font-size:12px;color:#8a8aa0">'+esc(result.reasoning)+'</p></div>';}
+  el.innerHTML=html;
+  agentLog('ACTION','上下文: '+result.context_count+' 条记忆');
+}
+
+async function agentReasonChain(){
+  const src=document.getElementById('agentReasonSrc').value;
+  const tgt=document.getElementById('agentReasonTgt').value;
+  if(!src||!tgt)return;
+  const el=document.getElementById('agentReasonResult');
+  el.innerHTML='<p style="color:#888">推理中...</p>';
+  agentLog('ACTION','推理链: '+src+' -> '+tgt);
+  const r=await api('/agent/reasoning',{method:'POST',body:{source_id:src,target_query:tgt,max_hops:5}});
+  if(!r||!r.chain||r.chain.length===0){el.innerHTML='<p style="color:#c9a04e">未找到推理路径</p>';return;}
+  let html='<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap">';
+  for(let i=0;i<r.chain.length;i++){
+    const n=r.chain[i];
+    html+='<div style="padding:6px 10px;background:#0e0e22;border:1px solid rgba(100,120,255,.1);border-radius:4px;font-size:11px;max-width:200px"><span style="color:#7b8cff;font-family:monospace;font-size:9px">'+n.id+'</span><p style="color:#a0a0c0;margin:2px 0 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(n.content||'')+'</p></div>';
+    if(i<r.chain.length-1)html+='<span style="color:#3a3a5a;font-size:16px">→</span>';
+  }
+  html+='</div>';
+  if(r.conclusion)html+='<p style="margin-top:8px;color:#5eb88a;font-size:12px">结论: '+esc(r.conclusion)+'</p>';
+  el.innerHTML=html;
+  agentLog('ACTION','推理完成: '+r.chain_length+' 跳');
+}
+
+async function renderFeedback(el){
+  const stats=await api('/feedback/stats').catch(()=>({}));
+  const insights=await api('/feedback/insights').catch(()=>({insights:[]}));
+  let html='<div style="margin-bottom:20px"><h1 style="margin:0;font-size:20px;color:#ec4899">反馈闭环 — Agent 决策学习</h1><p style="color:#4a4a6a;font-size:11px;margin-top:4px">记忆永不删除，只整合。negative 不降权重，只标记低优先级。</p></div>';
+  html+='<div class="card"><h2>反馈统计</h2><div class="stats-grid">';
+  html+='<div class="stat"><div class="label">总反馈数</div><div class="value pink">'+((stats.total_feedback||0))+'</div></div>';
+  html+='<div class="stat"><div class="label">正面率</div><div class="value green">'+((stats.positive_rate||0)*100).toFixed(1)+'%</div></div>';
+  const oc=stats.outcome_counts||{};
+  html+='<div class="stat"><div class="label">正面</div><div class="value green">'+(oc.positive||0)+'</div></div>';
+  html+='<div class="stat"><div class="label">负面</div><div class="value red">'+(oc.negative||0)+'</div></div>';
+  html+='<div class="stat"><div class="label">中性</div><div class="value yellow">'+(oc.neutral||0)+'</div></div>';
+  html+='</div></div>';
+  html+='<div class="card"><h2>记录反馈</h2><div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">';
+  html+='<input id="fbAction" placeholder="action (query/navigate/...)" class="input-field" style="flex:1;min-width:120px">';
+  html+='<input id="fbContextId" placeholder="context_id" class="input-field" style="flex:1;min-width:120px">';
+  html+='<select id="fbOutcome" class="input-field"><option value="positive">positive</option><option value="negative">negative</option><option value="neutral">neutral</option></select>';
+  html+='<input id="fbConfidence" type="number" value="0.5" min="0" max="1" step="0.1" class="input-field" style="width:70px">';
+  html+='</div><div style="display:flex;gap:8px;margin-bottom:10px">';
+  html+='<input id="fbReasoning" placeholder="推理说明..." class="input-field" style="flex:1">';
+  html+='<button onclick="doFeedbackRecord()" class="btn btn-accent">记录</button></div>';
+  html+='<div id="fbResult"></div></div>';
+  html+='<div class="card"><h2>学习洞察</h2><div id="fbInsights">';
+  const ins=insights.insights||[];
+  if(ins.length===0){html+='<p style="color:#4a4a6a;font-size:12px">暂无洞察数据</p>';}
+  else{for(const i of ins){const c=i.insight==='highly_effective'?'#5eb88a':'#c9a04e';html+='<div style="padding:8px;margin-bottom:6px;background:#0e0e22;border-left:3px solid '+c+';border-radius:4px"><span style="color:#7b8cff;font-size:11px">'+i.node_id+'</span> <span style="color:'+c+';font-size:11px">'+i.insight+'</span> <span style="color:#4a4a6a;font-size:10px">pos:'+i.positive_count+' neg:'+i.negative_count+'</span></div>';}}
+  html+='</div></div>';
+  html+='<div class="card"><h2>最近记录</h2><div id="fbRecent">';
+  const recent=stats.recent_records||[];
+  if(recent.length===0){html+='<p style="color:#4a4a6a;font-size:12px">暂无记录</p>';}
+  else{for(const r of recent){const oc2=r.outcome==='positive'?'#5eb88a':r.outcome==='negative'?'#cf6b6b':'#c9a04e';html+='<div style="padding:6px;margin-bottom:4px;background:#0e0e22;border-radius:4px;font-size:11px"><span style="color:'+oc2+'">'+r.outcome+'</span> <span style="color:#7b8cff">'+r.action+'</span> <span style="color:#4a4a6a">'+r.context_id+'</span> <span style="color:#2a2a4a">'+new Date(r.timestamp*1000).toLocaleTimeString()+'</span></div>';}}
+  html+='</div></div>';
+  el.innerHTML=html;
+}
+
+async function doFeedbackRecord(){
+  const action=document.getElementById('fbAction').value;
+  const contextId=document.getElementById('fbContextId').value;
+  const outcome=document.getElementById('fbOutcome').value;
+  const confidence=parseFloat(document.getElementById('fbConfidence').value)||0.5;
+  const reasoning=document.getElementById('fbReasoning').value;
+  if(!action||!contextId){alert('action 和 context_id 必填');return;}
+  const r=await api('/feedback/record',{method:'POST',body:{action:action,context_id:contextId,outcome:outcome,confidence:confidence,reasoning:reasoning}}).catch(e=>({error:e.message}));
+  document.getElementById('fbResult').innerHTML='<p style="color:'+(r.recorded?'#5eb88a':'#cf6b6b')+';font-size:12px">'+(r.recorded?'已记录: '+r.action_taken:'失败: '+(r.error||'unknown'))+'</p>';
+  setTimeout(()=>renderFeedback(document.getElementById('modePanel')),1000);
+}
+
+async function renderSession(el){
+  const list=await api('/session/list').catch(()=>({sessions:[]}));
+  let html='<div style="margin-bottom:20px"><h1 style="margin:0;font-size:20px;color:#06b6d4">会话管理 — 对话记忆生命周期</h1><p style="color:#4a4a6a;font-size:11px;margin-top:4px">ephemeral(临时) → short-term(短期) → long-term(长期) → eternal(永恒)</p></div>';
+  html+='<div class="card"><h2>创建新会话</h2><div style="display:flex;gap:8px">';
+  html+='<input id="sessAgent" placeholder="agent_id" class="input-field" style="flex:1" value="default">';
+  html+='<button onclick="doSessionCreate()" class="btn btn-accent">创建</button></div>';
+  html+='<div id="sessCreateResult"></div></div>';
+  html+='<div class="card"><h2>活跃会话 ('+((list.sessions||[]).length)+')</h2>';
+  const sessions=list.sessions||[];
+  if(sessions.length===0){html+='<p style="color:#4a4a6a;font-size:12px">暂无活跃会话</p>';}
+  else{html+='<table style="width:100%;font-size:11px"><tr style="color:#3a3a5a"><th>Session ID</th><th>Agent</th><th>记录数</th><th>最后活跃</th><th>操作</th></tr>';
+  for(const s of sessions){html+='<tr><td style="color:#7b8cff;font-family:monospace">'+s.session_id+'</td><td>'+s.agent_id+'</td><td>'+s.record_count+'</td><td style="color:#4a4a6a">'+new Date(s.last_active*1000).toLocaleTimeString()+'</td><td><button onclick="showSessionDetail(\''+s.session_id+'\')" class="btn" style="font-size:10px;padding:2px 8px">查看</button> <button onclick="doSessionConsolidate(\''+s.session_id+'\')" class="btn btn-green" style="font-size:10px;padding:2px 8px">整合</button></td></tr>';}
+  html+='</table>';}
+  html+='</div>';
+  html+='<div id="sessionDetail"></div>';
+  el.innerHTML=html;
+}
+
+async function doSessionCreate(){
+  const agentId=document.getElementById('sessAgent').value||'default';
+  const r=await api('/session/create',{method:'POST',body:{agent_id:agentId}}).catch(e=>({error:e.message}));
+  document.getElementById('sessCreateResult').innerHTML='<p style="color:'+(r.session_id?'#5eb88a':'#cf6b6b')+';font-size:12px">'+(r.session_id?'会话已创建: '+r.session_id:'失败: '+(r.error||'unknown'))+'</p>';
+  if(r.session_id)showSessionDetail(r.session_id);
+}
+
+async function showSessionDetail(sid){
+  const r=await api('/session/'+sid).catch(()=>null);
+  const el=document.getElementById('sessionDetail');
+  if(!r){el.innerHTML='<p style="color:#cf6b6b">加载失败</p>';return;}
+  let html='<div class="card" style="margin-top:14px"><h2>会话详情: '+sid+'</h2>';
+  html+='<div style="display:flex;gap:8px;margin-bottom:10px"><input id="sessAddRole" class="input-field" style="width:80px" value="user"><input id="sessAddContent" placeholder="内容..." class="input-field" style="flex:1"><button onclick="doSessionAdd(\''+sid+'\')" class="btn btn-accent" style="font-size:11px">添加</button></div>';
+  const records=r.recent_records||[];
+  if(records.length===0){html+='<p style="color:#4a4a6a;font-size:12px">暂无记录</p>';}
+  else{for(const rec of records){const rc=rec.role==='user'?'#7b8cff':rec.role==='agent'?'#5eb88a':'#c9a04e';html+='<div style="padding:6px;margin-bottom:4px;background:#0e0e22;border-left:3px solid '+rc+';border-radius:4px"><span style="color:'+rc+';font-size:10px;font-weight:bold">'+rec.role+'</span> <span style="color:#a0a0c0;font-size:12px">'+esc(rec.content||'')+'</span></div>';}}
+  html+='</div>';
+  el.innerHTML=html;
+}
+
+async function doSessionAdd(sid){
+  const role=document.getElementById('sessAddRole').value;
+  const content=document.getElementById('sessAddContent').value;
+  if(!content)return;
+  await api('/session/'+sid+'/add',{method:'POST',body:{role:role,content:content}});
+  showSessionDetail(sid);
+}
+
+async function doSessionConsolidate(sid){
+  const r=await api('/session/'+sid+'/consolidate',{method:'POST'}).catch(e=>({error:e.message}));
+  alert(r.promoted_to_permanent!==undefined?'整合完成: 晋升 '+r.promoted_to_permanent+' 条, 保留 '+r.soft_kept+' 条':'失败: '+(r.error||'unknown'));
+  renderSession(document.getElementById('modePanel'));
+}
+
+async function renderEvents(el){
+  let html='<div style="margin-bottom:20px"><h1 style="margin:0;font-size:20px;color:#b08cff">SSE 事件流 — 实时记忆系统通知</h1><p style="color:#4a4a6a;font-size:11px;margin-top:4px">订阅记忆系统事件：反馈学习、会话变更、心跳</p></div>';
+  html+='<div class="card"><h2>连接状态</h2><div id="sseStatus" style="display:flex;align-items:center;gap:8px"><div style="width:8px;height:8px;border-radius:50%;background:#4a4a6a" id="sseDot"></div><span style="color:#4a4a6a;font-size:12px" id="sseStatusText">未连接</span> <button onclick="connectSSE()" class="btn btn-accent" style="font-size:11px;padding:4px 12px">连接</button> <button onclick="disconnectSSE()" class="btn btn-danger" style="font-size:11px;padding:4px 12px">断开</button></div></div>';
+  html+='<div class="card"><h2>事件日志</h2><div id="sseLog" style="max-height:500px;overflow-y:auto;font-family:monospace;font-size:11px">';
+  html+='<p style="color:#4a4a6a">点击"连接"开始接收事件...</p>';
+  html+='</div></div>';
+  el.innerHTML=html;
+}
+
+let sseConn=null;
+function connectSSE(){
+  if(sseConn){sseConn.close();}
+  const url='/api/v1/events';
+  sseConn=new EventSource(url);
+  document.getElementById('sseDot').style.background='#5eb88a';
+  document.getElementById('sseStatusText').textContent='已连接';
+  document.getElementById('sseStatusText').style.color='#5eb88a';
+  sseConn.onmessage=function(e){
+    try{
+      const data=JSON.parse(e.data);
+      const log=document.getElementById('sseLog');
+      const evtColor=data.event==='heartbeat'?'#2a2a4a':data.event==='feedback_recorded'?'#ec4899':data.event==='feedback_learned'?'#5eb88a':data.event==='session_created'?'#06b6d4':'#7b8cff';
+      const time=new Date(data.timestamp*1000).toLocaleTimeString();
+      const line='<div style="padding:3px 0;border-bottom:1px solid rgba(100,120,255,.03)"><span style="color:#2a2a4a">'+time+'</span> <span style="color:'+evtColor+';font-weight:bold">'+data.event+'</span> <span style="color:#4a4a6a">'+JSON.stringify(data.data||{}).substring(0,120)+'</span></div>';
+      log.insertAdjacentHTML('afterbegin',line);
+      while(log.children.length>100){log.removeChild(log.lastChild);}
+    }catch(ex){}
+  };
+  sseConn.onerror=function(){
+    var d=document.getElementById('sseDot'),st=document.getElementById('sseStatusText');
+    if(d)d.style.background='#cf6b6b';
+    if(st){st.textContent='连接断开';st.style.color='#cf6b6b';}
+  };
+}
+function disconnectSSE(){
+  if(sseConn){sseConn.close();sseConn=null;}
+  var d=document.getElementById('sseDot'),st=document.getElementById('sseStatusText');
+  if(d)d.style.background='#4a4a6a';
+  if(st){st.textContent='已断开';st.style.color='#4a4a6a';}
+}
+</script>
+
+</body>
+</html>
