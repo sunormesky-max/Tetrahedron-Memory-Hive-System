@@ -82,11 +82,16 @@ def init_state():
 async def lifespan(application):
     init_state()
     yield
+    try:
+        _sync_persist()
+        print("[TetraMem v6.5] Final persist completed")
+    except Exception as e:
+        print(f"[TetraMem v6.5] Final persist failed: {e}")
     _field.stop_pulse_engine()
-    print("[TetraMem v6.2] Shutdown complete, PCNN pulse engine stopped")
+    print("[TetraMem v6.5] Shutdown complete, PCNN pulse engine stopped")
 
 
-app = FastAPI(title="TetraMem-XL v6.2", version="6.2.0", lifespan=lifespan)
+app = FastAPI(title="TetraMem-XL v6.5", version="6.5.0", lifespan=lifespan)
 
 
 class StoreReq(BaseModel):
@@ -148,6 +153,7 @@ def _sync_persist():
         ], "metadata": {"persist_time": time.time()}}
         path = Path(STORAGE_DIR) / "mesh_index.json"
         path.write_text(_json.dumps(export, ensure_ascii=False, indent=2), encoding="utf-8")
+        print(f"[TetraMem] persisted {len(nodes)} memories to mesh_index.json")
     except Exception as e:
         print(f"[TetraMem] sync persist error: {e}")
 
@@ -157,6 +163,9 @@ def _auto_persist_loop():
         _sync_persist()
 
 _threading.Thread(target=_auto_persist_loop, daemon=True, name="auto-persist").start()
+
+import atexit
+atexit.register(_sync_persist)
 
 
 @app.post("/api/v1/query")
@@ -261,9 +270,9 @@ def tension_map():
 @app.post("/api/v1/self-organize")
 def self_organize():
     with _state_lock:
-        _field._check_convergence_bridges()
-        _field._global_decay()
-    return {"stats": _field.stats()}
+        result = _field.run_self_organize()
+        _sync_persist()
+    return result
 
 
 @app.post("/api/v1/closed-loop")
@@ -282,7 +291,7 @@ def stats():
 
 @app.get("/api/v1/health")
 def health():
-    return {"status": "ok", "version": "6.2.0", "uptime_seconds": time.time() - _start_time}
+    return {"status": "ok", "version": "6.5.0", "uptime_seconds": time.time() - _start_time}
 
 
 @app.get("/api/v1/tetrahedra")
@@ -681,7 +690,7 @@ def status_endpoint():
     return {
         "status": "ok",
         "backend": "tetramem",
-        "version": "6.2.0",
+        "version": "6.5.0",
         "total_memories": stats.get("occupied_nodes", 0),
         "pulse_engine_running": stats.get("pulse_engine_running", False),
         "uptime_seconds": time.time() - _start_time,
@@ -761,7 +770,9 @@ def self_check_status():
 @app.post("/api/v1/self-check/run")
 def self_check_run():
     with _state_lock:
-        return _field.run_self_check()
+        result = _field.run_self_check()
+    _sync_persist()
+    return result
 
 
 @app.get("/api/v1/self-check/history")
@@ -834,7 +845,9 @@ def force_crystallize():
 @app.post("/api/v1/self-organize/run")
 def self_organize_run():
     with _state_lock:
-        return _field.run_self_organize()
+        result = _field.run_self_organize()
+    _sync_persist()
+    return result
 
 
 @app.get("/api/v1/self-organize/status")
