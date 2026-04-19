@@ -528,17 +528,19 @@ class SpatialReflectionField:
         return 1.0 - best_quality
 
     def _density_balance(self, field, nid: str, node) -> float:
-        occupied_count = 0
+        occupied_weights = []
         total_count = 0
         for fnid in node.face_neighbors[:8]:
             fn = field._nodes.get(fnid)
             if fn:
                 total_count += 1
                 if fn.is_occupied:
-                    occupied_count += 1
+                    occupied_weights.append(fn.weight)
         if total_count == 0:
             return 0.5
-        density = occupied_count / total_count
+        density = len(occupied_weights) / total_count
+        if density > 0.8 and occupied_weights:
+            return min(1.0, float(np.std(occupied_weights) / max(np.mean(occupied_weights), 0.1)))
         return abs(density - 0.5) * 2.0
 
     def _crystal_resonance(self, field, nid: str, node) -> float:
@@ -1572,11 +1574,14 @@ class HoneycombCellMap:
         scored_cells.sort(key=lambda x: -x[1])
         return [c for c, _ in scored_cells[:count]]
 
-    def structural_analysis(self) -> Dict[str, Any]:
+    def structural_analysis(self, nodes=None) -> Dict[str, Any]:
         if not self._cells:
             return {"total_cells": 0}
 
-        qualities = [c.quality for c in self._cells.values()]
+        if nodes:
+            self.update_all_densities(nodes)
+        qualities = [c.effective_quality for c in self._cells.values()]
+        raw_qualities = [c.quality for c in self._cells.values()]
         volumes = [c.volume for c in self._cells.values()]
         skews = [c.skewness for c in self._cells.values()]
         jacobians = [c.jacobian for c in self._cells.values()]
@@ -3228,6 +3233,47 @@ class HoneycombNeuralField:
                 attraction += cm.weight * 0.3
         return attraction
 
+    def _evict_for_space(self, content: str, labels, weight: float) -> str:
+        bridge_nodes = [(nid, n) for nid, n in self._nodes.items()
+                        if n.is_occupied and any(l.startswith("__pulse_bridge__") for l in n.labels)]
+        if bridge_nodes:
+            bridge_nodes.sort(key=lambda x: x[1].weight)
+            evict_id, evict_node = bridge_nodes[0]
+            self._clear_node(evict_id, evict_node)
+            logger.info("Evicted bridge node %s (w=%.2f) for new memory", evict_id[:8], evict_node.weight)
+            return evict_id
+        dream_nodes = [(nid, n) for nid, n in self._nodes.items()
+                       if n.is_occupied and "__dream__" in n.labels and n.weight < 0.5]
+        if dream_nodes:
+            dream_nodes.sort(key=lambda x: x[1].weight)
+            evict_id, evict_node = dream_nodes[0]
+            self._clear_node(evict_id, evict_node)
+            logger.info("Evicted dream node %s (w=%.2f) for new memory", evict_id[:8], evict_node.weight)
+            return evict_id
+        low_weight = [(nid, n) for nid, n in self._nodes.items()
+                      if n.is_occupied and n.weight < 0.3]
+        if low_weight:
+            low_weight.sort(key=lambda x: x[1].weight)
+            evict_id, evict_node = low_weight[0]
+            self._clear_node(evict_id, evict_node)
+            logger.info("Evicted low-weight node %s (w=%.2f)", evict_id[:8], evict_node.weight)
+            return evict_id
+        return random.choice(list(self._nodes.keys()))
+
+    def _clear_node(self, nid, node):
+        chash = hashlib.sha256((node.content or "").encode()).hexdigest()[:12]
+        self._content_hash_index.pop(chash, None)
+        for lbl in node.labels:
+            self._label_index[lbl].discard(nid)
+        node.content = ""
+        node.labels = []
+        node.weight = 0.0
+        node.activation = 0.0
+        node.base_activation = 0.01
+        node.is_occupied = False
+        node.metadata = {}
+        node.crystal_channels.clear()
+
     def store(self, content: str, labels: Optional[List[str]] = None,
               weight: float = 1.0, metadata: Optional[Dict] = None,
               creation_time_override: Optional[float] = None) -> str:
@@ -3255,6 +3301,9 @@ class HoneycombNeuralField:
 
             nid = self._find_nearest_empty_node(content, labels)
             node = self._nodes[nid]
+            if node.is_occupied:
+                nid = self._evict_for_space(content, labels, weight)
+                node = self._nodes[nid]
             node.content = content
             node.labels = labels or []
             node.weight = weight
@@ -3900,6 +3949,7 @@ class HoneycombNeuralField:
         self._feedback_loop = FeedbackLoop(self)
         self._session_manager = SessionManager(self)
         self._reflection_field = SpatialReflectionField()
+        self._phase_transition = None
         logger.info(
             "PCNN pulse engine started (v6.2) — face_decay=%.2f, edge_decay=%.2f, cascade=on, dream=on, reflection=on, vertex=on, autocorr=on",
             PCNNConfig.FACE_DECAY, PCNNConfig.FACE_DECAY * PCNNConfig.EDGE_DECAY_FACTOR,
@@ -3950,6 +4000,16 @@ class HoneycombNeuralField:
                 if cycle % 300 == 0:
                     self.compute_spatial_autocorrelation()
                     self._detect_resonance()
+                    if self._phase_transition and hasattr(self, '_phase_transition'):
+                        try:
+                            gt, tensions = self._phase_transition.compute_global_tension(self)
+                            if self._phase_transition.should_trigger(gt):
+                                clusters = self._phase_transition.identify_tension_clusters(tensions, self)
+                                if clusters:
+                                    self._phase_transition.execute_transition(self, tensions, clusters)
+                                    logger.info("Phase transition triggered: global_tension=%.1f, clusters=%d", gt, len(clusters))
+                        except Exception as e:
+                            logger.error("Phase transition error: %s", e)
 
             except Exception as e:
                 logger.error("Pulse cycle error: %s", e, exc_info=True)
@@ -4471,7 +4531,7 @@ class HoneycombNeuralField:
                 "lattice_integrity": self._lattice_checker.get_latest() if self._lattice_checker else None,
                 "self_check": self.self_check_status() if self._self_check else {"engine_running": False},
                 "self_organize": self._self_organize.stats() if self._self_organize else {"engine_active": False},
-                "honeycomb_cells": self._cell_map.structural_analysis(),
+                "honeycomb_cells": self._cell_map.structural_analysis(self._nodes),
                 "spatial_autocorrelation": {
                     "morans_i": round(self._spatial_autocorrelation, 4),
                     "history_len": len(self._autocorrelation_history),
@@ -4835,7 +4895,7 @@ class HoneycombNeuralField:
     def honeycomb_analysis(self) -> Dict[str, Any]:
         with self._lock:
             self._cell_map.update_all_densities(self._nodes)
-            analysis = self._cell_map.structural_analysis()
+            analysis = self._cell_map.structural_analysis(self._nodes)
             best_cells = self._cell_map.get_best_cells(10)
             dense_cells = self._cell_map.get_cells_by_density(10)
             analysis["best_quality_cells"] = [c.to_dict() for c in best_cells]
