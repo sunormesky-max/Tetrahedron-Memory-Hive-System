@@ -1,7 +1,7 @@
 """
-TetraMem-XL API v5.3 �?Tetrahedral Cell Decomposition + Honeycomb Structural Analysis + Enhanced Memory Placement
+TetraMem-XL API v6.0 — Agent-Driven Memory System + Feedback Loop + Session Management + SSE Events
 """
-import os, time, hashlib, threading, json
+import os, time, hashlib, threading, json, asyncio
 from contextlib import asynccontextmanager
 from pathlib import Path
 from fastapi import FastAPI, HTTPException
@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 from typing import Any, Dict, List, Optional
 
 from fastapi import FastAPI, HTTPException, Query
+from fastapi.responses import StreamingResponse
 from tetrahedron_memory.honeycomb_neural_field import HoneycombNeuralField
 from tetrahedron_memory.phase_transition_honeycomb import HoneycombPhaseTransition
 
@@ -19,6 +20,24 @@ _field: HoneycombNeuralField = None
 _phase_detector: HoneycombPhaseTransition = None
 _state_lock = threading.RLock()
 _start_time = time.time()
+
+_event_subscribers: List[asyncio.Queue] = []
+_event_lock = threading.Lock()
+
+
+def _emit_event(event_type: str, data: Dict[str, Any]):
+    msg = json.dumps({"event": event_type, "data": data, "timestamp": time.time()}, ensure_ascii=False)
+    with _event_lock:
+        dead = []
+        for i, q in enumerate(_event_subscribers):
+            try:
+                q.put_nowait(msg)
+            except asyncio.QueueFull:
+                dead.append(i)
+            except Exception:
+                dead.append(i)
+        for i in reversed(dead):
+            _event_subscribers.pop(i)
 
 
 def init_state():
@@ -44,14 +63,14 @@ def init_state():
         persist_time = persist_meta.get("persist_time", 0)
         from datetime import datetime as _dt
         pt_str = _dt.fromtimestamp(persist_time).strftime("%Y-%m-%d %H:%M") if persist_time else "unknown"
-        print(f"[TetraMem v5.3] Migrated {len(loaded)} memories from persist file (saved at {pt_str})")
+        print(f"[TetraMem v6.0] Migrated {len(loaded)} memories from persist file (saved at {pt_str})")
     else:
-        print("[TetraMem v5.3] Fresh start")
+        print("[TetraMem v6.0] Fresh start")
 
     _phase_detector = HoneycombPhaseTransition()
     _field.start_pulse_engine()
     stats = _field.stats()
-    print(f"[TetraMem v5.3] Honeycomb: {stats['total_nodes']} nodes, {stats['face_edges']} face edges, PCNN pulse engine running")
+    print(f"[TetraMem v6.0] Honeycomb: {stats['total_nodes']} nodes, {stats['face_edges']} face edges, PCNN pulse engine running")
 
 
 @asynccontextmanager
@@ -59,10 +78,10 @@ async def lifespan(application):
     init_state()
     yield
     _field.stop_pulse_engine()
-    print("[TetraMem v5.3] Shutdown complete, PCNN pulse engine stopped")
+    print("[TetraMem v6.0] Shutdown complete, PCNN pulse engine stopped")
 
 
-app = FastAPI(title="TetraMem-XL v5.3", version="5.3.0", lifespan=lifespan)
+app = FastAPI(title="TetraMem-XL v6.0", version="6.0.0", lifespan=lifespan)
 
 
 class StoreReq(BaseModel):
@@ -256,7 +275,7 @@ def stats():
 
 @app.get("/api/v1/health")
 def health():
-    return {"status": "ok", "version": "5.3.0", "uptime_seconds": time.time() - _start_time}
+    return {"status": "ok", "version": "6.0.0", "uptime_seconds": time.time() - _start_time}
 
 
 @app.get("/api/v1/tetrahedra")
@@ -470,6 +489,205 @@ def agent_suggest(request: dict = None):
     context = req.get("context", "")
     with _state_lock:
         return _field.agent_suggest(context)
+
+
+@app.post("/api/v1/feedback/record")
+def feedback_record(request: dict = None):
+    req = request or {}
+    action = req.get("action", "")
+    context_id = req.get("context_id", "")
+    outcome = req.get("outcome", "neutral")
+    confidence = req.get("confidence", 0.5)
+    reasoning = req.get("reasoning", "")
+    metadata = req.get("metadata")
+    if not action or not context_id:
+        raise HTTPException(400, "action and context_id are required")
+    with _state_lock:
+        result = _field.feedback_record(action, context_id, outcome, confidence, reasoning, metadata)
+    _emit_event("feedback_recorded", {"action": action, "outcome": outcome})
+    return result
+
+
+@app.post("/api/v1/feedback/learn")
+def feedback_learn(request: dict = None):
+    req = request or {}
+    action = req.get("action", "")
+    source_id = req.get("source_id", "")
+    target_id = req.get("target_id", "")
+    success = req.get("success", True)
+    confidence = req.get("confidence", 0.5)
+    if not action or not source_id or not target_id:
+        raise HTTPException(400, "action, source_id, and target_id are required")
+    with _state_lock:
+        result = _field.feedback_learn(action, source_id, target_id, success, confidence)
+    if success:
+        _emit_event("feedback_learned", {"action": action, "source": source_id[:12], "target": target_id[:12]})
+    return result
+
+
+@app.get("/api/v1/feedback/stats")
+def feedback_stats():
+    with _state_lock:
+        return _field.feedback_stats()
+
+
+@app.get("/api/v1/feedback/insights")
+def feedback_insights():
+    with _state_lock:
+        return {"insights": _field.feedback_insights()}
+
+
+@app.post("/api/v1/session/create")
+def session_create(request: dict = None):
+    req = request or {}
+    agent_id = req.get("agent_id", "default")
+    metadata = req.get("metadata")
+    with _state_lock:
+        session_id = _field.session_create(agent_id, metadata)
+    _emit_event("session_created", {"session_id": session_id, "agent_id": agent_id})
+    return {"session_id": session_id}
+
+
+@app.post("/api/v1/session/{session_id}/add")
+def session_add(session_id: str, request: dict = None):
+    req = request or {}
+    role = req.get("role", "user")
+    content = req.get("content", "")
+    metadata = req.get("metadata")
+    with _state_lock:
+        return _field.session_add(session_id, role, content, metadata)
+
+
+@app.get("/api/v1/session/{session_id}/recall")
+def session_recall(session_id: str, n: int = 20):
+    with _state_lock:
+        return _field.session_recall(session_id, n)
+
+
+@app.post("/api/v1/session/{session_id}/consolidate")
+def session_consolidate(session_id: str):
+    with _state_lock:
+        result = _field.session_consolidate(session_id)
+    _emit_event("session_consolidated", {"session_id": session_id})
+    return result
+
+
+@app.get("/api/v1/session/list")
+def session_list():
+    with _state_lock:
+        return {"sessions": _field.session_list()}
+
+
+@app.get("/api/v1/session/{session_id}")
+def session_get(session_id: str):
+    with _state_lock:
+        result = _field.session_get(session_id)
+    if result is None:
+        raise HTTPException(404, "Session not found")
+    return result
+
+
+@app.get("/api/v1/events")
+async def events(topics: str = ""):
+    topic_set = set(topics.split(",")) if topics else set()
+    queue = asyncio.Queue(maxsize=100)
+    _event_subscribers.append(queue)
+
+    async def event_generator():
+        try:
+            while True:
+                try:
+                    msg = await asyncio.wait_for(queue.get(), timeout=30)
+                    if topic_set:
+                        try:
+                            evt = json.loads(msg)
+                            if evt.get("event") not in topic_set:
+                                continue
+                        except Exception:
+                            pass
+                    yield f"data: {msg}\n\n"
+                except asyncio.TimeoutError:
+                    yield f"data: {json.dumps({'event': 'heartbeat', 'timestamp': time.time()})}\n\n"
+        except asyncio.CancelledError:
+            pass
+        finally:
+            try:
+                _event_subscribers.remove(queue)
+            except ValueError:
+                pass
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
+@app.post("/api/v1/search")
+def search_endpoint(request: dict = None):
+    req = request or {}
+    query_text = req.get("query", "")
+    limit = req.get("limit", 10)
+    if not query_text:
+        return {"results": []}
+    with _state_lock:
+        results = _field.query(query_text, k=limit)
+    mapped = []
+    for r in results:
+        mapped.append({
+            "text": r.get("content", ""),
+            "content": r.get("content", ""),
+            "score": max(0, 1.0 - r.get("distance", 1.0)),
+            "source": "tetramem",
+            "metadata": {"id": r.get("id", ""), "weight": r.get("weight", 0), "labels": r.get("labels", [])},
+        })
+    return {"results": mapped}
+
+
+@app.post("/api/v1/read")
+def read_endpoint(request: dict = None):
+    req = request or {}
+    path = req.get("path", "")
+    if not path:
+        return {"content": "", "text": ""}
+    with _state_lock:
+        node = _field.get_node(path)
+    if node is None:
+        with _state_lock:
+            results = _field.query(path, k=1)
+            if results:
+                r = results[0]
+                return {"content": r.get("content", ""), "text": r.get("content", ""), "metadata": {"id": r.get("id", "")}}
+        return {"content": "", "text": ""}
+    return {"content": node.get("content", ""), "text": node.get("content", ""), "metadata": node.get("metadata", {})}
+
+
+@app.get("/api/v1/status")
+def status_endpoint():
+    with _state_lock:
+        stats = _field.stats()
+    return {
+        "status": "ok",
+        "backend": "tetramem",
+        "version": "6.0.0",
+        "total_memories": stats.get("occupied_nodes", 0),
+        "pulse_engine_running": stats.get("pulse_engine_running", False),
+        "uptime_seconds": time.time() - _start_time,
+    }
+
+
+@app.post("/api/v1/sync")
+def sync_endpoint(request: dict = None):
+    _sync_persist()
+    with _state_lock:
+        count = _field.stats().get("occupied_nodes", 0)
+    return {"ok": True, "synced": count, "errors": 0}
+
+
+@app.get("/api/v1/capabilities/embeddings")
+def capabilities_embeddings():
+    return {"available": False, "model": None, "dimensions": 0, "engine": "topological"}
+
+
+@app.get("/api/v1/capabilities/vectors")
+def capabilities_vectors():
+    return {"available": False, "engine": None, "indexSize": 0, "alternative": "topological_bfs"}
 
 
 @app.get("/api/v1/topology-health")
