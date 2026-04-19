@@ -110,9 +110,9 @@ class PCNNConfig:
     EDGE_DECAY_FACTOR = 0.50
     VERTEX_DECAY_FACTOR = 0.25
 
-    MAX_HOPS_EXPLORATORY = 8
-    MAX_HOPS_REINFORCING = 5
-    MAX_HOPS_TENSION = 3
+    MAX_HOPS_EXPLORATORY = 12
+    MAX_HOPS_REINFORCING = 8
+    MAX_HOPS_TENSION = 5
 
     BRIDGE_THRESHOLD = 0.40
     MIN_BRIDGE_SOURCES = 2
@@ -126,9 +126,9 @@ class PCNNConfig:
     TENSION_STRENGTH_RANGE = (0.40, 0.70)
 
     PULSE_TYPE_PROBABILITIES = {
-        PulseType.EXPLORATORY: 0.30,
+        PulseType.EXPLORATORY: 0.25,
         PulseType.REINFORCING: 0.25,
-        PulseType.CASCADE: 0.15,
+        PulseType.CASCADE: 0.20,
         PulseType.TENSION_SENSING: 0.12,
         PulseType.SELF_CHECK: 0.08,
         PulseType.STRUCTURE: 0.07,
@@ -146,18 +146,18 @@ class PCNNConfig:
     DUPLICATE_TOKEN_OVERLAP = 0.85
     DUPLICATE_MERGE_MIN_WEIGHT_RATIO = 1.1
 
-    CASCADE_BRANCHING_FACTOR = 3
+    CASCADE_BRANCHING_FACTOR = 4
     CASCADE_BRANCHING_DECAY = 0.65
-    CASCADE_MAX_DEPTH = 4
+    CASCADE_MAX_DEPTH = 6
     CASCADE_ENERGY_CONSERVATION = 0.95
     CASCADE_STRENGTH_RANGE = (0.30, 0.60)
-    CASCADE_MAX_HOPS = 6
+    CASCADE_MAX_HOPS = 8
 
     STRUCTURE_MAX_HOPS = 3
     STRUCTURE_STRENGTH = 0.40
     STRUCTURE_INTEGRITY_INTERVAL = 300
 
-    CRYSTALLIZE_THRESHOLD = 5.0
+    CRYSTALLIZE_THRESHOLD = 2.0
     CRYSTALLIZE_MAX_PATHS = 600
     CRYSTAL_PULSE_BOOST = 1.8
     CRYSTAL_WEIGHT_FLOOR = 2.0
@@ -186,7 +186,7 @@ class PCNNConfig:
     TETRA_DENSITY_PENALTY = 0.5
 
     DREAM_CYCLE_INTERVAL = 300
-    DREAM_MAX_RECOMBINATIONS = 5
+    DREAM_MAX_RECOMBINATIONS = 10
     DREAM_MIN_SOURCE_WEIGHT = 1.0
     DREAM_INSIGHT_WEIGHT = 1.5
     DREAM_CROSS_DOMAIN_BONUS = 2.0
@@ -950,17 +950,17 @@ class HebbianPathMemory:
             return
 
         factor = self._reinforce if success else 1.0
-        edge_strength = strength * factor / max(len(path) - 1, 1)
+        edge_strength = min(strength * factor / max(len(path) - 1, 1), 2.0)
 
         for i in range(len(path) - 1):
             key = (path[i], path[i + 1])
             rev_key = (path[i + 1], path[i])
             if key in self._edges:
-                self._edges[key] += edge_strength
+                self._edges[key] = min(self._edges[key] + edge_strength, 10.0)
             elif rev_key in self._edges:
-                self._edges[rev_key] += edge_strength
+                self._edges[rev_key] = min(self._edges[rev_key] + edge_strength, 10.0)
             else:
-                self._edges[key] += edge_strength
+                self._edges[key] = min(edge_strength, 10.0)
 
         if success:
             self._success_count += 1
@@ -2848,6 +2848,7 @@ class HoneycombNeuralField:
         self._position_index: Dict[Tuple, str] = {}
         self._label_index: Dict[str, Set[str]] = defaultdict(set)
         self._content_hash_index: Dict[str, str] = {}
+        self._content_token_index: Dict[str, Set[str]] = defaultdict(set)
         self._edges: List[Tuple[str, str, str]] = []
         self._pulse_engine: Optional[threading.Thread] = None
         self._stop_event = threading.Event()
@@ -3370,6 +3371,8 @@ class HoneycombNeuralField:
             self._content_hash_index[chash] = nid
             for lbl in node.labels:
                 self._label_index[lbl].add(nid)
+            for tok in self._extract_tokens(content):
+                self._content_token_index[tok].add(nid)
 
             self._emit_pulse(nid, strength=weight * 0.5, pulse_type=PulseType.REINFORCING)
 
@@ -3509,6 +3512,8 @@ class HoneycombNeuralField:
                 for t in qtokens:
                     if t in self._label_index:
                         pre_hit_ids.update(self._label_index[t])
+                    if t in self._content_token_index:
+                        pre_hit_ids.update(self._content_token_index[t])
 
             scored = []
             checked = 0
@@ -3618,21 +3623,21 @@ class HoneycombNeuralField:
                             break
 
                 final = (
-                    0.18 * text_score
-                    + 0.05 * trigram_score
-                    + 0.10 * label_score
+                    0.30 * text_score
+                    + 0.10 * trigram_score
+                    + 0.12 * label_score
                     + 0.08 * activation_score
-                    + 0.04 * weight_score
-                    + 0.03 * hebbian_boost
-                    + 0.03 * crystal_boost
+                    + 0.05 * weight_score
+                    + 0.04 * hebbian_boost
+                    + 0.04 * crystal_boost
                     + 0.02 * pulse_boost
-                    + 0.10 * spatial_quality
-                    + 0.10 * geometric_quality
-                    + 0.05 * neighbor_density_score
-                    + 0.05 * geo_topo_divergence
-                    + 0.03 * divergence_bonus
-                    + 0.05 * bcc_coherence
-                    + 0.02 * autocorr_bonus
+                    + 0.05 * spatial_quality
+                    + 0.04 * geometric_quality
+                    + 0.03 * neighbor_density_score
+                    + 0.02 * geo_topo_divergence
+                    + 0.02 * divergence_bonus
+                    + 0.02 * bcc_coherence
+                    + 0.01 * autocorr_bonus
                     + 0.01 * dream_bonus
                     + shortcut_boost
                     - low_priority_penalty
@@ -3731,7 +3736,7 @@ class HoneycombNeuralField:
         src = getattr(self, '_propagation_source', '')
         biased = []
         for nid, strength, ctype in candidates:
-            h = self._hebbian.get_path_bias(src, nid)
+            h = min(self._hebbian.get_path_bias(src, nid), 3.0)
             biased.append((nid, strength * random.uniform(0.8, 1.2) * (1.0 + h * 0.5), ctype))
         return biased
 
@@ -3740,8 +3745,8 @@ class HoneycombNeuralField:
         biased = []
         for nid, strength, ctype in candidates:
             node = self._nodes.get(nid)
-            weight_boost = (node.weight * 0.5 + 1.0) if node else 1.0
-            hebbian_w = self._hebbian.get_path_bias(src, nid)
+            weight_boost = min((node.weight * 0.5 + 1.0) if node else 1.0, 5.0)
+            hebbian_w = min(self._hebbian.get_path_bias(src, nid), 3.0)
             hebbian_boost = 1.0 + hebbian_w * 2.0
             biased.append((nid, strength * weight_boost * hebbian_boost, ctype))
         return biased
@@ -3770,7 +3775,7 @@ class HoneycombNeuralField:
             if neighbor_weights:
                 w_var = float(np.var(neighbor_weights))
                 tension_factor *= (1.0 + w_var * 0.5)
-            h = self._hebbian.get_path_bias(src, nid)
+            h = min(self._hebbian.get_path_bias(src, nid), 3.0)
             tension_factor *= (1.0 + h * 0.3)
             biased.append((nid, strength * tension_factor, ctype))
         return biased
@@ -3783,7 +3788,7 @@ class HoneycombNeuralField:
             if node is None:
                 biased.append((nid, strength, ctype))
                 continue
-            h = self._hebbian.get_path_bias(src, nid)
+            h = min(self._hebbian.get_path_bias(src, nid), 3.0)
             h_factor = 1.0 + h * 0.3
             if not node.is_occupied:
                 biased.append((nid, strength * 1.5 * h_factor, ctype))
@@ -3812,7 +3817,7 @@ class HoneycombNeuralField:
             if source_node:
                 crystal_boost = self._crystallized.get_boost(source_node.id, nid)
             weight_factor = 1.0 + (node.weight * 0.3 if node.is_occupied else 0.1)
-            h = self._hebbian.get_path_bias(src, nid)
+            h = min(self._hebbian.get_path_bias(src, nid), 3.0)
             biased.append((nid, strength * weight_factor * crystal_boost * (1.0 + h * 0.5), ctype))
         return biased
 
@@ -3825,7 +3830,7 @@ class HoneycombNeuralField:
                 biased.append((nid, strength * 0.5, ctype))
                 continue
             total_neighbors = len(node.face_neighbors) + len(node.edge_neighbors)
-            h = self._hebbian.get_path_bias(src, nid)
+            h = min(self._hebbian.get_path_bias(src, nid), 3.0)
             h_factor = 1.0 + h * 0.3
             if total_neighbors < 6:
                 biased.append((nid, strength * 2.5 * h_factor, ctype))
@@ -3851,6 +3856,8 @@ class HoneycombNeuralField:
             current.reinforce(pulse.strength * 0.01)
             if pulse.pulse_type == PulseType.SELF_CHECK:
                 self._detect_empty_associations(current_id, current)
+            if pulse.pulse_type == PulseType.REINFORCING and len(pulse.path) >= 2 and self._pulse_engine is not None and self._pulse_engine.is_alive():
+                self._hebbian.record_path(pulse.path[-3:] if len(pulse.path) >= 3 else pulse.path, success=True, strength=pulse.strength * 0.6)
 
         cfg = PCNNConfig
         raw_candidates = []
@@ -3889,16 +3896,21 @@ class HoneycombNeuralField:
             return
 
         weights = [w for _, w, _ in biased]
-        idx = random.choices(range(len(biased)), weights=weights, k=1)[0]
-        next_id, next_strength, direction = biased[idx]
+        if not all(math.isfinite(w) and w > 0 for w in weights):
+            return
 
-        new_pulse = NeuralPulse(
-            pulse.source_id, next_strength, pulse.max_hops, pulse.pulse_type, pulse.bias_fn
-        )
-        new_pulse.hops = pulse.hops + 1
-        new_pulse.path = pulse.path + [next_id]
-        new_pulse.direction = direction
-        self._propagate_pulse(new_pulse)
+        fanout = 2 if pulse.pulse_type == PulseType.EXPLORATORY and len(biased) >= 2 else 1
+        chosen_indices = random.choices(range(len(biased)), weights=weights, k=min(fanout, len(biased)))
+        for idx in chosen_indices:
+            next_id, next_strength, direction = biased[idx]
+
+            new_pulse = NeuralPulse(
+                pulse.source_id, next_strength, pulse.max_hops, pulse.pulse_type, pulse.bias_fn
+            )
+            new_pulse.hops = pulse.hops + 1
+            new_pulse.path = pulse.path + [next_id]
+            new_pulse.direction = direction
+            self._propagate_pulse(new_pulse)
 
     def _propagate_cascade(self, pulse: NeuralPulse):
         if not pulse.alive:
@@ -3965,6 +3977,8 @@ class HoneycombNeuralField:
 
         k = min(cfg.CASCADE_BRANCHING_FACTOR, len(biased))
         weights = [w for _, w, _ in biased]
+        if not all(math.isfinite(w) and w > 0 for w in weights):
+            return
         selected_indices = random.choices(range(len(biased)), weights=weights, k=k)
 
         child_energy_budget = pulse.strength * cfg.CASCADE_ENERGY_CONSERVATION * cfg.CASCADE_BRANCHING_DECAY
@@ -3980,7 +3994,7 @@ class HoneycombNeuralField:
 
             self._propagate_cascade(child)
 
-        self._hebbian.record_path(pulse.path[-3:] if len(pulse.path) >= 3 else pulse.path, success=True, strength=pulse.strength * 0.5)
+        self._hebbian.record_path(pulse.path[-3:] if len(pulse.path) >= 3 else pulse.path, success=True, strength=pulse.strength * 0.8)
 
     def start_pulse_engine(self):
         if self._pulse_engine is not None and self._pulse_engine.is_alive():
@@ -4029,7 +4043,7 @@ class HoneycombNeuralField:
                     self._pcnn_global_step()
                     self._update_adaptive_interval()
 
-                if cycle % 90 == 0:
+                if cycle % 60 == 0:
                     self._crystal_maintenance()
 
                 if cycle % 600 == 0 and self._lattice_checker:
@@ -4755,6 +4769,11 @@ class HoneycombNeuralField:
             visited = {tetra_id}
             frontier = [tetra_id]
             results = []
+            shortcut_edges = {}
+            if self._self_organize:
+                for (a, b), s in self._self_organize._shortcuts.items():
+                    shortcut_edges[a] = (b, s)
+                    shortcut_edges[b] = (a, s)
 
             for depth in range(max_depth):
                 next_frontier = []
@@ -4762,13 +4781,23 @@ class HoneycombNeuralField:
                     fn = self._nodes.get(fid)
                     if fn is None:
                         continue
-                    for nid in fn.face_neighbors + fn.edge_neighbors:
+                    neighbors = list(fn.face_neighbors) + list(fn.edge_neighbors) + list(fn.vertex_neighbors)
+                    if fid in shortcut_edges:
+                        target_id, strength = shortcut_edges[fid]
+                        if target_id not in visited:
+                            neighbors.append(target_id)
+                    for nid in neighbors:
                         if nid in visited:
                             continue
                         visited.add(nid)
                         nn = self._nodes.get(nid)
                         if nn and nn.is_occupied:
-                            conn = "face" if nid in fn.face_neighbors else "edge"
+                            conn = "face" if nid in fn.face_neighbors else "edge" if nid in fn.edge_neighbors else "vertex" if nid in fn.vertex_neighbors else "shortcut"
+                            hebb_w = self._hebbian.get_path_bias(fid, nid)
+                            crystal_w = fn.crystal_channels.get(nid, 0.0)
+                            relevance = nn.weight * 0.4 + nn.activation * 0.2 + hebb_w * 0.01 + crystal_w * 0.2
+                            if conn == "shortcut":
+                                relevance += 1.0
                             results.append({
                                 "id": nid,
                                 "content": nn.content,
@@ -4776,10 +4805,13 @@ class HoneycombNeuralField:
                                 "weight": nn.weight,
                                 "labels": list(nn.labels),
                                 "activation": nn.activation,
+                                "relevance": round(relevance, 3),
+                                "depth": depth + 1,
                             })
                         next_frontier.append(nid)
                 frontier = next_frontier
 
+            results.sort(key=lambda x: -x.get("relevance", 0))
             return results
 
     def pulse_status(self) -> Dict:
