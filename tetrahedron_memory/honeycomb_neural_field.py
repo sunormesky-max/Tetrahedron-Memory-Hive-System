@@ -1849,6 +1849,10 @@ class SelfOrganizeEngine:
                 break
             if nid_a in checked:
                 continue
+            if node_a.crystal_channels:
+                continue
+            if "__low_priority__" in node_a.labels:
+                continue
 
             tokens_a = field._extract_tokens(node_a.content)
             if not tokens_a:
@@ -1860,6 +1864,8 @@ class SelfOrganizeEngine:
             for j in range(i + 1, min(i + 20, len(low_weight))):
                 nid_b, node_b = low_weight[j]
                 if nid_b in checked:
+                    continue
+                if node_b.crystal_channels:
                     continue
 
                 tokens_b = field._extract_tokens(node_b.content)
@@ -2427,6 +2433,7 @@ class DreamEngine:
 
     def _score_creativity(self, node_a, node_b, domain_a: str, domain_b: str) -> float:
         cfg = PCNNConfig
+        field = self._field
         cross_bonus = cfg.DREAM_CROSS_DOMAIN_BONUS if domain_a != domain_b else 1.0
         weight_factor = (node_a.weight * node_b.weight) / 25.0
         activation_factor = (node_a.activation + node_b.activation) / 10.0
@@ -2434,8 +2441,26 @@ class DreamEngine:
         crystal_boost_a = sum(node_a.crystal_channels.values()) if node_a.crystal_channels else 0
         crystal_boost_b = sum(node_b.crystal_channels.values()) if node_b.crystal_channels else 0
         crystal_factor = min(1.0, (crystal_boost_a + crystal_boost_b) / 10.0)
+        hebbian_factor = 0.0
+        hebbian_w = field._hebbian.get_path_bias(node_a.id, node_b.id)
+        if hebbian_w > 0:
+            hebbian_factor = min(1.0, hebbian_w * 0.3)
+        pcnn_factor = 0.0
+        if node_a.fired and node_b.fired:
+            pcnn_factor = 0.15
+        elif node_a.internal_activity > 0.5 or node_b.internal_activity > 0.5:
+            pcnn_factor = 0.08
+        resonance_factor = 0.0
+        for ev in field._resonance_events:
+            if node_a.id[:8] in ev.get("node_ids", []) or node_b.id[:8] in ev.get("node_ids", []):
+                resonance_factor = 0.1
+                break
+        moran_factor = 0.0
+        if field._spatial_autocorrelation > 0.1:
+            moran_factor = 0.05
         base = (cross_bonus * weight_factor * activation_factor) / (cross_bonus + 1)
-        creativity = base * (0.4 + 0.35 * structural + 0.15 * crystal_factor + 0.1 * min(1.0, weight_factor))
+        creativity = base * (0.30 + 0.25 * structural + 0.12 * crystal_factor + 0.08 * min(1.0, weight_factor)
+                            + 0.08 * hebbian_factor + 0.07 * pcnn_factor + 0.05 * resonance_factor + 0.05 * moran_factor)
         return min(1.0, creativity)
 
     def _novelty_score(self, node_a, node_b) -> float:
@@ -2729,6 +2754,12 @@ class AgentMemoryDriver:
                 if node is None:
                     continue
                 neighbors = list(node.face_neighbors) + list(node.edge_neighbors[:4])
+                if field._self_organize and hasattr(field._self_organize, '_shortcuts'):
+                    for sc_key, sc_str in field._self_organize._shortcuts.items():
+                        if nid in sc_key:
+                            partner = sc_key[1] if sc_key[0] == nid else sc_key[0]
+                            if partner not in visited:
+                                neighbors.append(partner)
                 for nnid in neighbors:
                     if nnid in visited:
                         continue
@@ -2743,6 +2774,12 @@ class AgentMemoryDriver:
                         crystal_boost = field._crystallized.get_boost(nid, nnid)
                         if crystal_boost > 1.0:
                             step_cost /= crystal_boost
+                        hebbian_w = field._hebbian.get_path_bias(nid, nnid)
+                        if hebbian_w > 0:
+                            step_cost /= (1.0 + hebbian_w * 0.5)
+                        if field._reflection_field:
+                            energy = field._reflection_field._node_energy.get(nnid, 0.5)
+                            step_cost *= (0.8 + energy * 0.4)
                     new_cost = cost + step_cost
                     new_path = path + [nnid]
                     if nnid == target_id:
@@ -3296,7 +3333,14 @@ class HoneycombNeuralField:
                     if cells:
                         cell_quality = max(c.quality for c in cells)
                     vacancy = self._vacancy_attraction(fnid) * 0.5
-                    face_candidates.append((fnid, fn, bonus + 10 + cell_quality * 3 + vacancy))
+                    energy_bonus = 0.0
+                    if self._reflection_field:
+                        energy = self._reflection_field._node_energy.get(fnid, 0.5)
+                        energy_bonus = (1.0 - energy) * 2.0
+                    crystal_nearby = 0.0
+                    if fn.crystal_channels:
+                        crystal_nearby = len(fn.crystal_channels) * 0.5
+                    face_candidates.append((fnid, fn, bonus + 10 + cell_quality * 3 + vacancy + energy_bonus + crystal_nearby))
 
         if face_candidates:
             face_candidates.sort(key=lambda x: -x[2])
@@ -3422,6 +3466,18 @@ class HoneycombNeuralField:
                 if node.pulse_accumulator > 0.1:
                     pulse_boost = min(0.05, node.pulse_accumulator * 0.1)
 
+                pcnn_activity = 0.0
+                if node.fired:
+                    pcnn_activity = 0.04
+                elif node.internal_activity > 0.5:
+                    pcnn_activity = 0.02
+
+                resonance_bonus = 0.0
+                for ev in self._resonance_events:
+                    if nid[:8] in ev.get("node_ids", []):
+                        resonance_bonus = min(0.04, ev.get("strength", 0) * 0.05)
+                        break
+
                 spatial_quality = 0.0
                 if self._reflection_field:
                     sq = self._reflection_field.get_spatial_quality(self, nid)
@@ -3454,10 +3510,11 @@ class HoneycombNeuralField:
                     low_priority_penalty = 0.05
 
                 shortcut_boost = 0.0
-                for sc_nodes, sc_str in self._shortcuts:
-                    if nid in sc_nodes:
-                        shortcut_boost = min(0.08, sc_str * 0.3)
-                        break
+                if self._self_organize and hasattr(self._self_organize, '_shortcuts'):
+                    for sc_key, sc_str in self._self_organize._shortcuts.items():
+                        if nid in sc_key:
+                            shortcut_boost = min(0.08, sc_str * 0.3)
+                            break
 
                 final = (
                     0.18 * text_score
@@ -3478,6 +3535,8 @@ class HoneycombNeuralField:
                     + 0.01 * dream_bonus
                     + shortcut_boost
                     - low_priority_penalty
+                    + pcnn_activity
+                    + resonance_bonus
                 )
                 scored.append((nid, final))
 
@@ -3930,7 +3989,20 @@ class HoneycombNeuralField:
     def _select_pulse_type(self) -> PulseType:
         cfg = PCNNConfig
         types = list(cfg.PULSE_TYPE_PROBABILITIES.keys())
-        weights = [cfg.PULSE_TYPE_PROBABILITIES[t] for t in types]
+        weights = list(cfg.PULSE_TYPE_PROBABILITIES.values())
+        phase = self._current_phase
+        if phase == "turbulent":
+            for i, t in enumerate(types):
+                if t == PulseType.EXPLORATORY:
+                    weights[i] *= 1.5
+                elif t == PulseType.REINFORCING:
+                    weights[i] *= 0.7
+        elif phase == "crystalline":
+            for i, t in enumerate(types):
+                if t == PulseType.STRUCTURE:
+                    weights[i] *= 1.5
+                elif t == PulseType.EXPLORATORY:
+                    weights[i] *= 0.7
         return random.choices(types, weights=weights, k=1)[0]
 
     def _select_source_exploratory(self, occupied: List[Tuple[str, Any]]) -> str:
@@ -3945,7 +4017,10 @@ class HoneycombNeuralField:
         return random.choice(occupied)[0]
 
     def _select_source_reinforcing(self, occupied: List[Tuple[str, Any]]) -> str:
-        weighted = [(nid, n.activation * max(n.weight, 0.5)) for nid, n in occupied]
+        filtered = [(nid, n) for nid, n in occupied if "__low_priority__" not in n.labels]
+        if not filtered:
+            filtered = occupied
+        weighted = [(nid, n.activation * max(n.weight, 0.5)) for nid, n in filtered]
         total = sum(w for _, w in weighted)
         if total <= 0:
             return random.choice(occupied)[0]
@@ -4002,13 +4077,19 @@ class HoneycombNeuralField:
         )[0]
 
     def _select_source_cascade(self, occupied: List[Tuple[str, Any]]) -> str:
+        filtered = [(nid, n) for nid, n in occupied if "__low_priority__" not in n.labels]
+        if not filtered:
+            filtered = occupied
+        dream_sources = [(nid, n) for nid, n in filtered if "__dream__" in n.labels and n.weight >= 2.0]
+        if dream_sources and random.random() < 0.3:
+            return random.choice(dream_sources)[0]
         hebbian_nodes = set()
         for (a, b), w in self._hebbian._edges.items():
             if w > 1.0:
                 hebbian_nodes.add(a)
                 hebbian_nodes.add(b)
 
-        hebbian_occupied = [(nid, n) for nid, n in occupied if nid in hebbian_nodes]
+        hebbian_occupied = [(nid, n) for nid, n in filtered if nid in hebbian_nodes]
         if hebbian_occupied:
             weighted = [(nid, n.activation * max(n.weight, 0.5)) for nid, n in hebbian_occupied]
             total = sum(w for _, w in weighted)
@@ -4115,6 +4196,25 @@ class HoneycombNeuralField:
             )
         self._current_phase = phase
 
+    def _crystal_maintenance(self):
+        with self._lock:
+            new_crystals = self._crystallized.scan_and_crystallize(self._hebbian._edges)
+
+            for node in self._nodes.values():
+                node.crystal_channels.clear()
+
+            for key, crystal in self._crystallized._crystals.items():
+                a, b = crystal["nodes"]
+                node_a = self._nodes.get(a)
+                node_b = self._nodes.get(b)
+                if node_a:
+                    node_a.crystal_channels[b] = crystal["crystal_weight"]
+                if node_b:
+                    node_b.crystal_channels[a] = crystal["crystal_weight"]
+
+            if new_crystals > 0:
+                logger.info("Crystal maintenance: %d new crystallized pathways", new_crystals)
+
     def _detect_resonance(self):
         """
         Resonance Propagation: detect synchronized firing patterns across
@@ -4178,23 +4278,6 @@ class HoneycombNeuralField:
                         )
 
         self._resonance_events = resonance_events[-10:]
-        with self._lock:
-            new_crystals = self._crystallized.scan_and_crystallize(self._hebbian._edges)
-
-            for node in self._nodes.values():
-                node.crystal_channels.clear()
-
-            for key, crystal in self._crystallized._crystals.items():
-                a, b = crystal["nodes"]
-                node_a = self._nodes.get(a)
-                node_b = self._nodes.get(b)
-                if node_a:
-                    node_a.crystal_channels[b] = crystal["crystal_weight"]
-                if node_b:
-                    node_b.crystal_channels[a] = crystal["crystal_weight"]
-
-            if new_crystals > 0:
-                logger.info("Crystal maintenance: %d new crystallized pathways", new_crystals)
 
     def _check_convergence_bridges(self):
         cfg = PCNNConfig
