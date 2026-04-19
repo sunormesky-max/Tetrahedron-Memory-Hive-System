@@ -1653,7 +1653,7 @@ class OrganizeResult:
     __slots__ = (
         "organize_time", "clusters_found", "clusters_reinforced",
         "entropy_before", "entropy_after", "consolidations_done",
-        "shortcuts_created", "details",
+        "shortcuts_created", "migrations_done", "details",
     )
 
     def __init__(self):
@@ -1664,6 +1664,7 @@ class OrganizeResult:
         self.entropy_after: float = 0.0
         self.consolidations_done: int = 0
         self.shortcuts_created: int = 0
+        self.migrations_done: int = 0
         self.details: str = ""
 
     def to_dict(self) -> Dict[str, Any]:
@@ -1675,6 +1676,7 @@ class OrganizeResult:
             "entropy_after": round(self.entropy_after, 4),
             "consolidations_done": self.consolidations_done,
             "shortcuts_created": self.shortcuts_created,
+            "migrations_done": self.migrations_done,
             "details": self.details,
         }
 
@@ -1720,6 +1722,7 @@ class SelfOrganizeEngine:
 
             self._detect_clusters(field, occupied, result)
             self._rebalance_entropy(field, occupied, result)
+            self._migrate_memories(field, occupied, result)
             self._consolidate_memories(field, occupied, result)
             self._create_shortcuts(field, occupied, result)
 
@@ -1843,6 +1846,87 @@ class SelfOrganizeEngine:
                     boost = avg_w * cfg.ENTROPY_BOOST_FACTOR
                     node.weight = min(max_w, node.weight + boost)
                     node.activation = min(10.0, node.activation + boost * 0.5)
+
+    def _migrate_memories(self, field, occupied, result: OrganizeResult):
+        occupied_count = len(occupied)
+        if occupied_count < 20:
+            return
+        max_migrations = min(5, max(1, occupied_count // 200))
+        quality_list = []
+        for nid, node in occupied:
+            if node.weight < 0.5 or "__consolidated__" in node.labels:
+                continue
+            geo_q = node.metadata.get("geometric_quality", 0.5)
+            bcc_c = node.metadata.get("bcc_cell_coherence", 0.5)
+            neighbors_occ = sum(
+                1 for fnid in node.face_neighbors[:6]
+                if field._nodes.get(fnid) and field._nodes[fnid].is_occupied
+            )
+            density_penalty = max(0, (neighbors_occ - 4) * 0.08)
+            quality = 0.4 * geo_q + 0.3 * bcc_c + 0.3 * (node.weight / 10.0) - density_penalty
+            quality_list.append((nid, node, quality))
+        quality_list.sort(key=lambda x: x[2])
+        migrated = 0
+        for nid, node, q in quality_list[:15]:
+            if migrated >= max_migrations:
+                break
+            node_labels = set(node.labels) - {
+                "__pulse_bridge__", "__system__", "__consolidated__", "__low_priority__"
+            }
+            best_target = None
+            best_ts = q + 0.12
+            search_pool = node.face_neighbors + node.edge_neighbors + node.vertex_neighbors
+            for fnid in search_pool:
+                fn = field._nodes.get(fnid)
+                if fn is None or fn.is_occupied:
+                    continue
+                t_geo = field._compute_node_geometric_quality(fnid)
+                t_bcc = field._bcc_cell_coherence(fnid)
+                label_match = 0
+                for fnn in fn.face_neighbors[:6]:
+                    fnn_n = field._nodes.get(fnn)
+                    if fnn_n and fnn_n.is_occupied and node_labels & set(fnn_n.labels):
+                        label_match += 1
+                ts = 0.4 * t_geo + 0.3 * t_bcc + 0.3 * min(label_match / 3.0, 1.0)
+                if ts > best_ts:
+                    best_target = fnid
+                    best_ts = ts
+            if best_target is None:
+                continue
+            target = field._nodes[best_target]
+            target.content = node.content
+            target.labels = list(node.labels)
+            target.weight = node.weight
+            target.activation = node.activation
+            target.base_activation = node.base_activation
+            target.metadata = dict(node.metadata)
+            target.creation_time = node.creation_time
+            target.feeding = node.feeding
+            target.crystal_channels = dict(node.crystal_channels)
+            target.metadata["geometric_quality"] = float(field._compute_node_geometric_quality(best_target))
+            target.metadata["geo_topo_divergence"] = float(field._compute_geometric_topo_divergence(best_target))
+            target.metadata["bcc_cell_coherence"] = float(field._bcc_cell_coherence(best_target))
+            target.metadata["migrated_from"] = nid[:12]
+            target.metadata["migration_time"] = time.time()
+            target.touch()
+            chash = hashlib.sha256(target.content.encode()).hexdigest()[:12]
+            field._content_hash_index[chash] = best_target
+            for lbl in target.labels:
+                if not lbl.startswith("__"):
+                    field._label_index[lbl].discard(nid)
+                    field._label_index[lbl].add(best_target)
+            for tok in field._extract_tokens(target.content):
+                field._content_token_index[tok].discard(nid)
+                field._content_token_index[tok].add(best_target)
+            node.content = None
+            node.labels = []
+            node.weight = 0.0
+            node.activation = 0.0
+            node.metadata = {}
+            node.crystal_channels = {}
+            field._emit_pulse(best_target, strength=target.weight * 0.3, pulse_type=PulseType.REINFORCING)
+            migrated += 1
+        result.migrations_done = migrated
 
     def _consolidate_memories(self, field, occupied, result: OrganizeResult):
         cfg = PCNNConfig
@@ -3010,6 +3094,8 @@ class HoneycombNeuralField:
         sp = self._spacing
         new_nodes = 0
         new_body = 0
+        new_corner_ids = set()
+        new_body_ids = set()
 
         for ix in range(-new_res, new_res + 1):
             for iy in range(-new_res, new_res + 1):
@@ -3022,6 +3108,7 @@ class HoneycombNeuralField:
                         self._nodes[nid] = HoneycombNode(nid, pos)
                         self._position_index[(ix, iy, iz)] = nid
                         new_nodes += 1
+                        new_corner_ids.add(nid)
 
         for ix in range(-new_res, new_res):
             for iy in range(-new_res, new_res):
@@ -3035,14 +3122,85 @@ class HoneycombNeuralField:
                         self._nodes[bid] = HoneycombNode(bid, bpos)
                         self._position_index[key] = bid
                         new_body += 1
+                        new_body_ids.add(bid)
                     elif key not in self._position_index:
                         self._position_index[key] = bid
 
-        self._build_connectivity()
+        self._build_shell_connectivity(new_corner_ids, new_body_ids)
         self._cell_map.build(self._nodes, self._position_index, self._spacing)
         self._build_bcc_unit_index()
         logger.info("Lattice expanded: res %d->%d, +%d corners +%d body, total %d nodes",
                      old_res, new_res, new_nodes, new_body, len(self._nodes))
+
+    def _build_shell_connectivity(self, new_corner_ids: Set[str], new_body_ids: Set[str]):
+        all_new = new_corner_ids | new_body_ids
+        face_count = 0
+        edge_count = 0
+        vertex_count = 0
+        for key, bid in list(self._position_index.items()):
+            if not (isinstance(key, tuple) and len(key) == 4 and key[3] == "b"):
+                continue
+            if bid not in all_new:
+                continue
+            ix, iy, iz = key[0], key[1], key[2]
+            for dx in (0, 1):
+                for dy in (0, 1):
+                    for dz in (0, 1):
+                        ck = (ix + dx, iy + dy, iz + dz)
+                        cnid = self._position_index.get(ck)
+                        if not cnid:
+                            continue
+                        bnode = self._nodes.get(bid)
+                        cnode = self._nodes.get(cnid)
+                        if not bnode or not cnode:
+                            continue
+                        if cnid not in bnode.face_neighbors:
+                            bnode.face_neighbors.append(cnid)
+                        if bid not in cnode.face_neighbors:
+                            cnode.face_neighbors.append(bid)
+                        self._edges.append((bid, cnid, "face"))
+                        face_count += 1
+        for key, nid in list(self._position_index.items()):
+            if not (isinstance(key, tuple) and len(key) == 3):
+                continue
+            if nid not in all_new:
+                continue
+            ix, iy, iz = key
+            for dx, dy, dz in [(1,0,0),(-1,0,0),(0,1,0),(0,-1,0),(0,0,1),(0,0,-1)]:
+                nk = (ix + dx, iy + dy, iz + dz)
+                nnid = self._position_index.get(nk)
+                if not nnid or nnid == nid:
+                    continue
+                node = self._nodes.get(nid)
+                nn = self._nodes.get(nnid)
+                if not node or not nn:
+                    continue
+                if nnid not in node.face_neighbors and nnid not in node.edge_neighbors:
+                    node.edge_neighbors.append(nnid)
+                    if nid not in nn.edge_neighbors:
+                        nn.edge_neighbors.append(nid)
+                    self._edges.append((nid, nnid, "edge"))
+                    edge_count += 1
+            for dx, dy, dz in [(1,1,0),(1,-1,0),(-1,1,0),(-1,-1,0),
+                                (1,0,1),(1,0,-1),(-1,0,1),(-1,0,-1),
+                                (0,1,1),(0,1,-1),(0,-1,1),(0,-1,-1)]:
+                nk = (ix + dx, iy + dy, iz + dz)
+                nnid = self._position_index.get(nk)
+                if not nnid or nnid == nid:
+                    continue
+                node = self._nodes.get(nid)
+                nn = self._nodes.get(nnid)
+                if not node or not nn:
+                    continue
+                if (nnid not in node.face_neighbors and
+                    nnid not in node.edge_neighbors and
+                    nnid not in node.vertex_neighbors):
+                    node.vertex_neighbors.append(nnid)
+                    if nid not in nn.vertex_neighbors:
+                        nn.vertex_neighbors.append(nid)
+                    self._edges.append((nid, nnid, "vertex"))
+                    vertex_count += 1
+        logger.info("Shell connectivity: %d face, %d edge, %d vertex", face_count, edge_count, vertex_count)
 
     def _build_connectivity(self):
         face_count = 0
@@ -3343,9 +3501,27 @@ class HoneycombNeuralField:
 
             total = len(self._nodes)
             occupied_count = sum(1 for n in self._nodes.values() if n.is_occupied)
+            expand_needed = False
             if total > 0 and occupied_count / total > 0.85:
-                logger.info("Lattice occupancy %.1f%% — auto-expanding (res %d->%d)",
-                            occupied_count / total * 100, self._resolution, self._resolution + 1)
+                expand_needed = True
+            elif total > 0 and occupied_count / total > 0.60:
+                dense_count = 0
+                for n in self._nodes.values():
+                    if not n.is_occupied:
+                        continue
+                    occ_nb = sum(
+                        1 for fnid in n.face_neighbors[:6]
+                        if self._nodes.get(fnid) and self._nodes[fnid].is_occupied
+                    )
+                    if occ_nb >= 5:
+                        dense_count += 1
+                if dense_count > occupied_count * 0.3:
+                    expand_needed = True
+            if expand_needed:
+                logger.info("Lattice occupancy %.1f%% (dense_nodes=%d) — auto-expanding (res %d->%d)",
+                            occupied_count / total * 100,
+                            sum(1 for n in self._nodes.values() if n.is_occupied and sum(1 for fnid in n.face_neighbors[:6] if self._nodes.get(fnid) and self._nodes[fnid].is_occupied) >= 5),
+                            self._resolution, self._resolution + 1)
                 self._expand_lattice()
 
             nid = self._find_nearest_empty_node(content, labels)
@@ -3748,7 +3924,11 @@ class HoneycombNeuralField:
             weight_boost = min((node.weight * 0.5 + 1.0) if node else 1.0, 5.0)
             hebbian_w = min(self._hebbian.get_path_bias(src, nid), 3.0)
             hebbian_boost = 1.0 + hebbian_w * 2.0
-            biased.append((nid, strength * weight_boost * hebbian_boost, ctype))
+            quality_factor = 1.0
+            if node and node.metadata:
+                gq = node.metadata.get("geometric_quality", 0.5)
+                quality_factor = 0.8 + 0.4 * gq
+            biased.append((nid, strength * weight_boost * hebbian_boost * quality_factor, ctype))
         return biased
 
     def _bias_tension_sensing(self, candidates: List[Tuple[str, float, str]]) -> List[Tuple[str, float, str]]:
