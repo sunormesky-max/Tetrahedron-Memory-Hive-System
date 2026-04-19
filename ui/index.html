@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TetraMem-XL v6.0</title>
+<title>TetraMem-XL v6.2</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔷</text></svg>">
 <link rel="stylesheet" href="/libs/index.css">
 <style>
@@ -130,7 +130,7 @@ tr:hover td{background:rgba(100,120,255,.02)}
 <div id="loginPage" class="login-wrap">
 <div class="login-box">
   <h1>TetraMem-XL</h1>
-  <div class="sub">PCNN 神经脉冲引擎 v4.1 — 主动意识</div>
+  <div class="sub">BCC 晶格蜂巢 + PCNN 脉冲 + 空间几何 v6.2</div>
   <input id="user" placeholder="用户名" autocomplete="off">
   <input id="pass" type="password" placeholder="密码">
   <button onclick="doLogin()">登 录</button>
@@ -141,14 +141,16 @@ tr:hover td{background:rgba(100,120,255,.02)}
 <div id="appPage" class="app-layout hidden">
 <div class="top-bar">
   <h1>Tetra<span>Mem</span>-XL</h1>
-  <span class="version">v4.0 PCNN</span>
+  <span class="version">v6.2 几何拓扑</span>
   <div class="stats-bar">
     <span>节点<b id="sNodes">-</b></span>
     <span>记忆<b id="sMem">-</b></span>
     <span>面边<b id="sFaces">-</b></span>
+    <span>体顶边<b id="sVertex" style="color:#b08cff">-</b></span>
     <span>脉冲<b class="system-pulse" id="sPulse">-</b></span>
     <span>桥接<b id="sBridge" style="color:#5eb88a">-</b></span>
     <span>激发<b id="sFired" style="color:#ec4899">-</b></span>
+    <span>自相关<b id="sMoran" style="color:#06b6d4">-</b></span>
   </div>
   <div class="pulse-ind"><div class="pulse-dot"></div><span id="sInterval">-</span></div>
   <button class="logout-btn" onclick="doLogout()">退出</button>
@@ -173,6 +175,7 @@ tr:hover td{background:rgba(100,120,255,.02)}
   <button onclick="switchMode('crystal',this)">结晶通路</button>
   <button onclick="switchMode('organize',this)">自组织</button>
   <button onclick="switchMode('honeycomb',this)">蜂巢结构</button>
+  <button onclick="switchMode('spatial',this)">空间几何</button>
   <button onclick="switchMode('dream',this)">梦境引擎</button>
   <button onclick="switchMode('agent',this)">Agent驱动</button>
   <button onclick="switchMode('feedback',this)">反馈闭环</button>
@@ -187,7 +190,8 @@ tr:hover td{background:rgba(100,120,255,.02)}
       <div class="legend-item"><div class="legend-dot" style="background:#c9a04e"></div>高权重</div>
       <div class="legend-item"><div class="legend-dot" style="background:#5eb88a"></div>梦境 / 桥接</div>
       <div class="legend-item"><div class="legend-dot" style="background:rgba(123,140,255,.4)"></div>神经脉冲</div>
-      <div style="margin-top:4px;color:#2a2a4a;font-size:9px">BCC 晶格 · PCNN v6.0</div>
+      <div class="legend-item"><div class="legend-dot" style="background:rgba(176,140,255,.4)"></div>vertex 邻居</div>
+      <div style="margin-top:4px;color:#2a2a4a;font-size:9px">BCC 晶格 · PCNN v6.2 · Moran's I</div>
     </div>
   </div>
   <div class="right-panel">
@@ -285,6 +289,9 @@ async function refreshTopbar(){
     document.getElementById('sBridge').textContent=s.bridge_count||0;
     document.getElementById('sFired').textContent=s.fired_nodes||0;
     document.getElementById('sInterval').textContent=(s.adaptive_interval||0.5).toFixed(2)+'s';
+    document.getElementById('sVertex').textContent=s.vertex_edges||0;
+    const mi=s.spatial_autocorrelation?.morans_i||0;
+    document.getElementById('sMoran').textContent=mi.toFixed(3)+(mi>0.1?' ↑':mi<-0.1?' ↓':' ≈');
   }catch(e){}
 }
 
@@ -335,6 +342,7 @@ async function renderPanelMode(mode){
     case 'crystal':await renderCrystal(el);break;
     case 'organize':await renderOrganize(el);break;
     case 'honeycomb':await renderHoneycomb(el);break;
+    case 'spatial':await renderSpatial(el);break;
     case 'dream':await renderDream(el);break;
     case 'agent':await renderAgent(el);break;
     case 'feedback':await renderFeedback(el);break;
@@ -358,6 +366,9 @@ async function renderDashboard(el){
     <div class="stat"><div class="label">桥接节点</div><div class="value cyan">${s.bridge_nodes||0}</div></div>
     <div class="stat"><div class="label">面边连接</div><div class="value">${s.face_edges}</div></div>
     <div class="stat"><div class="label">棱边连接</div><div class="value purple">${s.edge_edges}</div></div>
+    <div class="stat"><div class="label">体顶边连接</div><div class="value" style="color:#b08cff">${s.vertex_edges||0}</div></div>
+    <div class="stat"><div class="label">Moran's I</div><div class="value" style="color:${(s.spatial_autocorrelation?.morans_i||0)>0.1?'#5eb88a':(s.spatial_autocorrelation?.morans_i||0)<-0.1?'#cf6b6b':'#06b6d4'}">${(s.spatial_autocorrelation?.morans_i||0).toFixed(4)}</div></div>
+    <div class="stat"><div class="label">BCC单元索引</div><div class="value" style="color:#b08cff">${s.bcc_unit_index_size||0}</div></div>
     <div class="stat"><div class="label">脉冲总数</div><div class="value yellow">${s.pulse_count}</div></div>
     <div class="stat"><div class="label">桥接计数</div><div class="value green">${s.bridge_count}</div></div>
     <div class="stat"><div class="label">激发节点</div><div class="value pink">${s.fired_nodes||0}</div></div>
@@ -943,6 +954,63 @@ async function renderHoneycomb(el){
   let bestHTML=best.length?'<table class="mem-table"><tr><th>ID</th><th>质量</th><th>体积</th><th>偏斜</th><th>雅可比</th><th>记忆数</th><th>密度</th></tr>'+best.map(c=>'<tr><td>'+c.cell_id+'</td><td style="color:'+qColor+'">'+c.quality+'</td><td>'+c.volume+'</td><td>'+c.skewness+'</td><td style="color:#5eb88a">'+c.jacobian+'</td><td>'+c.memory_count+'</td><td style="color:#64b5f6">'+c.density+'</td></tr>').join('')+'</table>':'<p style="color:#888">暂无数据</p>';
   let denseHTML=dense.length?'<table class="mem-table"><tr><th>ID</th><th>体心</th><th>记忆数</th><th>总权重</th><th>密度</th></tr>'+dense.map(c=>'<tr><td>'+c.cell_id+'</td><td>'+c.body_center+'</td><td style="color:#ff8a65">'+c.memory_count+'</td><td style="color:#c9a04e">'+c.total_weight+'</td><td style="color:#64b5f6">'+c.density+'</td></tr>').join('')+'</table>':'<p style="color:#888">暂无数据</p>';
   el.innerHTML='<div style="margin-bottom:20px"><h1 style="margin:0;font-size:20px;color:#64b5f6">蜂巢结构 — BCC 四面体分解分析</h1><p style="color:#888;font-size:12px;margin:4px 0 0">每个 BCC 单元体分解为 8 个四面体单元格，追踪体积/质量/偏斜度/雅可比/记忆密度</p></div><div class="stats-grid" style="margin-bottom:20px"><div class="stat"><div class="label">四面体单元格</div><div class="value" style="color:#64b5f6;font-size:20px">'+analysis.total_cells+'</div></div><div class="stat"><div class="label">BCC 单元体</div><div class="value">'+analysis.total_bcc_units+'</div></div><div class="stat"><div class="label">质量均值</div><div class="value" style="color:'+qColor+'">'+q.mean+'</div></div><div class="stat"><div class="label">雅可比均值</div><div class="value" style="color:#5eb88a">'+jac.mean+'</div></div><div class="stat"><div class="label">偏斜均值</div><div class="value">'+sk.mean+'</div></div><div class="stat"><div class="label">总体积</div><div class="value">'+v.total+'</div></div><div class="stat"><div class="label">有记忆单元格</div><div class="value" style="color:#ff8a65">'+d.occupied_cells+'</div></div></div><div class="card"><h2>最高质量四面体</h2>'+bestHTML+'</div><div class="card"><h2>最高密度四面体</h2>'+denseHTML+'</div>';
+}
+
+async function renderSpatial(el){
+  const[stats,autocorr,vacancy]=await Promise.all([
+    api('/stats'),
+    api('/spatial/autocorrelation').catch(()=>({morans_i:0})),
+    api('/spatial/vacancy-map?top_n=15').catch(()=>({top_vacancies:[],total_with_attraction:0}))
+  ]);
+  const mi=autocorr.morans_i||0;
+  const miColor=mi>0.1?'#5eb88a':mi<-0.1?'#cf6b6b':'#c9a04e';
+  const miLabel=mi>0.1?'聚类分布（权重空间聚集）':mi<-0.1?'离散分布（权重空间分散）':'随机分布';
+  const refField=stats.reflection_field||{};
+  const honeycomb=stats.honeycomb_cells||{};
+  const vacs=vacancy.top_vacancies||[];
+  let vacHTML=vacs.length?'<table><tr><th>节点</th><th>吸引力</th><th>条形</th></tr>'+vacs.map(v=>{
+    const maxA=vacs[0]?.attraction||1;
+    const pct=(v.attraction/maxA*100).toFixed(0);
+    const c=v.attraction>10?'#c9a04e':v.attraction>5?'#7b8cff':'#4a5a9a';
+    return '<tr><td style="font-size:10px;font-family:monospace">'+v.node_id+'</td><td style="color:'+c+'">'+v.attraction+'</td><td><div class="tension-bar" style="width:120px"><div class="tension-fill" style="width:'+pct+'%;background:'+c+'"></div></div></td></tr>';
+  }).join('')+'</table>':'<p style="color:#4a4a6a">暂无高空位吸引力节点</p>';
+
+  el.innerHTML=`
+  <div style="margin-bottom:20px"><h1 style="margin:0;font-size:20px;color:#b08cff">空间几何 — BCC 晶格拓扑分析</h1>
+  <p style="color:#4a4a6a;font-size:11px;margin-top:4px">vertex邻居(第三级) · Moran's I 空间自相关 · BCC单元体一致性 · 空位能量场</p></div>
+  <div class="stats-grid" style="margin-bottom:20px">
+    <div class="stat"><div class="label">Moran's I</div><div class="value" style="color:${miColor};font-size:24px">${mi.toFixed(4)}</div></div>
+    <div class="stat"><div class="label">空间分布</div><div class="value" style="color:${miColor};font-size:14px">${miLabel}</div></div>
+    <div class="stat"><div class="label">Vertex边数</div><div class="value" style="color:#b08cff">${stats.vertex_edges||0}</div></div>
+    <div class="stat"><div class="label">平均Vertex连接</div><div class="value">${(stats.avg_vertex_connections||0).toFixed(1)}</div></div>
+    <div class="stat"><div class="label">BCC单元索引</div><div class="value" style="color:#b08cff">${stats.bcc_unit_index_size||0}</div></div>
+    <div class="stat"><div class="label">反射场相位</div><div class="value" style="color:${refField.phase_state==='crystalline'?'#5eb88a':refField.phase_state==='ordered'?'#7b8cff':'#c9a04e'}">${refField.phase_state||'-'}</div></div>
+    <div class="stat"><div class="label">场熵</div><div class="value">${(refField.field_entropy||0).toFixed(4)}</div></div>
+    <div class="stat"><div class="label">空位总数</div><div class="value">${vacancy.total_with_attraction||0}</div></div>
+  </div>
+  <div class="card"><h2>空间自相关 (Moran's I)</h2>
+  <p style="font-size:11px;color:#3a3a5a;margin-bottom:10px">Moran's I 衡量记忆权重在BCC晶格中的空间分布模式。正值表示相似权重的记忆聚集在一起，负值表示分散，接近零表示随机分布。</p>
+  <div style="display:flex;gap:20px;align-items:center;margin-bottom:12px">
+    <div style="width:300px;height:24px;border-radius:12px;background:linear-gradient(to right,#cf6b6b,#c9a04e,#5eb88a);position:relative">
+      <div style="position:absolute;left:${Math.max(0,Math.min(100,(mi+1)/2*100))}%;top:-4px;width:3px;height:32px;background:#fff;border-radius:2px;transform:translateX(-50%)"></div>
+      <div style="position:absolute;left:0;top:28px;font-size:9px;color:#cf6b6b">-1 离散</div>
+      <div style="position:absolute;left:50%;top:28px;font-size:9px;color:#c9a04e;transform:translateX(-50%)">0 随机</div>
+      <div style="position:absolute;right:0;top:28px;font-size:9px;color:#5eb88a">+1 聚集</div>
+    </div>
+  </div></div>
+  <div class="card"><h2>空位能量场 (Vacancy Attraction Map)</h2>
+  <p style="font-size:11px;color:#3a3a5a;margin-bottom:10px">空节点被高权重邻居包围时产生"吸引力"。高吸引力位置是新记忆放置的最优候选。</p>
+  ${vacHTML}
+  </div>
+  <div class="card"><h2>BCC 晶格几何统计</h2>
+  <div class="config-grid">
+    <div class="config-item"><div class="key">Face衰减</div><div class="val">${stats.pcnn_config?.face_decay||'-'}</div></div>
+    <div class="config-item"><div class="key">Edge衰减</div><div class="val">${stats.pcnn_config?.edge_decay||'-'}</div></div>
+    <div class="config-item"><div class="key">Vertex衰减</div><div class="val">${((stats.pcnn_config?.face_decay||0.72)*(stats.pcnn_config?.edge_decay||0.50)*0.30).toFixed(3)}</div></div>
+    <div class="config-item"><div class="key">四面体单元格</div><div class="val">${honeycomb.total_cells||0}</div></div>
+    <div class="config-item"><div class="key">BCC单元体</div><div class="val">${honeycomb.total_bcc_units||0}</div></div>
+    <div class="config-item"><div class="key">质量均值</div><div class="val">${honeycomb.quality?.mean||'-'}</div></div>
+  </div></div>`;
 }
 
 async function renderDream(el){
