@@ -458,6 +458,231 @@ class CrystallizedPathway:
         ]
 
 
+class SpatialReflectionField:
+    """
+    Spatial Reflection Force Field for the BCC Honeycomb Neural Field.
+
+    Computes a per-node potential energy based on local geometric harmony:
+    - Label coherence with neighbors (semantic gravity)
+    - Tetrahedral cell quality (geometric fitness)
+    - Local density balance (crowding repulsion)
+    - Crystal channel alignment (pathway resonance)
+    - Pulse accumulator pressure (neural tension)
+
+    The field does NOT move nodes (BCC lattice positions are fixed).
+    Instead, it modulates:
+    - Pulse propagation direction weights (anisotropic decay)
+    - Dream source selection (high-tension = creative potential)
+    - Query scoring (low-energy = high confidence)
+    - Memory placement preference (equilibrium positions)
+    - Phase transition detection (energy regime changes)
+    """
+
+    def __init__(self):
+        self._node_energy: Dict[str, float] = {}
+        self._node_gradient: Dict[str, np.ndarray] = {}
+        self._field_entropy = 1.0
+        self._total_reflections = 0
+        self._last_reflection_time = 0.0
+        self._energy_history: List[float] = []
+        self._phase_state = "fluid"
+        self._phase_transitions = 0
+
+    def compute_node_energy(self, field, nid: str) -> float:
+        node = field._nodes.get(nid)
+        if node is None:
+            return 0.5
+        e_label = self._label_coherence(field, nid, node)
+        e_cell = self._cell_quality_energy(field, nid)
+        e_density = self._density_balance(field, nid, node)
+        e_crystal = self._crystal_resonance(field, nid, node)
+        energy = 0.30 * e_label + 0.25 * e_cell + 0.25 * e_density + 0.20 * e_crystal
+        return min(1.0, max(0.0, energy))
+
+    def _label_coherence(self, field, nid: str, node) -> float:
+        if not node.is_occupied or not node.labels:
+            return 0.5
+        node_labels = set(l for l in node.labels if not l.startswith("__"))
+        if not node_labels:
+            return 0.5
+        coherent = 0
+        total = 0
+        for fnid in node.face_neighbors[:8]:
+            fn = field._nodes.get(fnid)
+            if fn and fn.is_occupied:
+                fn_labels = set(l for l in fn.labels if not l.startswith("__"))
+                if fn_labels:
+                    overlap = len(node_labels & fn_labels)
+                    union = len(node_labels | fn_labels)
+                    coherent += overlap / max(union, 1)
+                    total += 1
+        if total == 0:
+            return 0.5
+        return coherent / total
+
+    def _cell_quality_energy(self, field, nid: str) -> float:
+        cells = field._cell_map.get_cells_for_node(nid)
+        if not cells:
+            return 0.5
+        best_quality = max(c.quality for c in cells)
+        return 1.0 - best_quality
+
+    def _density_balance(self, field, nid: str, node) -> float:
+        occupied_count = 0
+        total_count = 0
+        for fnid in node.face_neighbors[:8]:
+            fn = field._nodes.get(fnid)
+            if fn:
+                total_count += 1
+                if fn.is_occupied:
+                    occupied_count += 1
+        if total_count == 0:
+            return 0.5
+        density = occupied_count / total_count
+        return abs(density - 0.5) * 2.0
+
+    def _crystal_resonance(self, field, nid: str, node) -> float:
+        if not node.crystal_channels:
+            return 0.5
+        crystal_sum = sum(node.crystal_channels.values())
+        return min(1.0, crystal_sum / 5.0)
+
+    def run_reflection_cycle(self, field) -> Dict[str, Any]:
+        with field._lock:
+            old_entropy = self._field_entropy
+            energies = []
+            gradient_sum = np.zeros(3, dtype=np.float32)
+
+            for nid, node in field._nodes.items():
+                if not node.is_occupied:
+                    continue
+                energy = self.compute_node_energy(field, nid)
+                self._node_energy[nid] = energy
+                energies.append(energy)
+
+                if node.is_occupied and len(node.face_neighbors) > 0:
+                    gradient = np.zeros(3, dtype=np.float32)
+                    for fnid in node.face_neighbors[:6]:
+                        fn = field._nodes.get(fnid)
+                        if fn:
+                            fn_e = self._node_energy.get(fnid, 0.5)
+                            direction = fn.position - node.position
+                            dist = float(np.linalg.norm(direction))
+                            if dist > 0:
+                                gradient += direction / dist * (fn_e - energy)
+                    self._node_gradient[nid] = gradient
+                    gradient_sum += np.abs(gradient)
+
+            if energies:
+                self._field_entropy = float(np.std(energies))
+            else:
+                self._field_entropy = 0.0
+
+            avg_energy = float(np.mean(energies)) if energies else 0.5
+            self._energy_history.append(avg_energy)
+            if len(self._energy_history) > 100:
+                self._energy_history = self._energy_history[-50:]
+
+            prev_phase = self._phase_state
+            if avg_energy < 0.2 and self._field_entropy < 0.1:
+                self._phase_state = "crystalline"
+            elif avg_energy < 0.35 and self._field_entropy < 0.2:
+                self._phase_state = "ordered"
+            elif avg_energy > 0.6 and self._field_entropy > 0.3:
+                self._phase_state = "turbulent"
+            else:
+                self._phase_state = "fluid"
+
+            if prev_phase != self._phase_state:
+                self._phase_transitions += 1
+
+            self._total_reflections += 1
+            self._last_reflection_time = time.time()
+
+            high_tension = [nid for nid, e in self._node_energy.items() if e > 0.7]
+            low_tension = [nid for nid, e in self._node_energy.items() if e < 0.2]
+
+            self._apply_field_adjustments(field, high_tension, low_tension)
+
+            return {
+                "avg_energy": round(avg_energy, 4),
+                "field_entropy": round(self._field_entropy, 4),
+                "phase_state": self._phase_state,
+                "phase_changed": prev_phase != self._phase_state,
+                "high_tension_nodes": len(high_tension),
+                "low_tension_nodes": len(low_tension),
+                "total_reflections": self._total_reflections,
+                "gradient_magnitude": round(float(np.mean(np.abs(gradient_sum))), 4),
+            }
+
+    def _apply_field_adjustments(self, field, high_tension: List[str], low_tension: List[str]):
+        for nid in high_tension[:5]:
+            node = field._nodes.get(nid)
+            if node and node.is_occupied:
+                node.base_activation = min(node.base_activation + 0.01, 1.0)
+                if node.weight > 0.5:
+                    geo_quality = field._compute_node_geometric_quality(nid)
+                    if geo_quality < 0.4:
+                        for enid in node.edge_neighbors[:4]:
+                            en = field._nodes.get(enid)
+                            if en and not en.is_occupied:
+                                for fnid in en.face_neighbors[:4]:
+                                    fn = field._nodes.get(fnid)
+                                    if fn and fn.is_occupied:
+                                        shared = len(set(node.labels) & set(fn.labels))
+                                        if shared > 0:
+                                            field._hebbian.record_path([nid, enid, fnid], True, 0.05 * shared)
+                                        break
+                    else:
+                        for fnid in node.face_neighbors[:3]:
+                            fn = field._nodes.get(fnid)
+                            if fn and fn.is_occupied:
+                                shared = len(set(node.labels) & set(fn.labels))
+                                if shared > 0:
+                                    field._hebbian.record_path([nid, fnid], True, 0.1 * shared)
+
+        for nid in low_tension[:5]:
+            node = field._nodes.get(nid)
+            if node and node.is_occupied:
+                node.base_activation = max(node.base_activation - 0.005, 0.01)
+                geo_q = field._compute_node_geometric_quality(nid)
+                node.metadata["geometric_quality"] = geo_q
+
+    def get_node_energy(self, nid: str) -> float:
+        return self._node_energy.get(nid, 0.5)
+
+    def get_pulse_direction_bias(self, field, from_id: str, to_id: str) -> float:
+        from_e = self._node_energy.get(from_id, 0.5)
+        to_e = self._node_energy.get(to_id, 0.5)
+        gradient = self._node_gradient.get(from_id)
+        from_node = field._nodes.get(from_id)
+        to_node = field._nodes.get(to_id)
+        if gradient is not None and from_node is not None and to_node is not None:
+            direction = to_node.position - from_node.position
+            dist = float(np.linalg.norm(direction))
+            if dist > 0:
+                alignment = float(np.dot(gradient, direction / dist))
+                return 1.0 + alignment * 0.3
+        return 1.0 + (to_e - from_e) * 0.2
+
+    def get_dream_tension(self, nid: str) -> float:
+        return self._node_energy.get(nid, 0.5)
+
+    def get_spatial_quality(self, field, nid: str) -> float:
+        energy = self._node_energy.get(nid, 0.5)
+        return 1.0 - energy
+
+    def stats(self) -> Dict[str, Any]:
+        return {
+            "phase_state": self._phase_state,
+            "phase_transitions": self._phase_transitions,
+            "field_entropy": round(self._field_entropy, 4),
+            "total_reflections": self._total_reflections,
+            "avg_energy": round(float(np.mean(list(self._node_energy.values()))), 4) if self._node_energy else 0.5,
+            "energy_history_len": len(self._energy_history),
+        }
+
+
 class LatticeIntegrityReport:
     __slots__ = (
         "check_time", "total_nodes", "face_edges_checked", "edge_edges_checked",
@@ -1934,7 +2159,12 @@ class DreamEngine:
                 if spatial_factor < 0.15:
                     continue
 
+                field_tension_a = field._reflection_field.get_dream_tension(nid_a) if field._reflection_field else 0.5
+                field_tension_b = field._reflection_field.get_dream_tension(nid_b) if field._reflection_field else 0.5
+                tension_product = field_tension_a * field_tension_b
+
                 creativity = self._score_creativity(node_a, node_b, domain_a_name, domain_b_name)
+                creativity = min(1.0, creativity * (1.0 + tension_product * 0.3))
 
                 if creativity < 0.3:
                     continue
@@ -2427,6 +2657,7 @@ class HoneycombNeuralField:
         self._agent_driver: Optional[AgentMemoryDriver] = None
         self._feedback_loop: Optional[FeedbackLoop] = None
         self._session_manager: Optional[SessionManager] = None
+        self._reflection_field: Optional[SpatialReflectionField] = None
 
     def initialize(self) -> Dict[str, Any]:
         with self._lock:
@@ -2438,6 +2669,85 @@ class HoneycombNeuralField:
                 len(self._cell_map._cells), len(self._cell_map._bcc_cell_index),
             )
             return self.stats()
+
+    def _bcc_direction_factor(self, from_pos: np.ndarray, to_pos: np.ndarray) -> float:
+        """
+        BCC crystallographic direction factor.
+        In BCC lattice, ⟨111⟩ (body diagonal) is the nearest-neighbor direction
+        with the strongest bonding. ⟨110⟩ is face diagonal. ⟨100⟩ is cube edge.
+        Returns a propagation favorability: ⟨111⟩ > ⟨110⟩ > ⟨100⟩.
+        """
+        delta = to_pos - from_pos
+        dist = float(np.linalg.norm(delta))
+        if dist < 1e-10:
+            return 1.0
+        direction = delta / dist
+        abs_dir = np.abs(direction)
+        abs_dir_sum = float(np.sum(abs_dir))
+        if abs_dir_sum < 1e-10:
+            return 1.0
+        normalized = abs_dir / abs_dir_sum
+        max_comp = float(np.max(normalized))
+        alignment_111 = 1.0 - max_comp
+        alignment_100 = max_comp - (1.0 / 3.0)
+        alignment_100 = max(0.0, alignment_100)
+        factor = 1.0 + 0.15 * alignment_111 - 0.10 * alignment_100
+        return max(0.7, min(1.3, factor))
+
+    def _compute_node_geometric_quality(self, nid: str) -> float:
+        """
+        Compute the geometric quality of a memory node based on its
+        tetrahedral cell volume, quality, skewness, and jacobian.
+        Higher = better geometric harmony = more reliable memory.
+        """
+        node = self._nodes.get(nid)
+        if node is None or not node.is_occupied:
+            return 0.0
+        cells = self._cell_map.get_cells_for_node(nid)
+        if not cells:
+            return 0.5
+        total_quality = sum(c.quality for c in cells)
+        avg_quality = total_quality / len(cells)
+        best_volume = max((c.volume for c in cells), default=0)
+        volume_factor = min(1.0, best_volume / (self._spacing ** 3 * 0.1178 + 1e-10))
+        avg_jacobian = sum(c.jacobian for c in cells) / len(cells)
+        avg_skew = sum(c.skewness for c in cells) / len(cells)
+        geo_quality = (
+            0.35 * avg_quality
+            + 0.25 * volume_factor
+            + 0.25 * avg_jacobian
+            + 0.15 * (1.0 - avg_skew)
+        )
+        return round(min(1.0, max(0.0, geo_quality)), 4)
+
+    def _compute_geometric_topo_divergence(self, nid: str) -> float:
+        """
+        Divergence between geometric proximity and topological (label) proximity.
+        High divergence = geometric neighbors share few labels = spatial tension.
+        This is the core metric for geometric memory understanding.
+        """
+        node = self._nodes.get(nid)
+        if node is None or not node.is_occupied:
+            return 0.0
+        node_labels = set(l for l in node.labels if not l.startswith("__"))
+        if not node_labels:
+            return 0.0
+        total_divergence = 0.0
+        count = 0
+        for fnid in node.face_neighbors[:8]:
+            fn = self._nodes.get(fnid)
+            if fn and fn.is_occupied:
+                fn_labels = set(l for l in fn.labels if not l.startswith("__"))
+                if fn_labels:
+                    jaccard = len(node_labels & fn_labels) / max(len(node_labels | fn_labels), 1)
+                    geometric_dist = float(np.linalg.norm(node.position - fn.position))
+                    geo_proximity = 1.0 / (1.0 + geometric_dist)
+                    divergence = abs(geo_proximity - jaccard)
+                    total_divergence += divergence
+                    count += 1
+        if count == 0:
+            return 0.0
+        return total_divergence / count
 
     def _build_bcc_lattice(self):
         res = self._resolution
@@ -2543,6 +2853,8 @@ class HoneycombNeuralField:
             node.activation = weight
             node.base_activation = max(0.01, weight * 0.1)
             node.metadata = metadata or {}
+            node.metadata["geometric_quality"] = self._compute_node_geometric_quality(nid)
+            node.metadata["geo_topo_divergence"] = self._compute_geometric_topo_divergence(nid)
             node.creation_time = creation_time_override if creation_time_override is not None else time.time()
             node.touch()
 
@@ -2725,19 +3037,41 @@ class HoneycombNeuralField:
                 if node.pulse_accumulator > 0.1:
                     pulse_boost = min(0.05, node.pulse_accumulator * 0.1)
 
+                spatial_quality = 0.0
+                if self._reflection_field:
+                    sq = self._reflection_field.get_spatial_quality(self, nid)
+                    spatial_quality = sq
+
+                geometric_quality = self._compute_node_geometric_quality(nid)
+
+                geo_topo_divergence = self._compute_geometric_topo_divergence(nid)
+                divergence_bonus = 0.0
+                if geo_topo_divergence > 0.5:
+                    divergence_bonus = geo_topo_divergence * 0.05
+
+                neighbor_density_score = 0.0
+                occ_neighbors = sum(1 for fnid in node.face_neighbors[:8] if self._nodes.get(fnid) and self._nodes[fnid].is_occupied)
+                if occ_neighbors > 0:
+                    neighbor_density_score = min(1.0, occ_neighbors / 6.0)
+
                 dream_bonus = 0.0
                 if "__dream__" in node.labels:
                     dream_bonus = 0.03
 
                 final = (
-                    0.35 * text_score
-                    + 0.10 * trigram_score
-                    + 0.20 * label_score
-                    + 0.15 * activation_score
-                    + 0.08 * weight_score
-                    + 0.05 * hebbian_boost
+                    0.20 * text_score
+                    + 0.06 * trigram_score
+                    + 0.12 * label_score
+                    + 0.10 * activation_score
+                    + 0.05 * weight_score
+                    + 0.04 * hebbian_boost
                     + 0.04 * crystal_boost
                     + 0.02 * pulse_boost
+                    + 0.10 * spatial_quality
+                    + 0.10 * geometric_quality
+                    + 0.06 * neighbor_density_score
+                    + 0.05 * geo_topo_divergence
+                    + 0.03 * divergence_bonus
                     + 0.01 * dream_bonus
                 )
                 scored.append((nid, final))
@@ -2952,12 +3286,22 @@ class HoneycombNeuralField:
             if nid not in pulse.path:
                 base_strength = pulse.strength * cfg.FACE_DECAY
                 crystal_boost = self._crystallized.get_boost(current_id, nid)
-                raw_candidates.append((nid, base_strength * crystal_boost, "face"))
+                spatial_bias = self._reflection_field.get_pulse_direction_bias(self, current_id, nid) if self._reflection_field else 1.0
+                bcc_dir = self._bcc_direction_factor(current.position, self._nodes[nid].position) if nid in self._nodes else 1.0
+                raw_candidates.append((nid, base_strength * crystal_boost * spatial_bias * bcc_dir, "face"))
         for nid in current.edge_neighbors:
             if nid not in pulse.path:
                 base_strength = pulse.strength * cfg.FACE_DECAY * cfg.EDGE_DECAY_FACTOR
                 crystal_boost = self._crystallized.get_boost(current_id, nid)
-                raw_candidates.append((nid, base_strength * crystal_boost, "edge"))
+                spatial_bias = self._reflection_field.get_pulse_direction_bias(self, current_id, nid) if self._reflection_field else 1.0
+                bcc_dir = self._bcc_direction_factor(current.position, self._nodes[nid].position) if nid in self._nodes else 1.0
+                raw_candidates.append((nid, base_strength * crystal_boost * spatial_bias * bcc_dir, "edge"))
+        for nid in current.vertex_neighbors:
+            if nid not in pulse.path:
+                nn = self._nodes.get(nid)
+                if nn and nn.is_occupied:
+                    base_strength = pulse.strength * cfg.FACE_DECAY * cfg.EDGE_DECAY_FACTOR * 0.3
+                    raw_candidates.append((nid, base_strength, "vertex"))
 
         if not raw_candidates:
             return
@@ -3058,8 +3402,9 @@ class HoneycombNeuralField:
         self._agent_driver = AgentMemoryDriver(self)
         self._feedback_loop = FeedbackLoop(self)
         self._session_manager = SessionManager(self)
+        self._reflection_field = SpatialReflectionField()
         logger.info(
-            "PCNN pulse engine started (v6.0) — face_decay=%.2f, edge_decay=%.2f, cascade=on, dream=on, agent=on, feedback=on, session=on",
+            "PCNN pulse engine started (v6.1) — face_decay=%.2f, edge_decay=%.2f, cascade=on, dream=on, reflection=on",
             PCNNConfig.FACE_DECAY, PCNNConfig.FACE_DECAY * PCNNConfig.EDGE_DECAY_FACTOR,
         )
 
@@ -3100,6 +3445,9 @@ class HoneycombNeuralField:
 
                 if cycle % PCNNConfig.DREAM_CYCLE_INTERVAL == 0 and self._dream_engine:
                     self._dream_engine.run_dream_cycle()
+
+                if cycle % 150 == 0 and self._reflection_field:
+                    self._reflection_field.run_reflection_cycle(self)
 
             except Exception as e:
                 logger.error("Pulse cycle error: %s", e, exc_info=True)
@@ -3472,6 +3820,7 @@ class HoneycombNeuralField:
                 "bridge_rate": round(self._recent_bridge_rate, 6),
                 "hebbian": self._hebbian.stats(),
                 "crystallized": self._crystallized.stats(),
+                "reflection_field": self._reflection_field.stats() if self._reflection_field else {"phase_state": "uninitialized"},
                 "lattice_integrity": self._lattice_checker.get_latest() if self._lattice_checker else None,
                 "self_check": self.self_check_status() if self._self_check else {"engine_running": False},
                 "self_organize": self._self_organize.stats() if self._self_organize else {"engine_active": False},
@@ -4024,6 +4373,14 @@ class FeedbackLoop:
                 node.activation = min(10.0, node.activation + boost * 0.5)
                 if "__low_priority__" in node.labels:
                     node.labels.remove("__low_priority__")
+
+                spatial_spread = boost * 0.3
+                for fnid in node.face_neighbors[:6]:
+                    fn = field._nodes.get(fnid)
+                    if fn and fn.is_occupied:
+                        shared = len(set(node.labels) & set(fn.labels))
+                        if shared > 0:
+                            fn.activation = min(10.0, fn.activation + spatial_spread * shared * 0.1)
 
                 self._consecutive_positive[context_id] = self._consecutive_positive.get(context_id, 0) + 1
                 if self._consecutive_positive[context_id] >= 3:
