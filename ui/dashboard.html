@@ -162,6 +162,7 @@ tr:hover td{background:rgba(100,80,255,.02)}
   <div class="sub">BCC Lattice Honeycomb + PCNN Neural Pulse v6.5</div>
   <div style="font-size:10px;color:rgba(100,120,255,.25);margin-bottom:18px;line-height:1.6">TetraMem-XL 独立可视化面板<br>默认用户: tetramem / tetramem123<br>请输入运行 TetraMem-XL 的服务器地址</div>
   <input id="apiBase" placeholder="API 地址 (如 http://192.168.1.100:8082)" value="" autocomplete="off">
+  <div id="apiStatus" style="font-size:10px;min-height:14px;margin-bottom:6px"></div>
   <input id="user" placeholder="用户名" autocomplete="off">
   <input id="pass" type="password" placeholder="密码">
   <button onclick="doLogin()">登 录</button>
@@ -292,10 +293,28 @@ function spawnFlowParticles(){
 }
 setInterval(spawnFlowParticles,400);
 
+(function autoDetect(){
+  const saved=localStorage.getItem('tetramem_api_base');
+  if(saved){document.getElementById('apiBase').value=saved;}
+  const ab=document.getElementById('apiBase');
+  function probe(){
+    const url=ab.value.trim().replace(/\/+$/,'');
+    if(!url){document.getElementById('apiStatus').innerHTML='';return;}
+    document.getElementById('apiStatus').innerHTML='<span style="color:#7b8cff">探测中...</span>';
+    fetch(url+'/api/v1/health',{signal:AbortSignal.timeout(3000)}).then(r=>r.json()).then(d=>{
+      if(d.status==='ok'){
+        document.getElementById('apiStatus').innerHTML='<span style="color:#5eb88a">已连接 · '+d.version+'</span>';
+      }else{document.getElementById('apiStatus').innerHTML='<span style="color:#cf6b6b">响应异常</span>';}
+    }).catch(()=>{document.getElementById('apiStatus').innerHTML='<span style="color:#cf6b6b">无法连接</span>';});
+  }
+  ab.addEventListener('input',(()=>{let t;return()=>{clearTimeout(t);t=setTimeout(probe,800);};})());
+  if(saved){probe();}
+})();
+
 function doLogin(){
   const u=document.getElementById('user').value,p=document.getElementById('pass').value;
   const ab=document.getElementById('apiBase').value.trim();
-  if(ab){API=ab.replace(/\/+$/,'')+'/api/v1/';}
+  if(ab){API=ab.replace(/\/+$/,'')+'/api/v1/';localStorage.setItem('tetramem_api_base',ab);}
   if(CREDS[u]&&CREDS[u]===p){
     document.getElementById('loginPage').classList.add('hidden');
     document.getElementById('appPage').classList.remove('hidden');
