@@ -1931,8 +1931,9 @@ class SelfOrganizeEngine:
 
         consolidated = 0
         checked = set()
+        low_map = {nid: n for nid, n in low_weight}
 
-        for i, (nid_a, node_a) in enumerate(low_weight):
+        for nid_a, node_a in low_weight:
             if consolidated >= cfg.CONSOLIDATION_MAX_PER_CYCLE:
                 break
             if nid_a in checked:
@@ -1949,9 +1950,16 @@ class SelfOrganizeEngine:
             best_match = None
             best_sim = 0.0
 
-            for j in range(i + 1, min(i + 20, len(low_weight))):
-                nid_b, node_b = low_weight[j]
+            candidate_nids = set()
+            for tok in tokens_a:
+                candidate_nids.update(field._content_token_index.get(tok, set()))
+            candidate_nids.discard(nid_a)
+
+            for nid_b in candidate_nids:
                 if nid_b in checked:
+                    continue
+                node_b = low_map.get(nid_b)
+                if node_b is None:
                     continue
                 if node_b.crystal_channels:
                     continue
@@ -2001,41 +2009,58 @@ class SelfOrganizeEngine:
 
     def _create_shortcuts(self, field, occupied, result: OrganizeResult):
         cfg = PCNNConfig
-        occupied_dict = {nid: n for nid, n in occupied}
         shortcuts_this_cycle = 0
+        exclude = {"__pulse_bridge__", "__system__", "__consolidated__", "__dream__"}
+        occupied_set = {nid for nid, _ in occupied}
+        label_inv: Dict[str, List[str]] = defaultdict(list)
+        for nid, node in occupied:
+            for lbl in node.labels:
+                if lbl not in exclude:
+                    label_inv[lbl].append(nid)
 
-        for nid_a, node_a in occupied[:50]:
+        candidate_pairs: Dict[Tuple[str, str], Set[str]] = defaultdict(set)
+        for lbl, nids in label_inv.items():
+            if len(nids) < 2:
+                continue
+            sampled = nids if len(nids) <= 30 else random.sample(nids, 30)
+            for i in range(len(sampled)):
+                for j in range(i + 1, len(sampled)):
+                    a, b = sampled[i], sampled[j]
+                    key = (min(a, b), max(a, b))
+                    candidate_pairs[key].add(lbl)
+
+        scored: List[Tuple[float, Tuple[str, str], Set[str]]] = []
+        for key, shared in candidate_pairs.items():
+            if len(shared) < cfg.SHORTCUT_MIN_LABEL_OVERLAP:
+                continue
+            if key in self._shortcuts:
+                continue
+            na, nb = field._nodes.get(key[0]), field._nodes.get(key[1])
+            if na is None or nb is None:
+                continue
+            if nb.id in na.face_neighbors or nb.id in na.edge_neighbors:
+                continue
+            all_labels_a = set(na.labels) - exclude
+            all_labels_b = set(nb.labels) - exclude
+            jaccard = len(shared) / max(len(all_labels_a | all_labels_b), 1)
+            scored.append((jaccard, key, shared))
+        scored.sort(key=lambda x: -x[0])
+
+        for jaccard, key, shared in scored[:200]:
             if shortcuts_this_cycle >= cfg.SHORTCUT_MAX_PER_CYCLE:
                 break
-
-            labels_a = set(node_a.labels) - {"__pulse_bridge__", "__system__", "__consolidated__"}
-            if not labels_a:
+            nid_a, nid_b = key
+            distance = self._topo_distance(field, nid_a, nid_b)
+            if distance is None or distance <= 2 or distance > cfg.SHORTCUT_MAX_DISTANCE:
                 continue
-
-            for nid_b, node_b in occupied[:50]:
-                if nid_a == nid_b or nid_b in node_a.face_neighbors or nid_b in node_a.edge_neighbors:
-                    continue
-
-                key = (min(nid_a, nid_b), max(nid_a, nid_b))
-                if key in self._shortcuts:
-                    continue
-
-                labels_b = set(node_b.labels) - {"__pulse_bridge__", "__system__", "__consolidated__"}
-                shared_labels = labels_a & labels_b
-                if len(shared_labels) < cfg.SHORTCUT_MIN_LABEL_OVERLAP:
-                    continue
-
-                distance = self._topo_distance(field, nid_a, nid_b)
-                if distance is None or distance <= 2 or distance > cfg.SHORTCUT_MAX_DISTANCE:
-                    continue
-
-                strength = cfg.SHORTCUT_VIRTUAL_STRENGTH * len(shared_labels) / max(len(labels_a | labels_b), 1)
-                self._shortcuts[key] = strength
-
-                field._hebbian.record_path(
-                    [nid_a, nid_b], success=True, strength=strength * 2.0
-                )
-                shortcuts_this_cycle += 1
+            all_labels_a = set(field._nodes[nid_a].labels) - exclude
+            all_labels_b = set(field._nodes[nid_b].labels) - exclude
+            strength = cfg.SHORTCUT_VIRTUAL_STRENGTH * len(shared) / max(len(all_labels_a | all_labels_b), 1)
+            self._shortcuts[key] = strength
+            field._hebbian.record_path(
+                [nid_a, nid_b], success=True, strength=strength * 2.0
+            )
+            shortcuts_this_cycle += 1
 
         if len(self._shortcuts) > 500:
             sorted_s = sorted(self._shortcuts.items(), key=lambda x: x[1])
