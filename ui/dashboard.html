@@ -925,7 +925,7 @@ function updateScene(tetras){
 
 function buildScene(data){
   const sp=data.spacing||1.0;const sc=0.8;
-  const mems=(data.memories||[]).slice(0,800);
+  const mems=(data.memories||[]);
   if(mems.length===0)return;
 
   const neighborVerts=[];
@@ -934,17 +934,36 @@ function buildScene(data){
   latticeAdjacency=new Map();
   mems.forEach(m=>{const v=new THREE.Vector3(m.pos[0]*sc,m.pos[1]*sc,m.pos[2]*sc);posMap.set(m.id,v);latticePosMap.set(m.id,v);latticeAdjacency.set(m.id,new Set());});
   const thresh=sp*sc*2.0;
-  for(let i=0;i<mems.length;i++){
-    const idA=mems[i].id;const p1=posMap.get(idA);
-    for(let j=i+1;j<mems.length;j++){
-      const idB=mems[j].id;const p2=posMap.get(idB);
-      if(p1.distanceTo(p2)<thresh){
-        neighborVerts.push(p1.x,p1.y,p1.z,p2.x,p2.y,p2.z);
-        latticeAdjacency.get(idA).add(idB);
-        latticeAdjacency.get(idB).add(idA);
+  const cellSize=thresh;
+  const grid=new Map();
+  mems.forEach(m=>{
+    const v=posMap.get(m.id);
+    const cx=Math.floor(v.x/cellSize),cy=Math.floor(v.y/cellSize),cz=Math.floor(v.z/cellSize);
+    const key=cx+','+cy+','+cz;
+    if(!grid.has(key))grid.set(key,[]);
+    grid.get(key).push(m.id);
+  });
+  const seen=new Set();
+  grid.forEach((ids,key)=>{
+    const [cx,cy,cz]=key.split(',').map(Number);
+    for(let dx=-1;dx<=1;dx++)for(let dy=-1;dy<=1;dy++)for(let dz=-1;dz<=1;dz++){
+      const nk=(cx+dx)+','+(cy+dy)+','+(cz+dz);
+      const nids=grid.get(nk);
+      if(!nids)continue;
+      for(const idA of ids)for(const idB of nids){
+        if(idA>=idB)continue;
+        const pair=idA<idB?idA+'|'+idB:idB+'|'+idA;
+        if(seen.has(pair))continue;
+        seen.add(pair);
+        const p1=posMap.get(idA),p2=posMap.get(idB);
+        if(p1.distanceTo(p2)<thresh){
+          neighborVerts.push(p1.x,p1.y,p1.z,p2.x,p2.y,p2.z);
+          latticeAdjacency.get(idA).add(idB);
+          latticeAdjacency.get(idB).add(idA);
+        }
       }
     }
-  }
+  });
   if(neighborVerts.length>0){
     const geo=new THREE.BufferGeometry();
     geo.setAttribute('position',new THREE.Float32BufferAttribute(neighborVerts,3));
