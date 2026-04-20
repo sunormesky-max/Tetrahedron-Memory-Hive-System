@@ -299,9 +299,44 @@ def stats():
         return _field.stats()
 
 
+_ui_password = os.environ.get("TETRAMEM_UI_PASSWORD", "CHANGE_ME")
+
+
+@app.post("/api/v1/setup/set-password")
+def set_password(body: Dict[str, str]):
+    global _ui_password
+    new_pw = body.get("new_password", "")
+    if not new_pw or len(new_pw) < 4:
+        raise HTTPException(400, "Password must be at least 4 characters")
+    if _ui_password != "CHANGE_ME":
+        raise HTTPException(403, "Password already set. Use environment variable TETRAMEM_UI_PASSWORD to change.")
+    _ui_password = new_pw
+    return {"status": "ok", "message": "Password updated for this session. Set TETRAMEM_UI_PASSWORD env var for persistence."}
+
 @app.get("/api/v1/health")
 def health():
     return {"status": "ok", "version": "6.5.0", "uptime_seconds": time.time() - _start_time}
+
+
+@app.get("/api/v1/setup-info")
+def setup_info():
+    return {
+        "version": "6.5.0",
+        "system": "TetraMem-XL",
+        "description": "BCC Lattice Honeycomb + PCNN Neural Pulse Memory System",
+        "default_credentials": {
+            "username": "tetramem",
+            "password": "CHANGE_ME",
+        },
+        "api_prefix": "/api/v1/",
+        "ui_path": "/ui/",
+        "endpoints": [
+            "health", "store", "query", "tetrahedra", "stats",
+            "pulse-status", "cascade/trigger", "self-check",
+            "self-organize", "dream", "lattice-info", "honeycomb/analysis",
+            "crystallized/status", "session", "feedback", "spatial/*",
+        ],
+    }
 
 
 @app.get("/api/v1/tetrahedra")
