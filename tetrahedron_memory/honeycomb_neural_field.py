@@ -2410,7 +2410,7 @@ class DreamEngine:
                     struct_b = self._extract_deep_structure(node_b.content)
                     creativity = self._score_creativity(node_a, node_b, domain_a_name, domain_b_name)
                     creativity = min(1.0, creativity * 1.3)
-                    if creativity < 0.3:
+                    if creativity < 0.5:
                         continue
                     self._create_deep_dream(field, result, nid_a, nid_b, node_a, node_b,
                                             domain_a_name, domain_b_name, struct_a, struct_b,
@@ -2438,7 +2438,7 @@ class DreamEngine:
                 creativity = self._score_creativity(node_a, node_b, domain_a_name, domain_b_name)
                 creativity = min(1.0, creativity * (1.0 + tension_product * 0.3))
 
-                if creativity < 0.3:
+                if creativity < 0.5:
                     continue
 
                 depth_a = domain_depths.get(domain_a_name, 0)
@@ -2477,19 +2477,22 @@ class DreamEngine:
         )
 
         dream_parts = []
-        dream_parts.append(f"{domain_a_name}⟨{summary_a}⟩")
+        dream_parts.append(f"{domain_a_name}核心: {summary_a}")
         for wlabels, ws in waypoint_summaries:
-            label_hint = "·".join(wlabels) if wlabels else "..."
-            dream_parts.append(f"↔{label_hint}⟨{ws}⟩")
-        dream_parts.append(f"{domain_b_name}⟨{summary_b}⟩")
+            label_hint = "/".join(wlabels) if wlabels else ""
+            dream_parts.append(f"经由{label_hint}: {ws}" if label_hint else f"中间: {ws}")
+        dream_parts.append(f"{domain_b_name}核心: {summary_b}")
 
-        dream_content = "[dream] " + " → ".join(dream_parts) + " || " + deep_insight
+        dream_content = "[dream] " + " -> ".join(dream_parts) + " | " + deep_insight
         dream_labels = list(set([
             domain_a_name, domain_b_name, "__dream__",
         ]))
-        dream_weight = min(
-            cfg.DREAM_INSIGHT_WEIGHT * creativity * (1.0 + (depth_a + depth_b) * 0.2),
-            max(node_a.weight, node_b.weight) * 0.8,
+        dream_weight = max(
+            0.5,
+            min(
+                cfg.DREAM_INSIGHT_WEIGHT * creativity * (1.0 + (depth_a + depth_b) * 0.2),
+                max(node_a.weight, node_b.weight) * 0.8,
+            )
         )
 
         path_length = len(waypoints) + 2
@@ -4639,26 +4642,62 @@ class HoneycombNeuralField:
                         sources.add(enid)
 
                 if len(sources) >= cfg.MIN_BRIDGE_SOURCES and not node.is_occupied:
-                    source_contents = []
+                    source_nodes = []
                     source_labels = set()
                     for sid in list(sources)[:4]:
                         sn = self._nodes.get(sid)
                         if sn and sn.is_occupied:
-                            source_contents.append(sn.content[:60])
+                            source_nodes.append((sid, sn))
                             source_labels.update(sn.labels)
                     source_labels.discard("__dream__")
                     source_labels.discard("__system__")
-                    label_str = ", ".join(list(source_labels)[:4]) if source_labels else "general"
-                    bridge = f"[pulse:bridge:{label_str}] {' | '.join(source_contents[:3])}"
+                    source_labels.discard("__pulse_bridge__")
+
+                    non_system_labels = [l for l in source_labels if not l.startswith("__")]
+                    if len(non_system_labels) < 1:
+                        continue
+
+                    src_token_sets = [self._extract_tokens(sn.content) for _, sn in source_nodes]
+                    pairwise_overlap = 0
+                    pair_count = 0
+                    for ti in range(len(src_token_sets)):
+                        for tj in range(ti + 1, len(src_token_sets)):
+                            if src_token_sets[ti] and src_token_sets[tj]:
+                                inter = len(src_token_sets[ti] & src_token_sets[tj])
+                                union = len(src_token_sets[ti] | src_token_sets[tj])
+                                if union > 0:
+                                    pairwise_overlap += inter / union
+                                pair_count += 1
+                    avg_semantic = pairwise_overlap / max(pair_count, 1)
+
+                    bridge_weight = node.pulse_accumulator * (0.5 + 0.5 * avg_semantic)
+                    if bridge_weight < 0.3 and avg_semantic < 0.15:
+                        continue
+
+                    label_str = ", ".join(non_system_labels[:4])
+                    summaries = []
+                    for _, sn in source_nodes:
+                        clean = sn.content.lstrip("[").split("] ", 1)
+                        text = clean[-1] if len(clean) > 1 else clean[0]
+                        summaries.append(text.strip()[:50])
+                    bridge = f"[bridge] {label_str}: {' ; '.join(summaries[:3])}"
+
                     node.content = bridge
-                    node.labels = list(source_labels)[:6] + ["__pulse_bridge__"]
-                    node.weight = min(node.pulse_accumulator, 1.0)
-                    node.activation = node.pulse_accumulator * 0.5
+                    node.labels = non_system_labels[:6] + ["__pulse_bridge__"]
+                    node.weight = min(max(bridge_weight, 0.3), 2.0)
+                    node.activation = bridge_weight * 0.5
                     node.base_activation = 0.05
+                    node.metadata = {
+                        "bridge_sources": len(source_nodes),
+                        "semantic_overlap": round(avg_semantic, 3),
+                        "pulse_accumulated": round(node.pulse_accumulator, 3),
+                    }
                     chash = hashlib.sha256(bridge.encode()).hexdigest()[:12]
                     self._content_hash_index[chash] = nid
                     for lbl in node.labels:
                         self._label_index[lbl].add(nid)
+                    for tok in self._extract_tokens(bridge):
+                        self._content_token_index[tok].add(nid)
                     node.pulse_accumulator = 0.0
                     self._bridge_count += 1
                     bridges_this_cycle += 1
