@@ -1882,7 +1882,8 @@ class SelfOrganizeEngine:
                     fnn_n = field._nodes.get(fnn)
                     if fnn_n and fnn_n.is_occupied and node_labels & set(fnn_n.labels):
                         label_match += 1
-                ts = 0.4 * t_geo + 0.3 * t_bcc + 0.3 * min(label_match / 3.0, 1.0)
+                t_cell_q = field._cell_quality_factor(fnid) if hasattr(field, '_cell_quality_factor') else 1.0
+                ts = 0.3 * t_geo + 0.25 * t_bcc + 0.25 * min(label_match / 3.0, 1.0) + 0.2 * t_cell_q
                 if ts > best_ts:
                     best_target = fnid
                     best_ts = ts
@@ -2969,12 +2970,6 @@ class HoneycombNeuralField:
             return self.stats()
 
     def _bcc_direction_factor(self, from_pos: np.ndarray, to_pos: np.ndarray) -> float:
-        """
-        BCC crystallographic direction factor.
-        In BCC lattice, ⟨111⟩ (body diagonal) is the nearest-neighbor direction
-        with the strongest bonding. ⟨110⟩ is face diagonal. ⟨100⟩ is cube edge.
-        Returns a propagation favorability: ⟨111⟩ > ⟨110⟩ > ⟨100⟩.
-        """
         delta = to_pos - from_pos
         dist = float(np.linalg.norm(delta))
         if dist < 1e-10:
@@ -2985,12 +2980,16 @@ class HoneycombNeuralField:
         if abs_dir_sum < 1e-10:
             return 1.0
         normalized = abs_dir / abs_dir_sum
-        max_comp = float(np.max(normalized))
-        alignment_111 = 1.0 - max_comp
-        alignment_100 = max_comp - (1.0 / 3.0)
-        alignment_100 = max(0.0, alignment_100)
-        factor = 1.0 + 0.15 * alignment_111 - 0.10 * alignment_100
-        return max(0.7, min(1.3, factor))
+        ideal_111 = np.array([1.0/3.0, 1.0/3.0, 1.0/3.0])
+        alignment_111 = float(1.0 - np.linalg.norm(normalized - ideal_111) / math.sqrt(2.0/3.0))
+        ideal_100 = np.array([1.0, 0.0, 0.0])
+        alignment_100 = float(1.0 - np.linalg.norm(normalized - ideal_100) / math.sqrt(2.0))
+        factor = 1.0 + 0.20 * alignment_111 - 0.12 * alignment_100
+        nn_dist = self._spacing * math.sqrt(3) / 2.0
+        ideal_step_ratio = nn_dist / max(dist, 1e-10)
+        if 0.8 < ideal_step_ratio < 1.3:
+            factor += 0.15
+        return max(0.7, min(1.4, factor))
 
     def _compute_node_geometric_quality(self, nid: str) -> float:
         """
@@ -3602,7 +3601,13 @@ class HoneycombNeuralField:
                     crystal_nearby = 0.0
                     if fn.crystal_channels:
                         crystal_nearby = len(fn.crystal_channels) * 0.5
-                    face_candidates.append((fnid, fn, bonus + 10 + cell_quality * 3 + vacancy + energy_bonus + crystal_nearby))
+                    cell_q = self._cell_quality_factor(fnid)
+                    autocorr_bonus = 0.0
+                    if bonus > 0 and self._spatial_autocorrelation > 0.05:
+                        autocorr_bonus = bonus * self._spatial_autocorrelation * 3.0
+                    elif bonus == 0 and self._spatial_autocorrelation < -0.05:
+                        autocorr_bonus = 2.0
+                    face_candidates.append((fnid, fn, bonus + 10 + cell_quality * 3 + vacancy + energy_bonus + crystal_nearby + cell_q * 2.0 + autocorr_bonus))
 
         if face_candidates:
             face_candidates.sort(key=lambda x: -x[2])
@@ -3748,6 +3753,11 @@ class HoneycombNeuralField:
 
                 geometric_quality = self._compute_node_geometric_quality(nid)
 
+                cell_effective = 0.0
+                node_cells = self._cell_map.get_cells_for_node(nid)
+                if node_cells:
+                    cell_effective = sum(c.effective_quality for c in node_cells) / len(node_cells)
+
                 geo_topo_divergence = self._compute_geometric_topo_divergence(nid)
                 divergence_bonus = 0.0
                 if geo_topo_divergence > 0.5:
@@ -3780,7 +3790,7 @@ class HoneycombNeuralField:
                             break
 
                 final = (
-                    0.30 * text_score
+                    0.28 * text_score
                     + 0.10 * trigram_score
                     + 0.12 * label_score
                     + 0.08 * activation_score
@@ -3790,6 +3800,7 @@ class HoneycombNeuralField:
                     + 0.02 * pulse_boost
                     + 0.05 * spatial_quality
                     + 0.04 * geometric_quality
+                    + 0.03 * cell_effective
                     + 0.03 * neighbor_density_score
                     + 0.02 * geo_topo_divergence
                     + 0.02 * divergence_bonus
@@ -4001,6 +4012,14 @@ class HoneycombNeuralField:
                 biased.append((nid, strength * 0.8 * h_factor, ctype))
         return biased
 
+    def _cell_quality_factor(self, nid: str) -> float:
+        cells = self._cell_map.get_cells_for_node(nid)
+        if not cells:
+            return 1.0
+        avg_quality = sum(c.quality for c in cells) / len(cells)
+        avg_eff = sum(c.effective_quality for c in cells) / len(cells)
+        return 0.7 + 0.3 * (0.6 * avg_quality + 0.4 * avg_eff)
+
     def _propagate_pulse(self, pulse: NeuralPulse):
         if not pulse.alive:
             return
@@ -4022,16 +4041,17 @@ class HoneycombNeuralField:
 
         cfg = PCNNConfig
         raw_candidates = []
+        cell_q = self._cell_quality_factor(current_id)
         for nid in current.face_neighbors:
             if nid not in pulse.path:
-                base_strength = pulse.strength * cfg.FACE_DECAY
+                base_strength = pulse.strength * cfg.FACE_DECAY * cell_q
                 crystal_boost = self._crystallized.get_boost(current_id, nid)
                 spatial_bias = self._reflection_field.get_pulse_direction_bias(self, current_id, nid) if self._reflection_field else 1.0
                 bcc_dir = self._bcc_direction_factor(current.position, self._nodes[nid].position) if nid in self._nodes else 1.0
                 raw_candidates.append((nid, base_strength * crystal_boost * spatial_bias * bcc_dir, "face"))
         for nid in current.edge_neighbors:
             if nid not in pulse.path:
-                base_strength = pulse.strength * cfg.FACE_DECAY * cfg.EDGE_DECAY_FACTOR
+                base_strength = pulse.strength * cfg.FACE_DECAY * cfg.EDGE_DECAY_FACTOR * cell_q
                 crystal_boost = self._crystallized.get_boost(current_id, nid)
                 spatial_bias = self._reflection_field.get_pulse_direction_bias(self, current_id, nid) if self._reflection_field else 1.0
                 bcc_dir = self._bcc_direction_factor(current.position, self._nodes[nid].position) if nid in self._nodes else 1.0
@@ -4215,6 +4235,9 @@ class HoneycombNeuralField:
 
                 if cycle % PCNNConfig.DREAM_CYCLE_INTERVAL == 0 and self._dream_engine:
                     self._dream_engine.run_dream_cycle()
+
+                if cycle % 120 == 0:
+                    self._cell_map.update_all_densities(self._nodes)
 
                 if cycle % 150 == 0 and self._reflection_field:
                     self._reflection_field.run_reflection_cycle(self)
