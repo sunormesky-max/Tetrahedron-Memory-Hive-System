@@ -160,8 +160,12 @@ tr:hover td{background:rgba(100,80,255,.02)}
 <div class="login-box">
   <h1>TetraMem-XL</h1>
   <div class="sub">BCC Lattice Honeycomb + PCNN Neural Pulse v6.5</div>
-  <input id="user" placeholder="用户名" autocomplete="off">
-  <input id="pass" type="password" placeholder="密码">
+  <div id="setupHint" style="display:none;font-size:11px;color:#5eb88a;margin-bottom:12px;line-height:1.5;padding:10px;background:rgba(94,184,138,.06);border-radius:8px;border:1px solid rgba(94,184,138,.15)">
+    <div style="font-weight:600;margin-bottom:4px">首次安装检测</div>
+    <div id="setupHintText">检测到默认密码，请登录后在「系统设置」中修改密码</div>
+  </div>
+  <input id="user" placeholder="用户名 (默认: tetramem)" autocomplete="off">
+  <input id="pass" type="password" placeholder="密码" autocomplete="off">
   <button onclick="doLogin()">登 录</button>
   <div id="loginErr" class="login-error"></div>
 </div>
@@ -212,6 +216,7 @@ tr:hover td{background:rgba(100,80,255,.02)}
   <button onclick="switchMode('feedback',this)">反馈闭环</button>
   <button onclick="switchMode('session',this)">会话管理</button>
   <button onclick="switchMode('events',this)">事件流</button>
+  <button onclick="switchMode('settings',this)">系统设置</button>
 </div>
 
 <div id="mode3d" class="content-3d">
@@ -267,6 +272,20 @@ let refreshTimer=null;
 let currentMode='3d';
 let _sceneInited=false;
 let _sceneBuilt=false;
+let _isFirstSetup=false;
+
+(function autoSetup(){
+  fetch(API+'setup-info').then(r=>r.json()).then(info=>{
+    if(info&&info.default_credentials&&info.default_credentials.password==='CHANGE_ME'){
+      _isFirstSetup=true;
+      document.getElementById('setupHint').style.display='block';
+      document.getElementById('user').value='tetramem';
+      document.getElementById('pass').value='CHANGE_ME';
+      document.getElementById('pass').focus();
+      document.getElementById('pass').select();
+    }
+  }).catch(()=>{});
+})();
 let G={stats:{},memories:[],selectedId:null,detail:{},associations:[]};
 let scene,camera,renderer,controls,meshGroup,edgeGroup,pulseGroup,tetraMeshMap={},raycaster,mouse,pulseFetchTimer=0;
 let latticeAdjacency=new Map();
@@ -406,6 +425,7 @@ async function renderPanelMode(mode){
     case 'feedback':await renderFeedback(el);break;
     case 'session':await renderSession(el);break;
     case 'events':await renderEvents(el);break;
+    case 'settings':await renderSettings(el);break;
     case 'phase':await renderPhase(el);break;
   }
 }
@@ -1496,6 +1516,46 @@ function disconnectSSE(){
   var d=document.getElementById('sseDot'),st=document.getElementById('sseStatusText');
   if(d)d.style.background='#4a4a6a';
   if(st){st.textContent='已断开';st.style.color='#4a4a6a';}
+}
+
+async function renderSettings(el){
+  let info={};
+  try{info=await api('setup-info');}catch(e){}
+  const isDefault=info.default_credentials&&info.default_credentials.password==='CHANGE_ME';
+  let html='<div style="margin-bottom:20px"><h1 style="margin:0;font-size:20px;color:#7b8cff">系统设置</h1><p style="color:#4a4a6a;font-size:11px;margin-top:4px">TetraMem-XL v6.5 配置管理</p></div>';
+  if(isDefault){
+    html+='<div class="card" style="border-color:rgba(94,184,138,.3)"><h2 style="color:#5eb88a">首次安装 — 设置密码</h2><p style="color:#5eb88a;font-size:12px;margin-bottom:12px">检测到默认密码，强烈建议设置新密码</p>';
+    html+='<input id="newPw" type="password" placeholder="新密码 (至少4位)" style="width:100%;padding:10px 14px;background:rgba(10,10,30,.8);border:1px solid rgba(94,184,138,.15);border-radius:8px;color:#c8c8e0;font-size:14px;margin-bottom:8px">';
+    html+='<input id="newPw2" type="password" placeholder="确认密码" style="width:100%;padding:10px 14px;background:rgba(10,10,30,.8);border:1px solid rgba(94,184,138,.15);border-radius:8px;color:#c8c8e0;font-size:14px;margin-bottom:12px">';
+    html+='<button onclick="setNewPassword()" class="btn btn-accent">确认修改</button><div id="pwResult" style="margin-top:8px;font-size:12px"></div></div>';
+  }else{
+    html+='<div class="card"><h2>密码状态</h2><p style="color:#5eb88a;font-size:12px">密码已设置。如需修改请设置环境变量 TETRAMEM_UI_PASSWORD 后重启服务。</p></div>';
+  }
+  html+='<div class="card"><h2>系统信息</h2><div style="font-size:12px;color:#7a7a9a;line-height:1.8">';
+  html+='<div>版本: <b style="color:#7b8cff">'+(info.version||'-')+'</b></div>';
+  html+='<div>系统: <b style="color:#7b8cff">'+(info.description||'-')+'</b></div>';
+  html+='<div>API前缀: <b style="color:#7b8cff">'+(info.api_prefix||'-')+'</b></div>';
+  html+='<div>可用端点: <b style="color:#7b8cff">'+((info.endpoints||[]).length)+' 个</b></div>';
+  html+='</div></div>';
+  html+='<div class="card"><h2>环境变量配置</h2><div style="font-size:11px;color:#5a5a7a;line-height:2">';
+  html+='<div><code style="color:#7b8cff">TETRAMEM_STORAGE</code> — 数据存储目录 (默认: ./tetramem_data_v2)</div>';
+  html+='<div><code style="color:#7b8cff">TETRAMEM_UI_PASSWORD</code> — UI登录密码 (默认: CHANGE_ME)</div>';
+  html+='</div></div>';
+  el.innerHTML=html;
+}
+
+async function setNewPassword(){
+  const pw=document.getElementById('newPw').value;
+  const pw2=document.getElementById('newPw2').value;
+  const res=document.getElementById('pwResult');
+  if(pw.length<4){res.innerHTML='<span style="color:#cf6b6b">密码至少4位</span>';return;}
+  if(pw!==pw2){res.innerHTML='<span style="color:#cf6b6b">两次输入不一致</span>';return;}
+  try{
+    const r=await api('setup/set-password',{method:'POST',body:{new_password:pw}});
+    res.innerHTML='<span style="color:#5eb88a">'+r.message+'</span>';
+    CREDS.tetramem=pw;
+    CREDS.admin=pw;
+  }catch(e){res.innerHTML='<span style="color:#cf6b6b">设置失败: '+e.message+'</span>';}
 }
 </script>
 
