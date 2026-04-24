@@ -1916,13 +1916,13 @@ class HoneycombNeuralField:
                 clusters_raw = self._self_organize._clusters
 
             n_clusters = len(clusters_raw)
-            cluster_sizes = [len(c.get("node_ids", [])) for c in clusters_raw] if clusters_raw else []
+            cluster_sizes = [len(c.node_ids) for c in clusters_raw] if clusters_raw else []
             cluster_label_diversity = 0.0
             if clusters_raw:
                 all_cluster_labels = []
                 for c in clusters_raw:
                     labels = set()
-                    for nid in c.get("node_ids", [])[:20]:
+                    for nid in c.node_ids[:20]:
                         node = self._nodes.get(nid)
                         if node:
                             labels.update(node.labels)
@@ -1999,8 +1999,8 @@ class HoneycombNeuralField:
                         fn = self._nodes.get(fnid)
                         if fn and fn.is_occupied:
                             for c in clusters_raw:
-                                if fnid in c.get("node_ids", []):
-                                    connected_clusters.add(c.get("id", fnid[:8]))
+                                if fnid in c.node_ids:
+                                    connected_clusters.add(c.cluster_id)
                 if n_clusters > 1:
                     bridge_connectivity = len(connected_clusters) / max(n_clusters, 1)
 
