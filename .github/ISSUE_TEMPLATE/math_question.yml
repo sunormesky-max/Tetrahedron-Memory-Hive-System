@@ -1,0 +1,37 @@
+name: Topological / Mathematical Question
+description: Ask about the math behind TetraMem — persistent homology, mapping cones, etc.
+labels: ["question", "math"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Questions about the mathematical foundations are very welcome!
+        Please describe what you're trying to understand.
+  - type: textarea
+    id: question
+    attributes:
+      label: Your Question
+      description: What would you like to know about the topological/mathematical aspects?
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: What were you doing when this question came up? (reading code, running experiments, etc.)
+  - type: dropdown
+    id: math_area
+    attributes:
+      label: Mathematical Area
+      options:
+        - Persistent Homology (PH)
+        - Alpha Complex / Delaunay Triangulation
+        - Zigzag Persistence
+        - Mapping Cones / Algebraic Topology
+        - Persistent Entropy
+        - Homology Groups (H₀/H₁/H₂)
+        - Topological Surgery
+        - Resolution Pyramid Theory
+        - Other
+    validations:
+      required: true

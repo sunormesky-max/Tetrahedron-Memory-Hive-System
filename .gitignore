@@ -1,0 +1,41 @@
+# Sensitive data files - NEVER push these
+tetramem_export.md
+tetramem_data/
+tetramem_data_v2/
+mesh_index*.json
+*.pre_*.json
+*.pre_fix*
+*.bak
+*.bak2
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Environment
+.env
+.env.local
+.venv/
+venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node
+node_modules/
+
+# Logs
+*.log
+nohup.out

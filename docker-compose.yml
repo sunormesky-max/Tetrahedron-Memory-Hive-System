@@ -1,0 +1,17 @@
+version: "3.8"
+
+services:
+  tetramem:
+    build: .
+    container_name: tetramem-xl
+    restart: unless-stopped
+    ports:
+      - "${TETRAMEM_PORT:-8000}:8000"
+    environment:
+      - TETRAMEM_STORAGE=/data/tetramem_data_v2
+      - TETRAMEM_UI_PASSWORD=${TETRAMEM_PASSWORD:-CHANGE_ME}
+    volumes:
+      - tetramem_data:/data/tetramem_data_v2
+
+volumes:
+  tetramem_data:
