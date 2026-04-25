@@ -195,6 +195,61 @@ curl -X POST http://localhost:8000/api/v1/query \
   -d '{"query": "trajectory error", "k": 10}'
 ```
 
+#### Agent 接入 Observer 的三种方式
+
+**方式一：文件 tail（推荐 — 外部 AI，日志写文件）**
+
+```python
+from tetrahedron_memory.runtime_observer import attach_file_observer
+
+observer = attach_file_observer(field, "/var/log/your-agent.log")
+```
+
+**方式二：程序注入（内嵌 Agent，无日志文件）**
+
+```python
+from tetrahedron_memory.runtime_observer import attach_callback_observer, LogEvent
+import time
+
+observer = attach_callback_observer(field)
+observer.ingest(LogEvent(time.time(), "ERROR", "my_agent", "Planning failed"))
+```
+
+**方式三：零接触自动挂载（最简单）**
+
+```python
+from tetrahedron_memory.observer_config import auto_attach
+
+# 首次调用生成 ./observer_config.json 模板
+observer = auto_attach(field, config_path="./observer_config.json")
+```
+
+首次运行后，编辑 `observer_config.json`：
+- `log_sources.file_tail[0].path` → 改成你自己的日志文件路径
+- `rules` → 按需增删规则
+- 重启或重新调用 `auto_attach()` 生效
+
+**环境变量覆盖：**
+
+| 变量 | 作用 |
+|------|------|
+| `TETRAMEM_OBSERVER_ENABLED` | `false` 禁用 |
+| `TETRAMEM_OBSERVER_WINDOW` | 聚合窗口秒数 |
+| `TETRAMEM_OBSERVER_MAX_STORES` | 每分钟最大存储数 |
+| `TETRAMEM_OBSERVER_LOG_PATH` | 日志文件路径 |
+
+**日志格式：** 默认匹配 `YYYY-MM-DD HH:MM:SS LEVEL module message`。非标准格式整行作为 INFO 存入。
+
+**接入检查清单：**
+
+```
+□ 安装 TetraMem-XL v8.0+ 并启动 API
+□ curl .../observer/stats → "enabled": true
+□ 选择接入方式并配置日志源
+□ 运行一段时间 → "memories_stored" > 0
+□ query "trajectory" → 看到 self-observation 标签的记忆
+```
+
 ### 3.1 一键安装（推荐）
 
 ```bash
