@@ -14,7 +14,7 @@ COPY ui/dashboard.html ./static/dashboard.html
 RUN chmod +x /entrypoint.sh
 
 RUN mkdir -p /data/tetramem_data_v2 && \
-    echo '{"metadata":{"version":"7.0.0"},"tetrahedra":{}}' > /data/tetramem_data_v2/mesh_index.json
+    echo '{"metadata":{"version":"7.1.0"},"tetrahedra":{}}' > /data/tetramem_data_v2/mesh_index.json
 
 ENV TETRAMEM_STORAGE=/data/tetramem_data_v2
 ENV TETRAMEM_UI_PASSWORD=CHANGE_ME

@@ -192,9 +192,8 @@ WantedBy=multi-user.target
 | `/api/v1/dream` | POST | 触发梦境周期 |
 | `/api/v1/dream/status` | GET | 梦境引擎状态 |
 | `/api/v1/dream/history` | GET | 梦境历史 |
-| `/api/v1/pulse/emit` | POST | 发射脉冲 |
-| `/api/v1/pulse/status` | GET | 脉冲状态 |
-| `/api/v1/hebbian/stats` | GET | 赫布路径统计 |
+| `/api/v1/pulse-status` | GET | 脉冲状态 |
+| `/api/v1/pcnn/hebbian` | GET | 赫布路径统计 |
 | `/api/v1/cascade/trigger` | POST | 触发级联脉冲 |
 | `/api/v1/crystallized/force` | POST | 强制结晶化 |
 | `/api/v1/crystallized/status` | GET | 结晶通路状态 |
@@ -218,11 +217,12 @@ WantedBy=multi-user.target
 |------|------|------|
 | `/api/v1/dark-plane/stats` | GET | 暗位面统计（位面分布/温度/阈值） |
 | `/api/v1/dark-plane/flow` | POST | 触发暗位面流动周期 |
-| `/api/v1/dark-plane/nodes` | GET | 按位面查看节点 |
+| `/api/v1/dark-plane/node/{node_id}` | GET | 查看指定节点暗位面状态 |
 | `/api/v1/regulation/trigger` | POST | 触发自我调节周期 |
 | `/api/v1/regulation/status` | GET | PID 控制器状态 + 激素水平 |
-| `/api/v1/attention/foci` | GET/POST | 查询/设置注意力焦点 |
+| `/api/v1/attention/focus` | POST | 设置注意力焦点 |
 | `/api/v1/attention/clear` | POST | 清除注意力焦点 |
+| `/api/v1/attention/status` | GET | 查询注意力状态 |
 
 ### 3.9 OpenClaw 兼容端点
 
@@ -607,8 +607,7 @@ Tetrahedron-Memory-Hive-System/
 │   └── dashboard.html                # 独立仪表板
 ├── tetramem_data_v2/
 │   └── mesh_index.json               # 持久化数据
-├── mcp-tetramem/
-│   └── index.js                      # MCP 工具服务器
+├── tetramem_mcp_server.py             # MCP 工具服务器 (Python)
 ├── install.sh                        # 一键安装脚本
 ├── Dockerfile                        # Docker 构建
 ├── docker-compose.yml                # Docker Compose
@@ -624,7 +623,7 @@ Tetrahedron-Memory-Hive-System/
 |------|--------|------|
 | Store 吞吐 | 103 mem/s | 378 mem/s |
 | Query 延迟 | 92ms avg | — |
-| API 路由数 | 132 | — |
+| API 路由数 | 129 | — |
 | 集成测试 | 20/20 pass (1.7s) | — |
 
 ### 暗位面实测

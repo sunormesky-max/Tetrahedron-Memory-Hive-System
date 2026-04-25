@@ -52,7 +52,7 @@ All notable changes to TetraMem-XL are documented here. Format follows [Keep a C
 ### Performance
 - Store: **103 mem/s** (server), **378 mem/s** (local) — 103x improvement over baseline
 - Query: **92ms** avg latency — 3x improvement over baseline
-- API routes: 132 registered, 20/20 integration tests pass
+- API routes: 129 registered, 20/20 integration tests pass
 
 ## [7.0.0] - 2026-04-22
 

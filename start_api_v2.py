@@ -54,19 +54,19 @@ async def lifespan(application):
             with state.state_lock:
                 snapshot = state.field.export_full_state()
             state.persistence.checkpoint(snapshot)
-            print("[TetraMem v7.0] Final checkpoint completed")
+            print("[TetraMem v7.1] Final checkpoint completed")
     except Exception as e:
-        print(f"[TetraMem v7.0] Final checkpoint failed: {e}")
+        print(f"[TetraMem v7.1] Final checkpoint failed: {e}")
     finally:
         if state.persistence is not None:
             state.persistence.close()
     state.proactive_engine_stop.set()
     state.field.stop_pulse_engine()
     state.auth_manager.cleanup_expired()
-    print("[TetraMem v7.0] Shutdown complete")
+    print("[TetraMem v7.1] Shutdown complete")
 
 
-app = FastAPI(title="TetraMem-XL v7.0", version="7.0.0", lifespan=lifespan)
+app = FastAPI(title="TetraMem-XL v7.1", version="7.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,

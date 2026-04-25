@@ -30,7 +30,7 @@ def health(request: Request):
         report = state.system_ops.run_health_check()
         return {
             "status": report["status"],
-            "version": "7.0.0",
+            "version": "7.1.0",
             "uptime_seconds": time.time() - state.start_time,
             "degradation_level": report["degradation_level"],
             "checks": {
@@ -38,7 +38,7 @@ def health(request: Request):
             },
             "issues": report.get("issues", []),
         }
-    return {"status": "ok", "version": "7.0.0", "uptime_seconds": time.time() - state.start_time}
+    return {"status": "ok", "version": "7.1.0", "uptime_seconds": time.time() - state.start_time}
 
 
 @router.get("/stats")
@@ -56,7 +56,7 @@ def status_endpoint(request: Request):
     return {
         "status": "ok",
         "backend": "tetramem",
-        "version": "7.0.0",
+        "version": "7.1.0",
         "total_memories": stats.get("occupied_nodes", 0),
         "pulse_engine_running": stats.get("pulse_engine_running", False),
         "uptime_seconds": time.time() - state.start_time,
@@ -84,7 +84,7 @@ def set_password(body: Dict[str, str]):
 @router.get("/setup-info")
 def setup_info():
     return {
-        "version": "7.0.0",
+        "version": "7.1.0",
         "system": "TetraMem-XL",
         "description": "BCC Lattice Honeycomb + PCNN Neural Pulse Memory System",
         "default_credentials": "Use setup/set-password to configure",

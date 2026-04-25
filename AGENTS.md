@@ -53,7 +53,7 @@ curl http://localhost:8000/api/v1/stats -H "X-API-Key: your-key"
 ### Health check
 ```bash
 curl http://localhost:8000/api/v1/health
-# Returns: {"status":"ok","version":"7.0.0"}
+# Returns: {"status":"ok","version":"7.1.0"}
 ```
 
 ### List memories
