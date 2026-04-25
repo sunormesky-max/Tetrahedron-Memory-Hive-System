@@ -1,20 +1,18 @@
 [Unit]
-Description=TetraMem-XL v7.0 API Server
+Description=TetraMem-XL v7.1 API Server
 After=network.target
 
 [Service]
 Type=simple
-WorkingDirectory=/root/.openclaw/workspace/sunorm-space-memory
-ExecStart=/usr/bin/python3 start_api_v2.py
+WorkingDirectory=/opt/tetramem
+ExecStart=/usr/bin/python3 -m uvicorn start_api_v2:app --host 127.0.0.1 --port 8000
 Restart=always
 RestartSec=5
 StartLimitIntervalSec=300
 StartLimitBurst=10
 
-Environment=TETRAMEM_STORAGE=/root/.openclaw/workspace/sunorm-space-memory/tetramem_data_v2
-Environment=TETRAMEM_PORT=8000
-Environment=TETRAMEM_HOST=127.0.0.1
-Environment=TETRAMEM_UI_PASSWORD=Hive@2026
+Environment=TETRAMEM_STORAGE=/opt/tetramem/tetramem_data_v2
+Environment=TETRAMEM_UI_PASSWORD=CHANGE_ME
 Environment=TETRAMEM_RESOLUTION=5
 Environment=TETRAMEM_CHECKPOINT_INTERVAL=120
 

@@ -155,8 +155,12 @@ class SelfCheckEngine:
 
         checked = set()
         for i, (nid_a, node_a) in enumerate(occupied):
+            if "__duplicate_of__" in node_a.labels:
+                continue
             for j in range(i + 1, min(i + 30, len(occupied))):
                 nid_b, node_b = occupied[j]
+                if "__duplicate_of__" in node_b.labels:
+                    continue
                 pair_key = (min(nid_a, nid_b), max(nid_a, nid_b))
                 if pair_key in checked:
                     continue
@@ -204,10 +208,12 @@ class SelfCheckEngine:
                 result.repairs_attempted += 1
                 result.repairs_succeeded += 1
 
-        for dup in result.duplicate_pairs[:3]:
+        for dup in result.duplicate_pairs[:10]:
             nid_a_full = None
             nid_b_full = None
             for nid, n in field._nodes.items():
+                if n.is_occupied and "__duplicate_of__" in n.labels:
+                    continue
                 if nid.startswith(dup["node_a"]) and n.is_occupied:
                     nid_a_full = nid
                 if nid.startswith(dup["node_b"]) and n.is_occupied:

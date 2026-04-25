@@ -2,6 +2,83 @@
 
 All notable changes to TetraMem-XL are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [7.1.0] - 2026-04-24
+
+### Added — Dark Plane Thermodynamics + PID Self-Regulation + Security
+
+#### Dark Plane Engine — Real Physics
+- **Adaptive quantile thresholds**: depth distribution 25th/50th/75th percentile replaces hardcoded cutoffs
+- **Boltzmann redistribution**: 5% thermal transition probability per cycle, P(plane_i | D) = exp(-β|D - center_i|) / Z
+- **WKB tunneling**: direction-corrected barrier penetration, P = exp(-2κ × barrier), κ=0.5
+- **Query energy injection**: hits on deep/abyss nodes receive 0.1 + relevance×0.3 energy boost
+- **Cross-plane depth weights**: surface=1.0, shallow=1.5, deep=2.5, abyss=4.0
+- **Metastable tracking**: 30s cooldown after plane transitions to prevent oscillation
+- **Activity-rate temperature**: T = T_base × (1+0.5×stress) × circadian × (1+0.3×activity_rate)
+- Production result: thresholds at -0.75/-0.04/0.75, ~42%/14%/19%/24% plane distribution
+
+#### Self-Regulation Engine — PID Control
+- **5 PID controllers**: bridge_rate, crystal_ratio, field_entropy, activation, emergence
+  - Anti-windup integral clamping per controller
+  - Example: bridge_rate kp=0.15, ki=0.02, kd=0.03, integral_limit=1.0
+- **Hysteresis bands**: autonomic enters at 0.35/0.65, stress emergency enters at 0.85/exits at 0.50
+- **Dark plane feedback**: heavy transitions → endocrine cortisol response, awakening → dopamine surge
+- **All parameters applied**: dream_frequency, bridge_threshold, cascade_depth_bonus now actually write to system
+- **Immune enhancement**: _occupied_ids consistency check, frontier_empty cleanup, empty node release
+- **Query history**: deque(maxlen=100) replaces unbounded list for query_success_history
+
+#### Attention Mechanism Fix
+- Attention mask only boosts query scores when `_attention_foci` is non-empty
+- Prevents residual noise from degrading query relevance (fixed -10.6% regression)
+
+#### Security Fixes
+- UI login now uses backend `/login` endpoint with `TETRAMEM_UI_PASSWORD` environment variable
+- All hardcoded passwords removed (Hive@2026, tetramem123, admin123)
+- `/login` endpoint accepts both `api_key` and `password` fields
+
+#### Test Suite
+- `tests/test_integration.py`: 20 TestClient integration tests, all passing in 1.7s
+- Covers: health, store, query, browse, stats, dream, self-organize, dark plane, regulation, cascade, crystallize, lattice, honeycomb, attention, export/import
+
+#### Documentation
+- README.md / README.cn.md / AGENTS.md rewritten for v7.1 architecture
+- Removed references to deleted files (ARCHITECTURE.md, demo_tetramem.py, tetra_distributed.py, etc.)
+
+### Fixed
+- InsightAggregator: added `collect()` method (was missing, caused `_insight_loop` crash)
+- 60+ bare except blocks now log errors instead of silently swallowing
+- QUERY_WEIGHTS normalized to sum=1.0
+- WAL replay enhanced with error recovery
+
+### Performance
+- Store: **103 mem/s** (server), **378 mem/s** (local) — 103x improvement over baseline
+- Query: **92ms** avg latency — 3x improvement over baseline
+- API routes: 132 registered, 20/20 integration tests pass
+
+## [7.0.0] - 2026-04-22
+
+### Added — Comprehensive Architecture Hardening (~70 fixes)
+
+#### Route Architecture
+- API split into 6 router modules: memory, agent, system, neural, spatial, darkplane
+- `AppState` dependency injection container replacing global state
+- 13 Critical/High severity fixes across all modules
+
+#### Infrastructure
+- Dual-lock unification: write operations acquire `_lock` and `_write_lock` consistently
+- WAL (Write-Ahead Log) replay with error recovery
+- Structured error responses with consistent JSON format
+- 60+ exception handlers now log errors instead of silently swallowing
+
+#### Configuration
+- QUERY_WEIGHTS normalized (total=1.0) for balanced scoring
+- ATTENTION_MULTIPLIER=0.5, ATTENTION_ADDITIVE=0.15 tunable constants
+- PCNNConfig centralizes all tuning parameters
+
+### Changed
+- `start_api_v2.py`: slimmed to ~95 lines, uses AppState + CORS + async middleware + router includes
+- All routers receive `AppState` via dependency injection
+- Error handling: bare except → except Exception with logging
+
 ## [6.0.0] - 2026-04-19
 
 ### Added — Agent-Driven Memory System + OpenClaw Deep Integration

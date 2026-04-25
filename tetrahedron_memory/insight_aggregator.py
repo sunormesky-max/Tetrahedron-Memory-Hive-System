@@ -36,6 +36,25 @@ class InsightAggregator:
         with self._lock:
             self._insights.clear()
 
+    def collect(self) -> List[Dict]:
+        priority_map = {"high": 8, "medium": 5, "low": 2}
+        with self._lock:
+            insights = list(self._insights)
+        result = []
+        for ins in insights:
+            numeric_priority = priority_map.get(ins.get("priority", "medium"), 5)
+            if isinstance(ins.get("metadata", {}).get("priority"), (int, float)):
+                numeric_priority = ins["metadata"]["priority"]
+            result.append({
+                "type": ins.get("type", "unknown"),
+                "title": ins.get("title", ""),
+                "description": ins.get("description", ""),
+                "priority": numeric_priority,
+                "action": ins.get("metadata", {}).get("action", ""),
+                "ts": ins.get("ts", 0),
+            })
+        return result
+
     def get_stats(self) -> Dict[str, Any]:
         with self._lock:
             total = len(self._insights)

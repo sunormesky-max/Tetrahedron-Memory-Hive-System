@@ -1,11 +1,11 @@
 [Unit]
-Description=TetraMem-XL v7.0 Watchdog
+Description=TetraMem-XL v7.1 Watchdog
 After=tetramem-api.service
 Requires=tetramem-api.service
 
 [Service]
 Type=simple
-WorkingDirectory=/root/.openclaw/workspace/sunorm-space-memory
+WorkingDirectory=/opt/tetramem
 ExecStart=/usr/bin/python3 watchdog.py
 Restart=always
 RestartSec=10
