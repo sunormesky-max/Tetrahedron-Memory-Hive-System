@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from tetrahedron_memory.app_state import AppState
-from tetrahedron_memory.routers import memory, agent, system, neural, spatial, darkplane
+from tetrahedron_memory.routers import memory, agent, system, neural, spatial, darkplane, observer
 
 log = logging.getLogger("tetramem.api")
 
@@ -54,19 +54,19 @@ async def lifespan(application):
             with state.state_lock:
                 snapshot = state.field.export_full_state()
             state.persistence.checkpoint(snapshot)
-            print("[TetraMem v7.1] Final checkpoint completed")
+            print("[TetraMem v8.0] Final checkpoint completed")
     except Exception as e:
-        print(f"[TetraMem v7.1] Final checkpoint failed: {e}")
+        print(f"[TetraMem v8.0] Final checkpoint failed: {e}")
     finally:
         if state.persistence is not None:
             state.persistence.close()
     state.proactive_engine_stop.set()
     state.field.stop_pulse_engine()
     state.auth_manager.cleanup_expired()
-    print("[TetraMem v7.1] Shutdown complete")
+    print("[TetraMem v8.0] Shutdown complete")
 
 
-app = FastAPI(title="TetraMem-XL v7.1", version="7.1.0", lifespan=lifespan)
+app = FastAPI(title="TetraMem-XL v8.0", version="8.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -84,6 +84,7 @@ app.include_router(system.router)
 app.include_router(neural.router)
 app.include_router(spatial.router)
 app.include_router(darkplane.router)
+app.include_router(observer.router)
 
 ui_dir = Path(__file__).parent / "ui"
 if ui_dir.exists():

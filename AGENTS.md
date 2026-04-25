@@ -1,9 +1,11 @@
-# TetraMem-XL v7.1 — Agent Integration Guide
+# TetraMem-XL v8.0 — Agent Integration Guide
 
 ## What is this?
 
 TetraMem-XL is an eternal memory system based on BCC lattice honeycomb + PCNN neural pulse networks.
 It provides a REST API for storing, querying, and autonomously organizing memories.
+
+**v8.0 核心新能力: RuntimeObserver** — 记忆系统可以观察自身运行轨迹，自动将运行日志蒸馏为低权重"自省记忆"，由暗位面引擎自然整合。安装后必须确认 Observer 正常运行（见下方 §Observer）。
 
 ## Quick Install (Linux)
 
@@ -53,7 +55,7 @@ curl http://localhost:8000/api/v1/stats -H "X-API-Key: your-key"
 ### Health check
 ```bash
 curl http://localhost:8000/api/v1/health
-# Returns: {"status":"ok","version":"7.1.0"}
+# Returns: {"status":"ok","version":"8.0.0"}
 ```
 
 ### List memories
@@ -84,6 +86,31 @@ curl -X POST http://localhost:8000/api/v1/dark-plane/flow -H "X-API-Key: your-ke
 ### Self-regulation trigger
 ```bash
 curl -X POST http://localhost:8000/api/v1/regulation/trigger -H "X-API-Key: your-key"
+```
+
+### Observer stats (v8.0 — 安装后必须检查)
+```bash
+curl http://localhost:8000/api/v1/observer/stats -H "X-API-Key: your-key"
+# Must see: "enabled": true, "memories_stored" slowly growing
+```
+
+### Observer flush
+```bash
+curl -X POST http://localhost:8000/api/v1/observer/flush -H "X-API-Key: your-key"
+```
+
+### Observer enable/disable
+```bash
+curl -X POST http://localhost:8000/api/v1/observer/enable -H "X-API-Key: your-key"
+curl -X POST http://localhost:8000/api/v1/observer/disable -H "X-API-Key: your-key"
+```
+
+### Observer manual observe
+```bash
+curl -X POST http://localhost:8000/api/v1/observer/observe \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-key" \
+  -d '{"level": "ERROR", "module": "my-agent", "message": "Connection failed"}'
 ```
 
 ### Export memories
@@ -117,6 +144,7 @@ curl -X POST http://localhost:8000/api/v1/import \
 - **Dark Plane**: Thermodynamic energy landscape with adaptive thresholds
 - **Self-Regulation**: Six-layer physiological control (PID + circadian + autonomic + immune + endocrine + stress)
 - **Spatial Reflection Field**: Energy-based phase transition detection
+- **Runtime Observer** (v8.0): Self-observation layer — captures runtime logs, classifies by semantics, aggregates into trajectory memories, auto-stores into dark plane
 
 ## UI
 
@@ -130,3 +158,44 @@ systemctl restart tetramem-api   # Restart
 systemctl stop tetramem-api      # Stop
 journalctl -u tetramem-api -f    # View logs
 ```
+
+## Observer (v8.0) — 安装后必须检查
+
+RuntimeObserver 在 `initialize()` 时自动启动。它捕获 `tetramem` logger 的 WARNING+ 日志，经语义分类、聚合窗口、轨迹叙述后，以低权重存入晶格。暗位面引擎在 `dark_plane_flow()` 中自动拾取这些轨迹记忆并整合。
+
+### 数据流
+
+```
+日志 → 语义分类(6类) → 聚合窗口(300s) → 轨迹叙述 → 速率控制(30/min) → store(低权重)
+                                                                           ↓
+                                                                    暗位面自动拾取整合
+```
+
+### 分类与权重
+
+| 分类 | 触发条件 | 权重 | 暗位面层级 |
+|------|----------|------|-----------|
+| error | ERROR/CRITICAL | 2.0 | deep/abyss（创伤记忆） |
+| anomaly | timeout/crash/slow... | 1.8 | deep/abyss |
+| system | WARNING | 0.8 | shallow/deep |
+| performance | latency/throughput | 0.5 | surface/shallow |
+| behavior | store/query/dream... | 0.3 | surface（行为轨迹） |
+| noise | DEBUG/heartbeat | 0.0 | 丢弃 |
+
+### 安全阀
+
+- **循环隔离**: `source="self-observation"` 的日志自动丢弃
+- **噪声过滤**: DEBUG + heartbeat 直接丢弃
+- **速率硬上限**: 30 stores/min
+- **隐私脱敏**: api_key/password/token/Bearer → `[REDACTED]`
+
+### 安装后必须确认
+
+```bash
+curl http://localhost:8000/api/v1/observer/stats -H "X-API-Key: your-key"
+```
+
+检查项：
+1. `"enabled": true` — 观察器已启动
+2. `"memories_stored"` 缓慢增长 — 系统在记忆自己的轨迹
+3. `"events_dropped_loop"` 不在疯长 — 循环隔离正常

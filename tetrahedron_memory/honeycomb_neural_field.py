@@ -37,6 +37,9 @@ from .insight_aggregator import InsightAggregator
 from .geometry import TextToGeometryMapper
 from .self_regulation import SelfRegulationEngine
 from .dark_plane_engine import DarkPlaneEngine
+from .dark_plane_substrate import DarkPlaneSubstrate
+from .void_channel import VoidChannel
+from .runtime_observer import RuntimeObserver, TetraMemLogHandler
 
 
 logger = logging.getLogger("tetramem.honeycomb")
@@ -56,6 +59,7 @@ __all__ = [
     "FeedbackRecord", "FeedbackLoop",
     "SessionRecord", "Session", "SessionManager",
     "InsightAggregator",
+    "RuntimeObserver", "TetraMemLogHandler",
     "HoneycombNeuralField",
 ]
 
@@ -127,6 +131,10 @@ class HoneycombNeuralField:
         self._dark_plane_engine: Optional[DarkPlaneEngine] = None
         self._dark_plane_transitions = 0
         self._dark_plane_reawakenings = 0
+        self._dark_plane_substrate: Optional[DarkPlaneSubstrate] = None
+        self._void_channel: Optional[VoidChannel] = None
+        self._runtime_observer: Optional[RuntimeObserver] = None
+        self._observer_log_handler: Optional[TetraMemLogHandler] = None
         self._store_burst_counter: int = 0
         self._store_burst_window: float = 0.0
         self._attention_foci: List[Dict[str, Any]] = []
@@ -167,6 +175,26 @@ class HoneycombNeuralField:
             self._build_bcc_unit_index()
             self._self_regulation = SelfRegulationEngine(self)
             self._dark_plane_engine = DarkPlaneEngine(self)
+
+            self._dark_plane_substrate = DarkPlaneSubstrate(self)
+            self._void_channel = VoidChannel(self._dark_plane_substrate, self)
+            self._dark_plane_engine.set_substrate(self._dark_plane_substrate)
+            self._self_regulation.set_substrate(self._dark_plane_substrate)
+
+            self._runtime_observer = RuntimeObserver(
+                field=self,
+                window_seconds=300.0,
+                max_stores_per_minute=30,
+                queue_max_size=200,
+            )
+            self._runtime_observer.start()
+            self._observer_log_handler = TetraMemLogHandler(
+                self._runtime_observer, level=logging.WARNING
+            )
+            self._observer_log_handler.setFormatter(
+                logging.Formatter("%(levelname)s %(name)s: %(message)s")
+            )
+            logging.getLogger("tetramem").addHandler(self._observer_log_handler)
             logger.info(
                 "Honeycomb cells: %d tetrahedral cells in %d BCC units",
                 len(self._cell_map._cells), len(self._cell_map._bcc_cell_index),
@@ -1727,6 +1755,24 @@ class HoneycombNeuralField:
                     len(self._occupied_ids),
                 )
 
+            if self._dark_plane_substrate:
+                _stress = self._self_regulation._stress_level if self._self_regulation else 0
+                _temperature = self._dark_plane_engine._temperature if self._dark_plane_engine else 1.0
+                _dream_active = False
+                if self._dream_engine:
+                    _dream_active = getattr(self._dream_engine, '_is_dreaming', False)
+                _activity_rate = self._dark_plane_engine._activity_rate if self._dark_plane_engine else 0.0
+
+                substrate_report = self._dark_plane_substrate.update(
+                    _stress, _temperature, _activity_rate, _dream_active
+                )
+
+                for pt in substrate_report.get("phase_transitions", []):
+                    self._handle_phase_transition(pt)
+
+            if self._void_channel:
+                self._void_channel.apply_channel_effects()
+
             for nid in self._occupied_ids:
                 node = self._nodes.get(nid)
                 if node and node.is_occupied and self._dark_plane_engine:
@@ -1735,6 +1781,17 @@ class HoneycombNeuralField:
                     node.hibernated = (plane == "abyss")
 
             return result
+
+    def _handle_phase_transition(self, pt: dict):
+        level = pt.get("level", 0)
+        if level >= 6:
+            if self._void_channel:
+                self._void_channel.cascade_upgrade()
+            logger.info("H6 cascade phase transition: energy=%.3f coherence=%.3f", pt.get("energy", 0), pt.get("coherence", 0))
+        elif level >= 5:
+            logger.info("H5 regulation phase transition: regulation signal active")
+        elif level >= 4:
+            logger.info("H4 entanglement emergence: energy=%.3f coherence=%.3f", pt.get("energy", 0), pt.get("coherence", 0))
 
     def attention_set_focus(
         self,
@@ -2544,6 +2601,11 @@ class HoneycombNeuralField:
         )
 
     def stop_pulse_engine(self):
+        if self._runtime_observer:
+            self._runtime_observer.stop()
+        if self._observer_log_handler:
+            logging.getLogger("tetramem").removeHandler(self._observer_log_handler)
+            self._observer_log_handler = None
         if self._self_check:
             self._self_check.stop()
         self._stop_event.set()
@@ -4101,6 +4163,15 @@ class HoneycombNeuralField:
                     "dark_plane_feedback_score": float(self._self_regulation._dark_plane_feedback_score),
                 }
 
+            if self._dark_plane_substrate:
+                state["dark_plane_substrate"] = self._dark_plane_substrate.get_state()
+
+            if self._void_channel:
+                state["void_channels"] = self._void_channel.get_state()
+
+            if self._runtime_observer:
+                state["runtime_observer"] = self._runtime_observer.get_stats()
+
             return state
 
     def import_full_state(self, state_dict: Dict[str, Any]):
@@ -4321,4 +4392,15 @@ class HoneycombNeuralField:
                 self._self_regulation._dark_plane_feedback_score = float(
                     sr_raw.get("dark_plane_feedback_score", 0)
                 )
+
+            substrate_raw = state_dict.get("dark_plane_substrate", {})
+            if substrate_raw and self._dark_plane_substrate:
+                self._dark_plane_substrate.set_state(substrate_raw)
+
+            vc_raw = state_dict.get("void_channels", [])
+            if vc_raw and self._void_channel:
+                self._void_channel.set_state(vc_raw)
+
+            if self._runtime_observer and not self._runtime_observer._flush_thread:
+                self._runtime_observer.start()
 

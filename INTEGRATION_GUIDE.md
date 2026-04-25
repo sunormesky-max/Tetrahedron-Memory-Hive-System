@@ -1,4 +1,4 @@
-# TetraMem-XL v7.1 集成与配置指南
+# TetraMem-XL v8.0 集成与配置指南
 
 本文档记录了 TetraMem-XL 与 AI Agent 框架（如 OpenClaw）集成的完整过程，供其他 Agent 复现配置。
 
@@ -27,7 +27,8 @@
 │  routers/system   — health, stats, login, config     │
 │  routers/neural   — dream, pulse, cascade, crystal   │
 │  routers/spatial  — lattice, honeycomb, integrity    │
-│  routers/darkplane— 暗位面, 调节, 注意力              │
+  │  routers/darkplane— 暗位面, 调节, 注意力              │
+  │  routers/observer — 运行观察器, 自省轨迹              │
 └──────────────────────┬──────────────────────────────┘
                        │
                        ▼
@@ -55,14 +56,146 @@
 │  CrystallizedPathway   — 结晶化永久通路               │
 │  LatticeIntegrityChecker — BCC晶格完整性验证           │
 │  InsightAggregator     — 洞察聚合与事件推送           │
-└─────────────────────────────────────────────────────┘
+│  RuntimeObserver       — 自省观察层（v8.0）            │
+│    ├ 语义分类器          error/anomaly/behavior/noise  │
+│    ├ 聚合窗口            300s 滑动窗口 + 去重合并       │
+│    ├ 轨迹叙述器          日志→可记忆结构压缩            │
+│    ├ 速率硬上限          30 stores/min, 溢出丢低权      │
+│    └ 循环隔离            自动丢弃 observer 自身日志     │
+└─────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 2. 服务器部署
+## 2. 安装后必须配置（v8.0 新增）
 
-### 2.1 一键安装（推荐）
+### 2.1 RuntimeObserver — 自省观察层
+
+**这是 v8.0 的核心能力。** 安装后必须确认以下配置，否则记忆系统无法观察自身运行轨迹。
+
+#### 工作原理
+
+```
+Agent 运行日志 → TetraMemLogHandler 自动捕获
+                    ↓
+              语义分类器（6 类）
+              ├ error     → 立即存储, 权重 2.0
+              ├ anomaly   → 立即存储, 权重 1.8
+              ├ behavior  → 聚合窗口, 权重 0.3
+              ├ performance → 聚合窗口, 权重 0.5
+              ├ system    → 聚合窗口, 权重 0.8
+              └ noise     → 丢弃
+                    ↓
+              聚合窗口（300s）+ 去重合并
+                    ↓
+              轨迹叙述器（日志→可记忆结构）
+                    ↓
+              速率控制（30 stores/min 硬上限）
+                    ↓
+              store(低权重, source="self-observation")
+                    ↓
+              暗位面引擎自动拾取
+              ├ 权重 0.2~0.3 → surface/shallow 层（行为轨迹）
+              ├ 权重 0.8     → shallow/deep 层（系统警告）
+              └ 权重 1.5~2.0 → deep/abyss 层（创伤记忆）
+```
+
+#### 三重安全阀
+
+| 安全阀 | 作用 |
+|--------|------|
+| **循环隔离** | `source="self-observation"` 的日志自动丢弃，防止无限递归 |
+| **噪声过滤** | DEBUG 级别 + heartbeat/health-check 直接丢弃 |
+| **速率硬上限** | 30 stores/min，溢出按权重丢弃最低的 |
+
+#### 隐私脱敏
+
+以下模式在存储前自动替换为 `[REDACTED]`：
+- `api_key=...` / `X-API-Key: ...`
+- `password=...` / `token=...` / `secret=...`
+- `Bearer ...`
+
+#### 自动行为
+
+RuntimeObserver 在 `initialize()` 时自动启动，无需手动配置。具体：
+1. **自动捕获**：挂载到 `tetramem` Python logger，所有 WARNING+ 级别日志自动进入观察管线
+2. **定时 flush**：后台线程每 30s 检查过期聚合窗口，自动存储
+3. **ERROR/CRITICAL**：立即入队存储，不等聚合窗口
+4. **自动进入暗位面**：低权重轨迹由暗位面引擎在 `dark_plane_flow()` 中自然拾取和整合
+
+#### 确认 Observer 正常运行
+
+```bash
+# 检查 observer 状态
+curl http://localhost:8000/api/v1/observer/stats -H "X-API-Key: your-key"
+# 返回示例:
+# {
+#   "enabled": true,
+#   "total_events_received": 142,
+#   "memories_stored": 8,
+#   "events_dropped_noise": 95,
+#   "events_dropped_loop": 0,
+#   "events_dropped_rate": 0,
+#   "active_windows": {},
+#   "uptime_seconds": 3600.0,
+#   "category_counts": {"error": 3, "behavior": 35, "system": 9},
+#   "config": {
+#     "window_seconds": 300,
+#     "max_stores_per_minute": 30,
+#     "queue_max_size": 200
+#   }
+# }
+```
+
+**必须确认：**
+- `enabled` = `true`
+- `events_dropped_loop` 不在疯狂增长（否则循环隔离失效）
+- `memories_stored` 在缓慢增长（系统在记忆自己的轨迹）
+
+#### 临时禁用（如需调试）
+
+```bash
+# 禁用
+curl -X POST http://localhost:8000/api/v1/observer/disable -H "X-API-Key: your-key"
+
+# 重新启用
+curl -X POST http://localhost:8000/api/v1/observer/enable -H "X-API-Key: your-key"
+```
+
+#### 手动注入观察事件（可选）
+
+```bash
+curl -X POST http://localhost:8000/api/v1/observer/observe \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-key" \
+  -d '{"level": "ERROR", "module": "my-agent", "message": "Failed to connect to external service"}'
+# → {"accepted": true}
+```
+
+#### 手动 flush 聚合窗口（可选）
+
+```bash
+curl -X POST http://localhost:8000/api/v1/observer/flush -H "X-API-Key: your-key"
+# → {"flushed": 3}
+```
+
+#### Observer 轨迹记忆的标签
+
+所有 observer 存入的记忆自动带有以下标签：
+- `self-observation` — 标识来源
+- `meta` — 元认知标记
+- `trajectory` — 轨迹类型
+- `error` / `anomaly` / `behavior` / `performance` / `system` — 具体分类
+
+在 query 时可以用这些标签过滤：
+```bash
+curl -X POST http://localhost:8000/api/v1/query \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-key" \
+  -d '{"query": "trajectory error", "k": 10}'
+```
+
+### 3.1 一键安装（推荐）
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/sunormesky-max/Tetrahedron-Memory-Hive-System/main/install.sh | bash
@@ -70,7 +203,7 @@ curl -sSL https://raw.githubusercontent.com/sunormesky-max/Tetrahedron-Memory-Hi
 # curl -sSL ... | bash -s -- --password MySecret123 --port 8000
 ```
 
-### 2.2 环境要求
+### 3.2 环境要求
 
 | 依赖 | 版本 | 说明 |
 |------|------|------|
@@ -79,7 +212,7 @@ curl -sSL https://raw.githubusercontent.com/sunormesky-max/Tetrahedron-Memory-Hi
 | FastAPI + uvicorn | any | REST API |
 | Node.js | 18+ | MCP 工具服务器（可选） |
 
-### 2.3 手动部署 TetraMem API
+### 3.3 手动部署 TetraMem API
 
 ```bash
 # 克隆项目
@@ -102,7 +235,7 @@ python -m uvicorn start_api_v2:app --host 127.0.0.1 --port 8000
 | `TETRAMEM_STORAGE` | `./tetramem_data_v2` | 持久化目录 |
 | `TETRAMEM_UI_PASSWORD` | `CHANGE_ME` | UI 登录密码（**必须修改**） |
 
-### 2.4 Docker 部署
+### 3.4 Docker 部署
 
 ```bash
 git clone https://github.com/sunormesky-max/Tetrahedron-Memory-Hive-System.git
@@ -110,7 +243,7 @@ cd Tetrahedron-Memory-Hive-System
 TETRAMEM_PASSWORD=mypass docker compose up -d
 ```
 
-### 2.5 Systemd 服务（推荐）
+### 3.5 Systemd 服务（推荐）
 
 ```ini
 # /etc/systemd/system/tetramem-api.service
@@ -133,9 +266,9 @@ WantedBy=multi-user.target
 
 ---
 
-## 3. API 端点完整参考
+## 4. API 端点完整参考
 
-### 3.1 基础记忆操作 (routers/memory)
+### 4.1 基础记忆操作 (routers/memory)
 
 | 端点 | 方法 | 说明 |
 |------|------|------|
@@ -148,7 +281,7 @@ WantedBy=multi-user.target
 | `/api/v1/export` | GET/POST | 导出 |
 | `/api/v1/import` | POST | 导入 |
 
-### 3.2 Agent 驱动端点 (routers/agent)
+### 4.2 Agent 驱动端点 (routers/agent)
 
 | 端点 | 方法 | 说明 |
 |------|------|------|
@@ -157,7 +290,7 @@ WantedBy=multi-user.target
 | `/api/v1/agent/suggest` | POST | 主动行动建议 |
 | `/api/v1/navigate` | POST | 拓扑路径导航 |
 
-### 3.3 反馈闭环 (routers/agent)
+### 4.3 反馈闭环 (routers/agent)
 
 | 端点 | 方法 | 说明 |
 |------|------|------|
@@ -166,7 +299,7 @@ WantedBy=multi-user.target
 | `/api/v1/feedback/stats` | GET | 反馈统计 |
 | `/api/v1/feedback/insights` | GET | 学习洞察 |
 
-### 3.4 会话管理 (routers/agent)
+### 4.4 会话管理 (routers/agent)
 
 | 端点 | 方法 | 说明 |
 |------|------|------|
@@ -177,7 +310,7 @@ WantedBy=multi-user.target
 | `/api/v1/session/list` | GET | 列出活跃会话 |
 | `/api/v1/session/{id}` | GET | 获取会话详情 |
 
-### 3.5 系统端点 (routers/system)
+### 4.5 系统端点 (routers/system)
 
 | 端点 | 方法 | 说明 |
 |------|------|------|
@@ -185,7 +318,7 @@ WantedBy=multi-user.target
 | `/api/v1/stats` | GET | 系统统计 |
 | `/api/v1/login` | POST | 登录认证（接受 api_key 或 password） |
 
-### 3.6 认知引擎 (routers/neural)
+### 4.6 认知引擎 (routers/neural)
 
 | 端点 | 方法 | 说明 |
 |------|------|------|
@@ -198,7 +331,7 @@ WantedBy=multi-user.target
 | `/api/v1/crystallized/force` | POST | 强制结晶化 |
 | `/api/v1/crystallized/status` | GET | 结晶通路状态 |
 
-### 3.7 空间拓扑 (routers/spatial)
+### 4.7 空间拓扑 (routers/spatial)
 
 | 端点 | 方法 | 说明 |
 |------|------|------|
@@ -211,7 +344,7 @@ WantedBy=multi-user.target
 | `/api/v1/clusters` | GET | 语义簇 |
 | `/api/v1/shortcuts` | GET | 拓扑捷径 |
 
-### 3.8 暗位面与调节 (routers/darkplane) — v7.1 新增
+### 4.8 暗位面与调节 (routers/darkplane) — v7.1 新增
 
 | 端点 | 方法 | 说明 |
 |------|------|------|
@@ -224,7 +357,17 @@ WantedBy=multi-user.target
 | `/api/v1/attention/clear` | POST | 清除注意力焦点 |
 | `/api/v1/attention/status` | GET | 查询注意力状态 |
 
-### 3.9 OpenClaw 兼容端点
+### 4.9 运行观察器 (routers/observer) — v8.0 新增
+
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/api/v1/observer/stats` | GET | 观察器状态（事件数/存储数/分类统计） |
+| `/api/v1/observer/flush` | POST | 手动 flush 所有聚合窗口 |
+| `/api/v1/observer/enable` | POST | 启用观察器 |
+| `/api/v1/observer/disable` | POST | 禁用观察器 |
+| `/api/v1/observer/observe` | POST | 手动注入观察事件 |
+
+### 4.10 OpenClaw 兼容端点
 
 | 端点 | 方法 | 说明 |
 |------|------|------|
@@ -235,7 +378,7 @@ WantedBy=multi-user.target
 | `/api/v1/capabilities/embeddings` | GET | 向量嵌入能力（返回不可用） |
 | `/api/v1/capabilities/vectors` | GET | 向量引擎能力（返回不可用） |
 
-### 3.10 SSE 事件流
+### 4.11 SSE 事件流
 
 | 端点 | 方法 | 说明 |
 |------|------|------|
@@ -245,9 +388,9 @@ WantedBy=multi-user.target
 
 ---
 
-## 4. MCP 工具完整列表（22 个）
+## 5. MCP 工具完整列表（22 个）
 
-### 4.1 核心记忆操作
+### 5.1 核心记忆操作
 
 | 工具名 | 必填参数 | 说明 |
 |--------|----------|------|
@@ -260,7 +403,7 @@ WantedBy=multi-user.target
 | `tetramem_topology_health` | — | 拓扑健康报告 |
 | `tetramem_seed_by_label` | labels | 按标签查找种子节点 |
 
-### 4.2 认知周期
+### 5.2 认知周期
 
 | 工具名 | 说明 |
 |--------|------|
@@ -269,7 +412,7 @@ WantedBy=multi-user.target
 | `tetramem_abstract_reorganize` | 概念抽象重组 |
 | `tetramem_closed_loop` | 完整认知闭环（Dream+SelfOrg+Abstract） |
 
-### 4.3 Agent 智能
+### 5.3 Agent 智能
 
 | 工具名 | 必填参数 | 说明 |
 |--------|----------|------|
@@ -278,14 +421,14 @@ WantedBy=multi-user.target
 | `tetramem_agent_suggest` | — | 获取行动建议（可选: context） |
 | `tetramem_agent_navigate` | source_id, target_id | A*路径导航（可选: max_hops） |
 
-### 4.4 反馈闭环
+### 5.4 反馈闭环
 
 | 工具名 | 必填参数 | 说明 |
 |--------|----------|------|
 | `tetramem_feedback_record` | action, context_id, outcome | 记录反馈（可选: confidence, reasoning） |
 | `tetramem_feedback_insights` | — | 获取学习洞察 |
 
-### 4.5 会话管理
+### 5.5 会话管理
 
 | 工具名 | 必填参数 | 说明 |
 |--------|----------|------|
@@ -296,15 +439,15 @@ WantedBy=multi-user.target
 
 ---
 
-## 5. OpenClaw 集成指南
+## 6. OpenClaw 集成指南
 
-### 5.1 集成架构
+### 6.1 集成架构
 
 OpenClaw 通过两个并行机制使用 TetraMem：
 1. **原生记忆后端** — 替换内置 SQLite 后端，Agent 的 `memory search` 直接查询 TetraMem
 2. **MCP 工具** — 22 个工具，Agent 可主动调用高级功能
 
-### 5.2 配置 OpenClaw
+### 6.2 配置 OpenClaw
 
 在 `openclaw.json` 中配置：
 
@@ -350,7 +493,7 @@ OpenClaw 通过两个并行机制使用 TetraMem：
 
 **不接受 `timeout` 等其他键，会导致配置校验失败。**
 
-### 5.3 修补 OpenClaw 源码
+### 6.3 修补 OpenClaw 源码
 
 OpenClaw 需要修补 4 个文件才能识别 `"tetramem"` 后端：
 
@@ -388,7 +531,7 @@ export async function createTetraMemManager(config, params) {
 | `probeEmbeddingAvailability` | `GET /api/v1/capabilities/embeddings` |
 | `probeVectorAvailability` | `GET /api/v1/capabilities/vectors` |
 
-### 5.4 系统提示模板
+### 6.4 系统提示模板
 
 在 `systemPromptOverride` 中注入以下指令，让 Agent 优先使用 TetraMem：
 
@@ -406,9 +549,9 @@ export async function createTetraMemManager(config, params) {
 
 ---
 
-## 6. 自动学习系统
+## 7. 自动学习系统
 
-### 6.1 Cron 定时任务
+### 7.1 Cron 定时任务
 
 ```bash
 # 每30分钟自动学习
@@ -418,7 +561,7 @@ export async function createTetraMemManager(config, params) {
 */30 * * * * python3 /path/to/tetramem_sync.py >> /var/log/tetramem-sync.log 2>&1
 ```
 
-### 6.2 自动学习脚本模板
+### 7.2 自动学习脚本模板
 
 ```bash
 #!/bin/bash
@@ -434,7 +577,7 @@ openclaw agent --message "执行学习任务：
 6. 更新 next_topic.txt 为下一个主题"
 ```
 
-### 6.3 主题池示例
+### 7.3 主题池示例
 
 ```
 # next_topic.txt — 每行一个主题
@@ -445,9 +588,9 @@ openclaw agent --message "执行学习任务：
 
 ---
 
-## 7. 调试经验
+## 8. 调试经验
 
-### 7.1 PowerShell 通过 SSH 的引号陷阱
+### 8.1 PowerShell 通过 SSH 的引号陷阱
 
 Windows PowerShell 通过 SSH 执行含引号的命令会被破坏。解决方案：
 
@@ -458,7 +601,7 @@ subprocess.run(["scp", "script.py", "root@SERVER:/tmp/"])
 subprocess.run(["ssh", "root@SERVER", "python3 /tmp/script.py"])
 ```
 
-### 7.2 OpenClaw 配置校验严格
+### 8.2 OpenClaw 配置校验严格
 
 OpenClaw 使用 `.strict()` 的 Zod schema，**任何未定义的键都会导致整个配置被拒绝**。调试方法：
 
@@ -466,7 +609,7 @@ OpenClaw 使用 `.strict()` 的 Zod schema，**任何未定义的键都会导致
 journalctl --user -u openclaw-gateway --since '1 min ago' | grep "Unrecognized key"
 ```
 
-### 7.3 MCP 服务器防重复启动
+### 8.3 MCP 服务器防重复启动
 
 ```bash
 #!/bin/bash
@@ -480,7 +623,7 @@ echo $$ > "$LOCKFILE"
 exec node /path/to/mcp-tetramem/index.js
 ```
 
-### 7.4 SelfCheckEngine 死锁排查
+### 8.4 SelfCheckEngine 死锁排查
 
 v5.3 曾报告自检一直卡住。排查发现：
 - `SelfCheckEngine.run_full_check()` 持有 `field._lock`（RLock）
@@ -488,7 +631,7 @@ v5.3 曾报告自检一直卡住。排查发现：
 - RLock 理论上可重入，但如果其他线程同时竞争可能导致长时间阻塞
 - **解决方案**：将脉冲发射移到锁外执行，或使用独立的锁
 
-### 7.5 暗位面调参
+### 8.5 暗位面调参
 
 暗位面引擎使用自适应分位数阈值，无需手动调整。如需覆盖：
 
@@ -500,7 +643,7 @@ METASTABLE_COOLDOWN = 30.0           # 亚稳态冷却时间(秒)
 ENERGY_INJECTION_BASE = 0.1          # 查询能量注入基础值
 ```
 
-### 7.6 PID 自我调节参数
+### 8.6 PID 自我调节参数
 
 ```python
 # self_regulation.py PID 参数
@@ -513,7 +656,7 @@ emergence:      kp=0.12, ki=0.015, kd=0.025, integral_limit=1.5
 
 ---
 
-## 8. API 请求/响应示例
+## 9. API 请求/响应示例
 
 ### 存入记忆
 ```bash
@@ -565,7 +708,7 @@ curl -X POST http://127.0.0.1:8000/api/v1/feedback/record \
 
 ---
 
-## 9. 核心设计原则
+## 10. 核心设计原则
 
 | 原则 | 实现方式 |
 |------|----------|
@@ -579,12 +722,13 @@ curl -X POST http://127.0.0.1:8000/api/v1/feedback/record \
 
 ---
 
-## 10. 文件结构
+## 11. 文件结构
 
 ```
 Tetrahedron-Memory-Hive-System/
 ├── tetrahedron_memory/
 │   ├── honeycomb_neural_field.py    # 核心编排器 (~4320 行)
+│   ├── runtime_observer.py          # 运行观察器 (v8.0)
 │   ├── dark_plane_engine.py         # 暗位面热力学引擎 (v7.1)
 │   ├── self_regulation.py           # PID 自我调节引擎 (v7.1)
 │   ├── self_check.py                # 自检脉冲引擎
@@ -598,10 +742,12 @@ Tetrahedron-Memory-Hive-System/
 │   │   ├── neural.py                # dream, pulse, cascade, crystal
 │   │   ├── spatial.py               # lattice, honeycomb, integrity
 │   │   └── darkplane.py             # 暗位面, 调节, 注意力
+│   │   └── observer.py             # 运行观察器, 自省轨迹 (v8.0)
 │   └── ...
 ├── start_api_v2.py                   # FastAPI 入口 (~95 行)
 ├── tests/
 │   └── test_integration.py           # 20 个集成测试
+│   └── test_runtime_observer.py      # 25 个观察器单元测试 (v8.0)
 ├── ui/
 │   ├── index.html                    # 可视化 UI (后端登录)
 │   └── dashboard.html                # 独立仪表板
@@ -617,7 +763,7 @@ Tetrahedron-Memory-Hive-System/
 
 ---
 
-## 11. 性能基准（v7.1）
+## 12. 性能基准（v8.0）
 
 | 指标 | 服务器 | 本地 |
 |------|--------|------|

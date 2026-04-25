@@ -182,6 +182,10 @@ class SelfRegulationEngine:
         self._max_log = 200
 
         self._dark_plane_feedback_score = 0.0
+        self._substrate = None
+
+    def set_substrate(self, substrate):
+        self._substrate = substrate
 
     def regulate(self) -> Dict[str, Any]:
         now = time.time()
@@ -216,6 +220,39 @@ class SelfRegulationEngine:
             self._immune_last_scan = now
 
         self._apply_params_to_field()
+
+        if self._substrate is not None:
+            sig = self._substrate.get_regulation_signals()
+            pe = sig.get("persistent_entropy", 0)
+            coherence = sig.get("coherence", 0)
+            h5_reg = sig.get("h5_regulation", 0)
+            h6_cascade = sig.get("h6_cascade_active", False)
+            psi = sig.get("psi_field", 0)
+
+            self._endocrine_hormones["dopamine"] = min(
+                1.0, self._endocrine_hormones["dopamine"] + 0.05 * pe
+            )
+            self._endocrine_hormones["serotonin"] = min(
+                1.0, self._endocrine_hormones["serotonin"] + 0.03 * pe
+            )
+            self._endocrine_hormones["acetylcholine"] = min(
+                1.0, self._endocrine_hormones["acetylcholine"] + 0.04 * coherence
+            )
+
+            if h5_reg > 0:
+                self._autonomic_raw_score = max(0, self._autonomic_raw_score - 0.05 * h5_reg)
+            elif h5_reg < 0:
+                self._autonomic_raw_score = min(1, self._autonomic_raw_score + 0.05 * abs(h5_reg))
+
+            if h6_cascade:
+                self._stress_level = min(1.0, self._stress_level + 0.5)
+                self._endocrine_hormones["cortisol"] = min(
+                    1.0, self._endocrine_hormones["cortisol"] + 0.4
+                )
+
+            self._endocrine_hormones["dopamine"] = min(
+                1.0, self._endocrine_hormones["dopamine"] + 0.1 * psi
+            )
 
         self._regulation_count += 1
         record = {

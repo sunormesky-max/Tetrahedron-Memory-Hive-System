@@ -109,6 +109,9 @@ class DarkPlaneEngine:
         "_tunnel_events",
         "_boltzmann_events",
         "_energy_injections",
+        "_substrate",
+        "_h5_regulation",
+        "_h6_cascade_strength",
     )
 
     def __init__(self, field: HoneycombNeuralField, config: Optional[Dict] = None):
@@ -138,6 +141,12 @@ class DarkPlaneEngine:
         self._tunnel_events: int = 0
         self._boltzmann_events: int = 0
         self._energy_injections: int = 0
+        self._substrate = None
+        self._h5_regulation: float = 0.0
+        self._h6_cascade_strength: float = 0.0
+
+    def set_substrate(self, substrate):
+        self._substrate = substrate
 
     def compute_internal_energy(self, weight: float, activation: float) -> float:
         C = self._capacity_constant
@@ -357,6 +366,12 @@ class DarkPlaneEngine:
         field = self._field
         now = time.time()
 
+        if self._substrate is not None:
+            proj = self._substrate.get_projection_data()
+            self._base_temperature = 1.0 + 0.2 * proj.get("void_energy", 0.0)
+            self._h5_regulation = proj.get("h5_regulation", 0.0)
+            self._h6_cascade_strength = proj.get("h6_cascade_strength", 0.0)
+
         transitions = 0
         reawakenings = 0
         descents = 0
@@ -395,6 +410,15 @@ class DarkPlaneEngine:
                 new_plane = boltzmann_result
 
             old_plane = self._plane_assignment.get(nid, "surface")
+            if self._h5_regulation > 0:
+                if PLANE_INDEX.get(new_plane, 0) < PLANE_INDEX.get(old_plane, 0):
+                    if random.random() < 0.3 * self._h5_regulation:
+                        new_plane = old_plane
+            elif self._h5_regulation < 0:
+                if PLANE_INDEX.get(new_plane, 0) > PLANE_INDEX.get(old_plane, 0):
+                    if random.random() < 0.3 * abs(self._h5_regulation):
+                        new_plane = old_plane
+
             old_idx = PLANE_INDEX.get(old_plane, 0)
             new_idx = PLANE_INDEX.get(new_plane, 0)
 
