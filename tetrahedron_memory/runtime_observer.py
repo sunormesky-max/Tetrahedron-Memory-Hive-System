@@ -5,6 +5,11 @@ Intercepts system runtime events, classifies them by semantic category,
 aggregates over sliding windows, generates trajectory narrations, and
 injects low-weight "self-observation" memories into the TMHS store.
 
+Input sources:
+  - Python logging handler (TetraMemLogHandler) -- in-process capture
+  - File tail (LogFileTailer) -- watch external log files
+  - Programmatic ingest() -- direct LogEvent injection
+
 Key design constraints:
   - Loop isolation: drops all events originating from the observer itself
   - Rate limiting: hard cap on stores per minute + priority queue overflow
@@ -14,13 +19,16 @@ Key design constraints:
 
 from __future__ import annotations
 
+import json
 import logging
+import os
 import re
 import threading
 import time
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 logger = logging.getLogger("tetramem.observer")
 
@@ -154,6 +162,132 @@ class ObserverStats:
     current_queue_size: int = 0
     uptime_seconds: float = 0.0
     category_counts: Dict[str, int] = field(default_factory=dict)
+    file_tailer_active: bool = False
+    file_tailer_path: str = ""
+    file_tailer_lines_read: int = 0
+
+
+@dataclass
+class LogEvent:
+    timestamp: float
+    level: str
+    module: str
+    message: str
+
+
+DEFAULT_LOG_PATTERN = re.compile(
+    r"^(\d{4}-\d{2}-\d{2}[\sT]\d{2}:\d{2}:\d{2}(?:\.\d+)?)\s+"
+    r"(DEBUG|INFO|WARNING|ERROR|CRITICAL)\s+"
+    r"(\S+)\s*[:\-]?\s*(.*)$"
+)
+
+
+class LogFileTailer:
+    """
+    Tails a log file and feeds parsed lines into a RuntimeObserver.
+    Handles rotation by tracking inode and file size.
+    """
+
+    def __init__(
+        self,
+        observer: RuntimeObserver,
+        file_path: str,
+        poll_interval: float = 1.0,
+        log_pattern: Optional[re.Pattern] = None,
+        module_override: Optional[str] = None,
+    ):
+        self._observer = observer
+        self._file_path = file_path
+        self._poll_interval = poll_interval
+        self._log_pattern = log_pattern or DEFAULT_LOG_PATTERN
+        self._module_override = module_override
+        self._stop_event = threading.Event()
+        self._thread: Optional[threading.Thread] = None
+        self._inode: int = 0
+        self._offset: int = 0
+        self._lines_read: int = 0
+
+    @property
+    def is_running(self) -> bool:
+        return self._thread is not None and self._thread.is_alive()
+
+    @property
+    def lines_read(self) -> int:
+        return self._lines_read
+
+    @property
+    def file_path(self) -> str:
+        return self._file_path
+
+    def start(self) -> None:
+        if self._thread is not None and self._thread.is_alive():
+            return
+        self._stop_event.clear()
+        self._thread = threading.Thread(
+            target=self._tail_loop, daemon=True, name="observer-tailer"
+        )
+        self._thread.start()
+        logger.info("LogFileTailer started: %s", self._file_path)
+
+    def stop(self) -> None:
+        self._stop_event.set()
+        if self._thread is not None:
+            self._thread.join(timeout=5.0)
+            self._thread = None
+
+    def _tail_loop(self) -> None:
+        while not self._stop_event.is_set():
+            try:
+                self._read_new_lines()
+            except Exception as e:
+                logger.debug("LogFileTailer read error: %s", e)
+            self._stop_event.wait(timeout=self._poll_interval)
+
+    def _read_new_lines(self) -> None:
+        path = Path(self._file_path)
+        if not path.exists():
+            return
+        try:
+            stat = path.stat()
+        except OSError:
+            return
+        current_inode = stat.st_ino
+        current_size = stat.st_size
+        if current_inode != self._inode:
+            self._inode = current_inode
+            self._offset = 0
+        if current_size < self._offset:
+            self._offset = 0
+        if current_size == self._offset:
+            return
+        try:
+            with open(self._file_path, "r", encoding="utf-8", errors="replace") as f:
+                f.seek(self._offset)
+                for line in f:
+                    line = line.rstrip("\n\r")
+                    if line:
+                        self._parse_and_observe(line)
+                self._offset = f.tell()
+        except OSError:
+            return
+
+    def _parse_and_observe(self, line: str) -> None:
+        self._lines_read += 1
+        self._observer._stats.file_tailer_lines_read = self._lines_read
+        m = self._log_pattern.match(line)
+        if m:
+            ts_str, level, module, message = m.groups()
+            module = self._module_override or module
+        else:
+            level = "INFO"
+            module = self._module_override or "external"
+            message = line
+        self._observer.observe(
+            level=level,
+            module=module,
+            message=message,
+            source="file-tailer",
+        )
 
 
 class RuntimeObserver:
@@ -197,6 +331,8 @@ class RuntimeObserver:
         self._flush_thread: Optional[threading.Thread] = None
         self._stop_event = threading.Event()
         self._compiled_rules = CLASSIFICATION_RULES
+        self._tailers: List[LogFileTailer] = []
+        self._custom_rules: Optional[List[Dict]] = None
 
     def start(self) -> None:
         if self._flush_thread is not None and self._flush_thread.is_alive():
@@ -206,15 +342,67 @@ class RuntimeObserver:
             target=self._flush_loop, daemon=True, name="observer-flush"
         )
         self._flush_thread.start()
+        for tailer in self._tailers:
+            tailer.start()
         logger.info("RuntimeObserver started (window=%.0fs, max_stores/min=%d)",
                      self._window_seconds, self._max_stores_per_minute)
 
     def stop(self) -> None:
+        for tailer in self._tailers:
+            tailer.stop()
+        self._tailers.clear()
         self._stop_event.set()
         if self._flush_thread is not None:
             self._flush_thread.join(timeout=5.0)
             self._flush_thread = None
         logger.info("RuntimeObserver stopped")
+
+    def ingest(self, event: LogEvent) -> bool:
+        return self.observe(
+            level=event.level,
+            module=event.module,
+            message=event.message,
+            metadata={"original_timestamp": event.timestamp},
+        )
+
+    def add_file_tail(
+        self,
+        file_path: str,
+        poll_interval: float = 1.0,
+        log_pattern: Optional[re.Pattern] = None,
+        module_override: Optional[str] = None,
+    ) -> LogFileTailer:
+        tailer = LogFileTailer(
+            observer=self,
+            file_path=file_path,
+            poll_interval=poll_interval,
+            log_pattern=log_pattern,
+            module_override=module_override,
+        )
+        self._tailers.append(tailer)
+        self._stats.file_tailer_active = True
+        self._stats.file_tailer_path = file_path
+        if self._flush_thread is not None and self._flush_thread.is_alive():
+            tailer.start()
+        return tailer
+
+    def set_rules(self, rules: List[Dict]) -> None:
+        compiled = []
+        for r in rules:
+            cat = r.get("category", CATEGORY_BEHAVIOR)
+            weight = r.get("weight", 0.3)
+            immediate = r.get("immediate", False)
+            level_filter = set(r["level_filter"]) if "level_filter" in r else None
+            pattern = re.compile(r["pattern"], re.IGNORECASE) if "pattern" in r else None
+            compiled.append({
+                "category": cat,
+                "weight": weight,
+                "immediate": immediate,
+                "level_filter": level_filter,
+                "pattern": pattern,
+            })
+        self._custom_rules = compiled
+        self._compiled_rules = compiled
 
     def observe(
         self,
@@ -323,6 +511,15 @@ class RuntimeObserver:
                 "max_stores_per_minute": self._max_stores_per_minute,
                 "queue_max_size": self._queue_max_size,
             },
+            "file_tailers": [
+                {
+                    "path": t.file_path,
+                    "active": t.is_running,
+                    "lines_read": t.lines_read,
+                }
+                for t in self._tailers
+            ],
+            "custom_rules": self._custom_rules is not None,
         }
 
     def set_enabled(self, enabled: bool) -> None:
@@ -489,3 +686,37 @@ class TetraMemLogHandler(logging.Handler):
             )
         except Exception:
             pass
+
+
+def attach_file_observer(
+    field: Any,
+    file_path: str,
+    poll_interval: float = 1.0,
+    module_override: Optional[str] = None,
+    **kwargs: Any,
+) -> RuntimeObserver:
+    """
+    Convenience: create a RuntimeObserver attached to a log file.
+    Starts both the observer flush thread and the file tailer.
+    """
+    observer = RuntimeObserver(field=field, **kwargs)
+    observer.start()
+    observer.add_file_tail(
+        file_path=file_path,
+        poll_interval=poll_interval,
+        module_override=module_override,
+    )
+    return observer
+
+
+def attach_callback_observer(
+    field: Any,
+    **kwargs: Any,
+) -> RuntimeObserver:
+    """
+    Convenience: create a RuntimeObserver for programmatic ingest().
+    No file tailing, no log handler. Use observer.ingest(LogEvent(...)).
+    """
+    observer = RuntimeObserver(field=field, **kwargs)
+    observer.start()
+    return observer

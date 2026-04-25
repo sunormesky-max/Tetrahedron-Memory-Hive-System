@@ -39,7 +39,8 @@ from .self_regulation import SelfRegulationEngine
 from .dark_plane_engine import DarkPlaneEngine
 from .dark_plane_substrate import DarkPlaneSubstrate
 from .void_channel import VoidChannel
-from .runtime_observer import RuntimeObserver, TetraMemLogHandler
+from .runtime_observer import RuntimeObserver, TetraMemLogHandler, LogEvent, LogFileTailer, attach_file_observer, attach_callback_observer
+from .observer_config import auto_attach, write_default_config, load_config
 
 
 logger = logging.getLogger("tetramem.honeycomb")
@@ -59,7 +60,9 @@ __all__ = [
     "FeedbackRecord", "FeedbackLoop",
     "SessionRecord", "Session", "SessionManager",
     "InsightAggregator",
-    "RuntimeObserver", "TetraMemLogHandler",
+    "RuntimeObserver", "TetraMemLogHandler", "LogEvent", "LogFileTailer",
+    "attach_file_observer", "attach_callback_observer",
+    "auto_attach", "write_default_config", "load_config",
     "HoneycombNeuralField",
 ]
 
