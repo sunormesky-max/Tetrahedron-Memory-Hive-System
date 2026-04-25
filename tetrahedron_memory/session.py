@@ -39,6 +39,7 @@ class Session:
         self.created_at = time.time()
         self.last_active = time.time()
         self.records: List[SessionRecord] = []
+        self._max_records = 500
         self.metadata = metadata or {}
         self.ephemeral_ids: List[str] = []
 
@@ -105,10 +106,17 @@ class SessionManager:
         record = SessionRecord(role, content, memory_id, metadata)
 
         with self._lock:
+            session = self._sessions.get(session_id)
+            if session is None:
+                return {"error": "session not found"}
             session.records.append(record)
+            if len(session.records) > session._max_records:
+                session.records = session.records[-session._max_records:]
             session.last_active = time.time()
             if memory_id:
                 session.ephemeral_ids.append(memory_id)
+                if len(session.ephemeral_ids) > session._max_records:
+                    session.ephemeral_ids = session.ephemeral_ids[-session._max_records:]
 
         return {"added": True, "memory_id": memory_id[:12] if memory_id else None}
 

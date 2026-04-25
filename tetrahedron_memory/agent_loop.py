@@ -4,9 +4,12 @@ Pure Python. No external engines.
 """
 from __future__ import annotations
 
+import logging
 import time
 from collections import defaultdict
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
+
+_log = logging.getLogger("tetramem.agent_loop")
 
 if TYPE_CHECKING:
     from .honeycomb_neural_field import HoneycombNeuralField
@@ -190,7 +193,7 @@ class AgentMemoryLoop:
                 clusters = so_stats.get("active_clusters", 0)
                 if clusters > 0:
                     weak_clusters = []
-                    for cl in field._self_organize._clusters.values() if hasattr(field._self_organize, '_clusters') else []:
+                    for cl in field._self_organize._clusters if hasattr(field._self_organize, '_clusters') else []:
                         if hasattr(cl, 'quality_score') and cl.quality_score < 0.3:
                             weak_clusters.append(
                                 {
@@ -575,6 +578,7 @@ class AgentMemoryLoop:
                     result["self_organize"] = {"raw": str(so_result)}
                 result["actions_taken"].append("self_organize")
             except Exception as e:
+                _log.error("self_organize failed: %s", e)
                 result["self_organize"] = {"error": str(e)}
 
         should_dream = (
@@ -595,6 +599,7 @@ class AgentMemoryLoop:
                     result["dream"] = {"raw": str(dream_result)}
                 result["actions_taken"].append("dream")
             except Exception as e:
+                _log.error("dream cycle failed: %s", e)
                 result["dream"] = {"error": str(e)}
 
         if occupied > 20 and avg_activation < 0.02:
@@ -606,6 +611,7 @@ class AgentMemoryLoop:
                     result["cascade"] = {"triggered": True}
                 result["actions_taken"].append("cascade")
             except Exception as e:
+                _log.error("cascade trigger failed: %s", e)
                 result["cascade"] = {"error": str(e)}
 
         result["triggers"] = {
@@ -701,7 +707,7 @@ class AgentMemoryLoop:
         so_stats = sense.get("cluster_state", {})
         clusters = so_stats.get("active_clusters", 0)
         if clusters > 0 and hasattr(field._self_organize, "_clusters"):
-            for cl in field._self_organize._clusters.values():
+            for cl in field._self_organize._clusters:
                 if hasattr(cl, "quality_score") and cl.quality_score < 0.3:
                     analyze["low_quality_clusters"].append(
                         {
@@ -873,6 +879,7 @@ class AgentMemoryLoop:
                         if relevant:
                             act["dreams_triggered"] += 1
             except Exception:
+                _log.warning("planned action %s failed, skipping", action.get("type", "unknown"))
                 continue
 
         try:
@@ -883,7 +890,7 @@ class AgentMemoryLoop:
                 else 0,
             }
         except Exception:
-            pass
+            _log.warning("dream cycle in ACT phase failed", exc_info=True)
 
         try:
             so_result = field.run_self_organize()
@@ -898,7 +905,7 @@ class AgentMemoryLoop:
                 else 0,
             }
         except Exception:
-            pass
+            _log.warning("self_organize in ACT phase failed", exc_info=True)
 
         return act
 

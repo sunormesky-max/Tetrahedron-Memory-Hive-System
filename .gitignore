@@ -1,4 +1,4 @@
-# Sensitive data files - NEVER push these
+# === Sensitive data - NEVER push ===
 tetramem_export.md
 tetramem_data/
 tetramem_data_v2/
@@ -7,8 +7,10 @@ mesh_index*.json
 *.pre_fix*
 *.bak
 *.bak2
+.env
+.env.local
 
-# Python cache
+# === Python ===
 __pycache__/
 *.pyc
 *.pyo
@@ -16,26 +18,56 @@ __pycache__/
 dist/
 build/
 *.egg
-
-# Environment
-.env
-.env.local
 .venv/
 venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.coverage
+coverage.xml
+htmlcov/
 
-# IDE
+# === IDE ===
 .idea/
 .vscode/
 *.swp
 *.swo
 
-# OS
+# === OS ===
 .DS_Store
 Thumbs.db
 
-# Node
+# === Node ===
 node_modules/
 
-# Logs
+# === Logs ===
 *.log
 nohup.out
+
+# === Benchmark / test artifacts ===
+benchmark_results.json
+stress_test_results.json
+local_stress_output.log
+test_output*.log
+
+# === Root clutter - temporary scripts ===
+bench_*.py
+benchmark_*.py
+test_*.py
+check_*.py
+quick_test.py
+profile_*.py
+profiler.py
+stress_test*.py
+micro_bench.py
+local_stress.py
+report_live.py
+final_validation.py
+git_*.sh
+audit_*.sh
+cleanup_*.sh
+
+# === Release artifacts ===
+*.tar.gz
+*.whl

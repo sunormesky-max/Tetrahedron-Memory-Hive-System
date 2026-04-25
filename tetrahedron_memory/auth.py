@@ -8,9 +8,12 @@ import enum
 import hashlib
 import hmac
 import json
+import logging
 import secrets
 import time
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
+
+_log = logging.getLogger("tetramem.auth")
 
 if TYPE_CHECKING:
     pass
@@ -78,6 +81,7 @@ class AuthManager:
                 p_b64 += "=" * padding
             payload = json.loads(base64.urlsafe_b64decode(p_b64))
         except Exception:
+            _log.warning("Token payload parse failed", exc_info=True)
             return None
         if payload.get("exp", 0) < time.time():
             return None

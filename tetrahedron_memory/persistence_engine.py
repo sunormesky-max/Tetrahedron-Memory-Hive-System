@@ -1,10 +1,13 @@
 import json
+import logging
 import os
 import time
 import threading
 import gzip
 import io
 from typing import Any, Dict, List, Optional
+
+logger = logging.getLogger("tetramem.persistence")
 
 
 class PersistenceEngine:
@@ -32,7 +35,7 @@ class PersistenceEngine:
                 try:
                     self._wal_fd.close()
                 except Exception:
-                    pass
+                    logger.warning("Failed to close WAL file descriptor")
             self._closed = True
             self._wal_fd = None
 
@@ -46,8 +49,8 @@ class PersistenceEngine:
                 self._wal_fd.write(line + "\n")
                 self._wal_fd.flush()
                 self.dirty_ops += 1
-            except Exception:
-                pass
+            except Exception as e:
+                logger.error("WAL write failed: %s", e)
 
     def is_dirty(self) -> bool:
         return self.dirty_ops > 0
@@ -86,11 +89,12 @@ class PersistenceEngine:
                     self._wal_fd = open(self._wal_path, "a", encoding="utf-8")
                 self._rotate_checkpoints()
             except Exception as e:
+                logger.error("Checkpoint failed: %s", e)
                 if tmp_path and os.path.exists(tmp_path):
                     try:
                         os.remove(tmp_path)
                     except OSError:
-                        pass
+                        logger.warning("Failed to remove temp checkpoint: %s", tmp_path)
 
     def recover(self) -> Optional[dict]:
         latest = self._find_latest_checkpoint()
@@ -120,7 +124,8 @@ class PersistenceEngine:
             else:
                 with open(path, "r", encoding="utf-8") as f:
                     return json.load(f)
-        except Exception:
+        except Exception as e:
+            logger.error("Failed to load checkpoint %s: %s", path, e)
             return None
 
     def _replay_wal(self, state: dict):
@@ -141,10 +146,21 @@ class PersistenceEngine:
                             nid = data.get("id")
                             if nid and nid not in nodes:
                                 nodes[nid] = data
+                        elif op == "delete":
+                            nodes = state.get("nodes", {})
+                            nid = data.get("id")
+                            if nid:
+                                nodes.pop(nid, None)
+                        elif op == "update":
+                            nodes = state.get("nodes", {})
+                            nid = data.get("id")
+                            if nid and nid in nodes:
+                                nodes[nid].update(data)
                     except json.JSONDecodeError:
+                        logger.warning("Corrupted WAL line skipped: %s", line[:80])
                         continue
-        except Exception:
-            pass
+        except Exception as e:
+            logger.error("WAL replay failed: %s", e)
 
     def _replay_wal_only(self) -> Optional[dict]:
         if not os.path.exists(self._wal_path):
@@ -164,8 +180,8 @@ class PersistenceEngine:
         for old in checkpoints[:-self._max_checkpoints]:
             try:
                 os.remove(old)
-            except OSError:
-                pass
+            except OSError as e:
+                logger.warning("Failed to rotate old checkpoint %s: %s", old, e)
 
     def get_config(self) -> dict:
         config_path = os.path.join(self._storage_dir, "config.json")
@@ -173,8 +189,8 @@ class PersistenceEngine:
             try:
                 with open(config_path, "r", encoding="utf-8") as f:
                     return json.load(f)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("Failed to load config: %s", e)
         return {"resolution": 5, "spacing": 1.0}
 
     def save_config(self, config: dict):
@@ -182,5 +198,5 @@ class PersistenceEngine:
         try:
             with open(config_path, "w", encoding="utf-8") as f:
                 json.dump(config, f)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.error("Failed to save config: %s", e)

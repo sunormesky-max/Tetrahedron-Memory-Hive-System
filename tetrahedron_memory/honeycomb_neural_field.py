@@ -34,9 +34,10 @@ from .agent_driver import AgentMemoryDriver
 from .feedback import FeedbackRecord, FeedbackLoop
 from .session import SessionRecord, Session, SessionManager
 from .insight_aggregator import InsightAggregator
-from .rw_lock import ReadWriteLock
-from .self_regulation import SelfRegulationEngine
 from .geometry import TextToGeometryMapper
+from .self_regulation import SelfRegulationEngine
+from .dark_plane_engine import DarkPlaneEngine
+
 
 logger = logging.getLogger("tetramem.honeycomb")
 
@@ -63,7 +64,6 @@ class HoneycombNeuralField:
 
     def __init__(self, resolution: int = 5, spacing: float = 1.0):
         self._lock = threading.RLock()
-        self._rw_lock = ReadWriteLock()
         self._nodes: Dict[str, HoneycombNode] = {}
         self._position_index: Dict[Tuple, str] = {}
         self._label_index: Dict[str, Set[str]] = defaultdict(set)
@@ -119,27 +119,21 @@ class HoneycombNeuralField:
         self._frontier_empty: Dict[str, float] = {}
         self._frontier_rebuild_counter: int = 0
         self._temporal_edges: Dict[str, List[Tuple[str, float]]] = defaultdict(list)
+        self._max_temporal_per_node = 30
         self._recent_stores: List[Tuple[str, float]] = []
         self._max_recent_stores: int = 50
-        self._lifecycle_thresholds = {
-            "fresh_seconds": 3600,
-            "consolidating_seconds": 86400,
-            "crystallized_reinforcement": 5,
-            "ancient_days": 7,
-        }
-        self._dark_plane_config = {
-            "surface": {"pulse_weight": 3.0, "query_priority": 1.0, "dream_focus": 0.3},
-            "shallow": {"pulse_weight": 2.0, "query_priority": 0.8, "dream_focus": 1.0},
-            "deep": {"pulse_weight": 0.8, "query_priority": 0.5, "dream_focus": 0.6},
-            "abyss": {"pulse_weight": 0.2, "query_priority": 0.2, "dream_focus": 0.1},
-        }
+        self._lifecycle_thresholds = dict(PCNNConfig.LIFECYCLE_THRESHOLDS)
+        self._dark_plane_config = PCNNConfig.DARK_PLANE_CONFIG
+        self._dark_plane_engine: Optional[DarkPlaneEngine] = None
         self._dark_plane_transitions = 0
         self._dark_plane_reawakenings = 0
+        self._store_burst_counter: int = 0
+        self._store_burst_window: float = 0.0
         self._attention_foci: List[Dict[str, Any]] = []
         self._attention_mask: Dict[str, float] = {}
-        self._attention_decay_rate: float = 0.05
-        self._attention_diffusion_rate: float = 0.3
-        self._attention_max_foci: int = 3
+        self._attention_decay_rate: float = PCNNConfig.ATTENTION_CONFIG["decay_rate"]
+        self._attention_diffusion_rate: float = PCNNConfig.ATTENTION_CONFIG["diffusion_rate"]
+        self._attention_max_foci: int = PCNNConfig.ATTENTION_CONFIG["max_foci"]
         self._attention_stats: Dict[str, int] = {
             "focus_set": 0,
             "queries_in_focus": 0,
@@ -162,6 +156,9 @@ class HoneycombNeuralField:
 
     def initialize(self) -> Dict[str, Any]:
         with self._lock:
+            if self._nodes:
+                logger.warning("initialize() called on non-empty field, skipping")
+                return self.stats(force=True)
             self._stats_cache = None
             self._stats_cache_time = 0
             self._build_bcc_lattice()
@@ -169,6 +166,7 @@ class HoneycombNeuralField:
             self._cell_map.build(self._nodes, self._position_index, self._spacing)
             self._build_bcc_unit_index()
             self._self_regulation = SelfRegulationEngine(self)
+            self._dark_plane_engine = DarkPlaneEngine(self)
             logger.info(
                 "Honeycomb cells: %d tetrahedral cells in %d BCC units",
                 len(self._cell_map._cells), len(self._cell_map._bcc_cell_index),
@@ -212,7 +210,7 @@ class HoneycombNeuralField:
         total_quality = sum(c.quality for c in cells)
         avg_quality = total_quality / len(cells)
         best_volume = max((c.volume for c in cells), default=0)
-        volume_factor = min(1.0, best_volume / (self._spacing ** 3 * 0.1178 + 1e-10))
+        volume_factor = min(1.0, best_volume / (self._spacing ** 3 * PCNNConfig.TETRA_IDEAL_VOLUME_FACTOR + 1e-10))
         avg_jacobian = sum(c.jacobian for c in cells) / len(cells)
         avg_skew = sum(c.skewness for c in cells) / len(cells)
         geo_quality = (
@@ -741,10 +739,25 @@ class HoneycombNeuralField:
         node.crystal_channels.clear()
         node.creation_time = 0.0
         node.domain_affinity.clear()
+        self._temporal_edges.pop(nid, None)
+        for adj_list in self._temporal_edges.values():
+            adj_list[:] = [(sid, w) for sid, w in adj_list if sid != nid]
+        self._frontier_empty.pop(nid, None)
+        for fnid in node.face_neighbors[:6]:
+            if fnid in self._nodes and not self._nodes[fnid].is_occupied:
+                self._frontier_empty[fnid] = self._frontier_empty.get(fnid, 0) + 1.0
+        for enid in node.edge_neighbors[:4]:
+            if enid in self._nodes and not self._nodes[enid].is_occupied:
+                self._frontier_empty[enid] = self._frontier_empty.get(enid, 0) + 0.5
 
     def store(self, content: str, labels: Optional[List[str]] = None,
               weight: float = 1.0, metadata: Optional[Dict] = None,
               creation_time_override: Optional[float] = None) -> str:
+        now = time.time()
+        if now - self._store_burst_window > 5.0:
+            self._store_burst_counter = 0
+            self._store_burst_window = now
+        self._store_burst_counter += 1
         with self._lock:
             self._stats_cache = None
             chash = hashlib.sha256(content.encode()).hexdigest()[:12]
@@ -771,11 +784,12 @@ class HoneycombNeuralField:
             total = len(self._nodes)
             occupied_count = self._occupied_count
             expand_needed = False
+            _le = PCNNConfig.LATTICE_EXPANSION
             dense_count = 0
-            if total > 0 and occupied_count / total > 0.85:
+            if total > 0 and occupied_count / total > _le["occupancy_threshold"]:
                 expand_needed = True
-            elif total > 0 and occupied_count / total > 0.60:
-                sample_size = min(200, len(self._occupied_ids))
+            elif total > 0 and occupied_count / total > _le["density_check_threshold"]:
+                sample_size = min(_le["sample_size"], len(self._occupied_ids))
                 sample_ids = random.sample(list(self._occupied_ids), sample_size) if self._occupied_ids else []
                 for sid in sample_ids:
                     n = self._nodes.get(sid)
@@ -785,10 +799,10 @@ class HoneycombNeuralField:
                         1 for fnid in n.face_neighbors[:6]
                         if fnid in self._occupied_ids
                     )
-                    if occ_nb >= 5:
+                    if occ_nb >= _le["dense_neighbor_count"]:
                         dense_count += 1
                 dense_ratio = dense_count / max(sample_size, 1)
-                if dense_ratio > 0.3:
+                if dense_ratio > _le["dense_ratio_threshold"]:
                     expand_needed = True
             if expand_needed:
                 logger.info("Lattice occupancy %.1f%% (dense_nodes=%d) — auto-expanding (res %d->%d)",
@@ -1167,38 +1181,41 @@ class HoneycombNeuralField:
                 ).get("query_priority", 0.5)
 
                 attention_boost = 0.0
+                attention_multiplier = 1.0
                 if self._attention_mask:
                     attn = self._attention_mask.get(nid, 0.0)
                     if attn > 0.1:
-                        attention_boost = attn * 0.15
+                        attention_boost = attn * PCNNConfig.ATTENTION_ADDITIVE
+                        attention_multiplier = 1.0 + attn * PCNNConfig.ATTENTION_MULTIPLIER
 
+                _qw = PCNNConfig.QUERY_WEIGHTS
                 final = (
-                    0.28 * text_score
-                    + 0.10 * trigram_score
-                    + 0.12 * label_score
-                    + 0.08 * activation_score
-                    + 0.05 * weight_score
-                    + 0.06 * hebbian_boost
-                    + 0.06 * crystal_boost
-                    + 0.02 * pulse_boost
-                    + 0.05 * spatial_quality
-                    + 0.04 * geometric_quality
-                    + 0.03 * cell_effective
-                    + 0.03 * neighbor_density_score
-                    + 0.02 * geo_topo_divergence
-                    + 0.02 * bcc_coherence
-                    + 0.01 * autocorr_bonus
-                    + 0.01 * dream_bonus
-                    + 0.06 * recency_boost
-                    + 0.04 * temporal_boost
-                    + 0.05 * spatial_proximity
-                    + 0.04 * plane_priority
-                    + attention_boost
-                    + shortcut_boost
-                    - low_priority_penalty
-                    + pcnn_activity
-                    + resonance_bonus
-                )
+                    _qw["text"] * text_score
+                    + _qw["trigram"] * trigram_score
+                    + _qw["label"] * label_score
+                    + _qw["activation"] * activation_score
+                    + _qw["weight"] * weight_score
+                    + _qw["hebbian"] * hebbian_boost
+                    + _qw["crystal"] * crystal_boost
+                    + _qw["pulse"] * pulse_boost
+                    + _qw["spatial_quality"] * spatial_quality
+                    + _qw["geometric_quality"] * geometric_quality
+                    + _qw["cell_effective"] * cell_effective
+                    + _qw["neighbor_density"] * neighbor_density_score
+                    + _qw["geo_topo_divergence"] * geo_topo_divergence
+                    + _qw["bcc_coherence"] * bcc_coherence
+                    + _qw["autocorr"] * autocorr_bonus
+                    + _qw["dream"] * dream_bonus
+                    + _qw["recency"] * recency_boost
+                    + _qw["temporal"] * temporal_boost
+                    + _qw["spatial_proximity"] * spatial_proximity
+                    + _qw["plane_priority"] * plane_priority
+                     + attention_boost
+                     + shortcut_boost
+                     - low_priority_penalty
+                     + pcnn_activity
+                     + resonance_bonus
+                ) * attention_multiplier
                 scored.append((nid, final))
 
             scored.sort(key=lambda x: -x[1])
@@ -1500,7 +1517,7 @@ class HoneycombNeuralField:
             for full_nid in self._occupied_ids:
                 if full_nid.startswith(nid_prefix):
                     node = self._nodes.get(full_nid)
-                    if node and node.is_occupied and node.weight >= 1.5:
+                    if node and node.is_occupied and node.weight >= PCNNConfig.DREAM_SOURCE_MIN_WEIGHT:
                         source_nodes.append(full_nid)
                     break
         if len(source_nodes) < 2:
@@ -1522,7 +1539,7 @@ class HoneycombNeuralField:
                         f" | query_labels={','.join(list(query_labels)[:4])}"
                     )
                     self.store(dream_content, labels=["__dream__", "__resonance__"],
-                               weight=1.5, metadata={"triggered_by": "resonance_query_feedback"})
+                               weight=PCNNConfig.DREAM_INSIGHT_WEIGHT, metadata={"triggered_by": "resonance_query_feedback"})
                     self._query_emergence_stats["resonance_dreams_triggered"] += 1
                     self._resonance_dream_cooldown = now
 
@@ -1538,6 +1555,9 @@ class HoneycombNeuralField:
             if now - ts < temporal_window and rid != nid
         ]
 
+        recent_in_window.sort(key=lambda x: -x[1])
+        recent_in_window = recent_in_window[:15]
+
         for rid, ts in recent_in_window:
             time_gap = now - ts
             proximity = 1.0 / (1.0 + time_gap / 60.0)
@@ -1546,18 +1566,15 @@ class HoneycombNeuralField:
             self._temporal_edges[nid].append((rid, proximity))
             self._temporal_edges[rid].append((nid, proximity))
 
-            self._hebbian.record_path([nid, rid], success=True, strength=strength)
-
             rn = self._nodes.get(rid)
             if rn and rn.is_occupied:
                 shared_labels = set(node.labels) & set(rn.labels)
                 shared_labels.discard("__system__")
-                if shared_labels:
-                    label_overlap = len(shared_labels) / max(len(set(node.labels) | set(rn.labels)), 1)
-                    self._hebbian.record_path(
-                        [nid, rid], success=True,
-                        strength=strength * (1.0 + label_overlap),
-                    )
+                label_overlap = len(shared_labels) / max(len(set(node.labels) | set(rn.labels)), 1) if shared_labels else 0.0
+                combined_strength = strength * (1.0 + label_overlap) if shared_labels else strength
+                self._hebbian.record_path([nid, rid], success=True, strength=combined_strength)
+            else:
+                self._hebbian.record_path([nid, rid], success=True, strength=strength)
 
         self._recent_stores.append((nid, now))
         if len(self._recent_stores) > self._max_recent_stores:
@@ -1686,72 +1703,26 @@ class HoneycombNeuralField:
 
     def dark_plane_flow(self):
         with self._lock:
-            now = time.time()
-            transitions = 0
-            reawakenings = 0
+            if self._dark_plane_engine is None:
+                return {"error": "dark plane engine not initialized"}
 
-            surface_ids = []
-            shallow_ids = []
-            deep_ids = []
-            abyss_ids = []
+            if self._self_regulation:
+                stress = self._self_regulation._stress_level
+                circadian = self._self_regulation._circadian_phase
+                self._dark_plane_engine.update_temperature(stress, circadian)
 
-            for nid in list(self._occupied_ids):
+            result = self._dark_plane_engine.run_flow_cycle()
+            self._dark_plane_transitions = self._dark_plane_engine._total_transitions
+            self._dark_plane_reawakenings = self._dark_plane_engine._total_reawakenings
+
+            for nid in self._occupied_ids:
                 node = self._nodes.get(nid)
-                if not node or not node.is_occupied:
-                    continue
-                plane = node.dark_plane()
-                if plane == "surface":
-                    surface_ids.append(nid)
-                elif plane == "shallow":
-                    shallow_ids.append(nid)
-                elif plane == "deep":
-                    deep_ids.append(nid)
-                elif plane == "abyss":
-                    abyss_ids.append(nid)
+                if node and node.is_occupied and self._dark_plane_engine:
+                    plane = self._dark_plane_engine.get_node_plane(nid)
+                    cfg = self._dark_plane_config.get(plane, {})
+                    node.hibernated = (plane == "abyss")
 
-            if len(surface_ids) > len(self._occupied_ids) * 0.6:
-                surface_ids.sort(key=lambda nid: self._nodes[nid].creation_time)
-                overflow_count = len(surface_ids) - int(len(self._occupied_ids) * 0.5)
-                for nid in surface_ids[:overflow_count]:
-                    node = self._nodes.get(nid)
-                    if node and node.lifecycle_stage() != "fresh":
-                        node.base_activation *= 0.8
-                        transitions += 1
-
-            for nid in abyss_ids:
-                node = self._nodes.get(nid)
-                if not node:
-                    continue
-                if node.access_count > 3 or node.pulse_accumulator > 0.3:
-                    node.activation = min(node.activation + 0.5, node.weight)
-                    node.base_activation = max(0.01, node.weight * 0.1)
-                    self._emit_pulse(nid, strength=0.4, pulse_type=PulseType.REINFORCING)
-                    reawakenings += 1
-
-            if len(shallow_ids) > 0 and len(deep_ids) > 0:
-                for nid in shallow_ids[:5]:
-                    node = self._nodes.get(nid)
-                    if not node:
-                        continue
-                    if node.reinforcement_count >= self._lifecycle_thresholds["crystallized_reinforcement"]:
-                        crystal_boost = sum(node.crystal_channels.values()) if node.crystal_channels else 0
-                        if crystal_boost > 0:
-                            node.base_activation = min(node.base_activation + 0.05, node.weight * 0.3)
-                            transitions += 1
-
-            self._dark_plane_transitions += transitions
-            self._dark_plane_reawakenings += reawakenings
-
-            return {
-                "transitions": transitions,
-                "reawakenings": reawakenings,
-                "plane_distribution": {
-                    "surface": len(surface_ids),
-                    "shallow": len(shallow_ids),
-                    "deep": len(deep_ids),
-                    "abyss": len(abyss_ids),
-                },
-            }
+            return result
 
     def attention_set_focus(
         self,
@@ -2038,7 +2009,7 @@ class HoneycombNeuralField:
                     weights = []
                     for key, c in self._crystallized._crystals.items():
                         if isinstance(c, dict):
-                            weights.append(c.get("weight", 1.0))
+                            weights.append(c.get("crystal_weight", 1.0))
                         elif hasattr(c, 'weight'):
                             weights.append(c.weight)
                     crystal_avg_weight = float(np.mean(weights)) if weights else 0.0
@@ -2571,6 +2542,10 @@ class HoneycombNeuralField:
     def _pulse_loop(self):
         cycle = 0
         while not self._stop_event.wait(timeout=self._adaptive_interval):
+            burst = self._store_burst_counter > 3 and (time.time() - self._store_burst_window) < 5.0
+            if burst:
+                self._stop_event.wait(timeout=self._adaptive_interval * 5)
+                continue
             try:
                 self._pulse_cycle()
                 cycle += 1
@@ -2583,14 +2558,16 @@ class HoneycombNeuralField:
                         self._global_decay()
                         self._hebbian.decay_all()
 
-                if cycle % 30 == 0:
+                _ci = PCNNConfig.PULSE_CYCLE_INTERVALS
+
+                if cycle % _ci["pcnn_step"] == 0:
                     self._pcnn_global_step()
                     self._update_adaptive_interval()
 
-                if cycle % 60 == 0:
+                if cycle % _ci["crystal_maintenance"] == 0:
                     self._crystal_maintenance()
 
-                if cycle % 600 == 0 and self._lattice_checker:
+                if cycle % _ci["lattice_check"] == 0 and self._lattice_checker:
                     self._lattice_checker.run_full_check()
 
                 if cycle % PCNNConfig.SELF_ORGANIZE_INTERVAL == 0 and self._self_organize:
@@ -2599,23 +2576,24 @@ class HoneycombNeuralField:
                 if cycle % PCNNConfig.DREAM_CYCLE_INTERVAL == 0 and self._dream_engine:
                     self._dream_engine.run_dream_cycle()
 
-                if cycle % 120 == 0:
+                if cycle % _ci["cell_density"] == 0:
                     with self._lock:
                         self._cell_map.update_all_densities(self._nodes)
 
-                if cycle % 150 == 0 and self._reflection_field:
+                if cycle % _ci["reflection"] == 0 and self._reflection_field:
                     self._reflection_field.run_reflection_cycle(self)
                     self._apply_phase_behavior()
 
                 if cycle % 200 == 0:
                     self.dark_plane_flow()
 
-                if cycle % 50 == 0 and self._attention_mask:
-                    self._attention_diffuse()
-                    self._attention_decay()
-                    self._rebuild_attention_mask()
+                if cycle % _ci["attention"] == 0 and self._attention_mask:
+                    with self._lock:
+                        self._attention_diffuse()
+                        self._attention_decay()
+                        self._rebuild_attention_mask()
 
-                if cycle % 300 == 0:
+                if cycle % _ci["resonance"] == 0:
                     self.compute_spatial_autocorrelation()
                     self._detect_resonance()
                     if self._phase_transition and hasattr(self, '_phase_transition'):
@@ -2630,7 +2608,7 @@ class HoneycombNeuralField:
                         except Exception as e:
                             logger.error("Phase transition error: %s", e)
 
-                if cycle % 500 == 0 and cycle > 0:
+                if cycle % _ci["emergence"] == 0 and cycle > 0:
                     try:
                         self.compute_emergence_quality()
                         if self._self_regulation:
@@ -3134,6 +3112,8 @@ class HoneycombNeuralField:
                     for tok in self._extract_tokens(bridge):
                         self._content_token_index[tok].add(nid)
                     node.pulse_accumulator = 0.0
+                    self._occupied_ids.add(nid)
+                    self._occupied_count += 1
                     self._bridge_count += 1
                     bridges_this_cycle += 1
 
@@ -3156,6 +3136,12 @@ class HoneycombNeuralField:
         for node in self._nodes.values():
             dt = now - node.last_pulse_time if node.last_pulse_time > 0 else 60
             node.decay(dt)
+        stale_nids = [nid for nid, adj in self._temporal_edges.items() if nid not in self._nodes]
+        for nid in stale_nids:
+            del self._temporal_edges[nid]
+        for adj in self._temporal_edges.values():
+            if len(adj) > self._max_temporal_per_node:
+                adj[:] = adj[-self._max_temporal_per_node:]
 
     def get_node(self, nid: str) -> Optional[Dict]:
         with self._lock:
@@ -3184,7 +3170,7 @@ class HoneycombNeuralField:
             }
 
     def list_occupied(self) -> List[Dict]:
-        with self._rw_lock.read_locked():
+        with self._lock:
             results = []
             for nid, node in self._nodes.items():
                 if node.is_occupied:
@@ -3211,7 +3197,7 @@ class HoneycombNeuralField:
             return results
 
     def topology_graph(self) -> Dict:
-        with self._rw_lock.read_locked():
+        with self._lock:
             nodes = []
             for nid, node in self._nodes.items():
                 if node.is_occupied or node.pulse_accumulator > 0.1:

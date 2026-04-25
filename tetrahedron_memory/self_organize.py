@@ -366,6 +366,8 @@ class SelfOrganizeEngine:
                 field._occupied_ids.discard(nid)
                 if field._occupied_count > 0:
                     field._occupied_count -= 1
+            field._occupied_ids.add(best_target)
+            field._occupied_count += 1
             field._emit_pulse(best_target, strength=target.weight * 0.3, pulse_type=PulseType.REINFORCING)
             migrated += 1
         result.migrations_done = migrated

@@ -131,7 +131,7 @@ class MemoryOffloader:
             try:
                 os.remove(meta["path"])
             except OSError:
-                pass
+                logger.debug("Could not remove cold-store file %s", meta["path"], exc_info=True)
             self._reload_count += 1
             self._access_log[node_id] = time.time()
             return data
@@ -353,6 +353,7 @@ class DistributedCoordinator:
                     peer_info["last_heartbeat"] = time.time()
                     peer_info["status"] = "alive"
                 except Exception:
+                    logger.warning("Gossip heartbeat failed to %s", peer_url, exc_info=True)
                     peer_info["status"] = "unreachable"
                     if time.time() - peer_info.get("last_heartbeat", 0) > self._peer_timeout:
                         peer_info["status"] = "dead"

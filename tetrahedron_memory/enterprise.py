@@ -1,9 +1,12 @@
 import copy
+import logging
 import time
 import json
 import os
 import threading
 from typing import Any, Dict, List, Optional
+
+_log = logging.getLogger("tetramem.enterprise")
 
 
 class VersionControl:
@@ -36,6 +39,10 @@ class VersionControl:
         with self._lock:
             versions = self._versions.get(node_id, [])
             return versions[-1] if versions else None
+
+    def remove_versions(self, node_id: str) -> None:
+        with self._lock:
+            self._versions.pop(node_id, None)
 
 
 class QuotaManager:
@@ -117,7 +124,8 @@ class BackupManager:
                 try:
                     os.remove(tmp)
                 except OSError:
-                    pass
+                    _log.debug("Failed to remove temp file %s", tmp, exc_info=True)
+            _log.error("Failed to create backup %s: %s", filename, e)
             raise
 
     def restore_backup(self, backup_id: str) -> Optional[dict]:
@@ -128,6 +136,7 @@ class BackupManager:
             with open(path, "r", encoding="utf-8") as f:
                 return json.load(f)
         except Exception:
+            _log.error("Failed to restore backup %s", backup_id, exc_info=True)
             return None
 
     def list_backups(self) -> List[Dict]:
@@ -143,7 +152,7 @@ class BackupManager:
                         "created": stat.st_mtime,
                     })
                 except OSError:
-                    pass
+                    _log.debug("Failed to stat backup file %s", path, exc_info=True)
         backups.sort(key=lambda b: b["created"], reverse=True)
         return backups
 
@@ -154,7 +163,7 @@ class BackupManager:
                 os.remove(path)
                 return True
             except OSError:
-                pass
+                _log.debug("Failed to delete backup file %s", path, exc_info=True)
         return False
 
     def _rotate(self):
@@ -165,7 +174,7 @@ class BackupManager:
                 try:
                     backups.append((os.path.getmtime(path), path))
                 except OSError:
-                    pass
+                    _log.debug("Failed to stat backup file %s during rotation", path, exc_info=True)
         if len(backups) <= self._max_backups:
             return
         backups.sort()
@@ -173,4 +182,4 @@ class BackupManager:
             try:
                 os.remove(path)
             except OSError:
-                pass
+                _log.debug("Failed to remove old backup %s during rotation", path, exc_info=True)

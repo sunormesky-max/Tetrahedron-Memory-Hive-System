@@ -1,3 +1,5 @@
+__version__ = "7.0.0"
+
 from .honeycomb_neural_field import (
     HoneycombNeuralField,
     HoneycombNode,
@@ -11,7 +13,6 @@ from .honeycomb_neural_field import (
     LatticeIntegrityChecker,
     SelfCheckResult,
     SelfCheckEngine,
-    TetrahedralCell,
     HoneycombCellMap,
     SemanticCluster,
     OrganizeResult,
@@ -24,8 +25,9 @@ from .honeycomb_neural_field import (
     SessionRecord,
     Session,
     SessionManager,
-    InsightAggregator,
 )
+
+from .dark_plane_engine import DarkPlaneEngine
 
 from .geometry import (
     GeometryPrimitives,
@@ -34,36 +36,8 @@ from .geometry import (
     weighted_tetra_power_radius,
 )
 
-try:
-    from .monitoring import (
-        ASSOCIATE_COUNTER,
-        ERROR_COUNTER,
-        NODE_COUNT_GAUGE,
-        QUERY_COUNTER,
-        SELF_ORGANIZE_COUNTER,
-        STORE_COUNTER,
-        WEIGHT_HISTOGRAM,
-        DREAM_COUNTER,
-        ENTROPY_GAUGE,
-        INTEGRATION_COUNTER,
-        QUERY_LATENCY,
-        STORE_LATENCY,
-        get_grafana_dashboard_json,
-        get_metrics_registry,
-        get_ray_cluster_status,
-        health_check,
-        increment_counter,
-        observe_histogram,
-        record_error,
-        set_gauge,
-    )
-    from .monitoring import (
-        generate_metrics as generate_prometheus_metrics,
-    )
-except ImportError:
-    pass
-
 __all__ = [
+    "__version__",
     "HoneycombNeuralField",
     "HoneycombNode",
     "PulseType",
@@ -76,7 +50,6 @@ __all__ = [
     "LatticeIntegrityChecker",
     "SelfCheckResult",
     "SelfCheckEngine",
-    "TetrahedralCell",
     "HoneycombCellMap",
     "SemanticCluster",
     "OrganizeResult",
@@ -89,29 +62,9 @@ __all__ = [
     "SessionRecord",
     "Session",
     "SessionManager",
-    "InsightAggregator",
+    "DarkPlaneEngine",
     "GeometryPrimitives",
     "TextToGeometryMapper",
     "SemanticEmbedder",
     "weighted_tetra_power_radius",
-    "increment_counter",
-    "set_gauge",
-    "observe_histogram",
-    "record_error",
-    "get_metrics_registry",
-    "get_ray_cluster_status",
-    "get_grafana_dashboard_json",
-    "health_check",
-    "STORE_COUNTER",
-    "QUERY_COUNTER",
-    "ASSOCIATE_COUNTER",
-    "SELF_ORGANIZE_COUNTER",
-    "NODE_COUNT_GAUGE",
-    "WEIGHT_HISTOGRAM",
-    "ERROR_COUNTER",
-    "STORE_LATENCY",
-    "QUERY_LATENCY",
-    "ENTROPY_GAUGE",
-    "INTEGRATION_COUNTER",
-    "DREAM_COUNTER",
 ]

@@ -1,7 +1,10 @@
+import logging
 import time
 import threading
 from typing import Any, Dict, List, Optional
 from contextlib import contextmanager
+
+_log = logging.getLogger("tetramem.observability")
 
 
 class SimpleMetrics:
@@ -17,14 +20,16 @@ class SimpleMetrics:
     @contextmanager
     def timer(self, name: str):
         t0 = time.time()
-        yield
-        elapsed = time.time() - t0
-        with self._lock:
-            if name not in self._timers:
-                self._timers[name] = []
-            self._timers[name].append(elapsed)
-            if len(self._timers[name]) > 1000:
-                self._timers[name] = self._timers[name][-500:]
+        try:
+            yield
+        finally:
+            elapsed = time.time() - t0
+            with self._lock:
+                if name not in self._timers:
+                    self._timers[name] = []
+                self._timers[name].append(elapsed)
+                if len(self._timers[name]) > 1000:
+                    self._timers[name] = self._timers[name][-500:]
 
     def get_stats(self) -> Dict[str, Any]:
         with self._lock:
@@ -76,6 +81,7 @@ class HealthChecker:
                 if isinstance(result, dict) and result.get("status") == "unhealthy":
                     issues.append(name)
             except Exception as e:
+                _log.warning("Health check '%s' raised exception: %s", name, e, exc_info=True)
                 results[name] = {"status": "error", "error": str(e)}
                 issues.append(name)
         self._last_check = {"results": results, "issues": issues, "ts": time.time()}

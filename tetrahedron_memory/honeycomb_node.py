@@ -264,6 +264,8 @@ class HoneycombNode:
     def dark_plane(self) -> str:
         if not self.is_occupied:
             return "void"
+        if self._frozen_metadata and "dark_plane" in self._frozen_metadata:
+            return self._frozen_metadata["dark_plane"]
         stage = self.lifecycle_stage()
         if stage == "fresh":
             return "surface"

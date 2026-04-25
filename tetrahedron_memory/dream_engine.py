@@ -1015,6 +1015,7 @@ class DreamEngine:
             try:
                 geo_distance = float(np.linalg.norm(node_a.position - node_b.position))
             except Exception:
+                logger.debug("geo_distance fallback for %s↔%s", node_a_id[:8], node_b_id[:8], exc_info=True)
                 geo_distance = field._spacing * 4.0
 
             max_distance = field._spacing * 10.0
@@ -1047,8 +1048,8 @@ class DreamEngine:
 
             structural_similarity = 0.0
             if struct_a["key_principles"] and struct_b["key_principles"]:
-                shared_p = len(set(tuple(p[:15] for p in struct_a["key_principles"])
-                                   ) & set(tuple(p[:15] for p in struct_b["key_principles"])))
+                shared_p = len(set(p[:15] for p in struct_a["key_principles"])
+                                   & set(p[:15] for p in struct_b["key_principles"]))
                 max_p = max(len(struct_a["key_principles"]), len(struct_b["key_principles"]), 1)
                 structural_similarity = shared_p / max_p
 

@@ -8,6 +8,7 @@ from __future__ import annotations
 import glob as _glob
 import hashlib
 import json
+import logging
 import os
 import shutil
 import tempfile
@@ -21,17 +22,11 @@ if TYPE_CHECKING:
 
 
 class SystemOperationManager:
-    """
-    Manages long-term system operation:
-    - Scheduled backups with rotation
-    - Health monitoring with auto-recovery
-    - Performance degradation detection
-    - Graceful degradation under resource pressure
-    - Data integrity verification
-    """
 
     BACKUP_DIR_NAME = "scheduled_backups"
     BACKUP_INDEX_FILE = "_schedule_index.json"
+
+    _log = logging.getLogger("tetramem.system_ops")
 
     def __init__(
         self,
@@ -122,19 +117,21 @@ class SystemOperationManager:
             try:
                 self._force_emergency_backup()
                 actions_taken.append("emergency_backup_created")
-            except Exception:
-                pass
+            except Exception as e:
+                self._log.error("Emergency backup failed: %s", e)
 
         result = {
-            "status": "healthy"
-            if self._degradation_level == 0
-            else (
-                "degraded"
-                if self._degradation_level == 1
+            "status": (
+                "ok"
+                if self._degradation_level == 0
                 else (
-                    "critical"
-                    if self._degradation_level == 2
-                    else "emergency"
+                    "degraded"
+                    if self._degradation_level == 1
+                    else (
+                        "critical"
+                        if self._degradation_level == 2
+                        else "emergency"
+                    )
                 )
             ),
             "checks": checks,
@@ -171,7 +168,8 @@ class SystemOperationManager:
             elif issue == "disk_low":
                 return self._recover_disk_low()
             return False
-        except Exception:
+        except Exception as e:
+            self._log.error("Auto-recovery failed for %s: %s", issue, e)
             return False
 
     def create_scheduled_backup(self, level: str = "daily") -> str:
@@ -209,18 +207,18 @@ class SystemOperationManager:
                 try:
                     os.fsync(f.fileno())
                 except OSError:
-                    pass
+                    self._log.debug("fsync failed for backup %s", backup_id)
             final_path = os.path.join(backup_path, "state.json")
             os.replace(tmp_path, final_path)
         except Exception:
+            self._log.error("Failed to write backup %s", backup_id, exc_info=True)
             try:
                 os.unlink(tmp_path)
             except OSError:
-                pass
+                self._log.debug("cleanup failed for %s", tmp_path)
             raise
 
         entry = {
-            "id": backup_id,
             "level": level,
             "ts": ts,
             "path": backup_path,
@@ -249,7 +247,8 @@ class SystemOperationManager:
         try:
             with open(state_path, "r", encoding="utf-8") as f:
                 state = json.load(f)
-        except Exception:
+        except Exception as e:
+            self._log.error("Failed to load backup %s: %s", backup_id, e)
             return False
 
         meta = state.get("_backup_meta", {})
@@ -416,8 +415,8 @@ class SystemOperationManager:
                 try:
                     bid = self.create_scheduled_backup(level)
                     created.append(f"{level}:{bid}")
-                except Exception:
-                    pass
+                except Exception as exc:
+                    self._log.warning("Scheduled backup failed for level %s: %s", level, exc)
         return created
 
     def create_rollback_point(self, label: str) -> Dict[str, Any]:
@@ -452,13 +451,14 @@ class SystemOperationManager:
                 try:
                     os.fsync(f.fileno())
                 except OSError:
-                    pass
+                    self._log.debug("fsync failed for rollback point %s", label)
             os.replace(tmp_path, rollback_path)
         except Exception:
+            self._log.error("Failed to write rollback point %s", label, exc_info=True)
             try:
                 os.unlink(tmp_path)
             except OSError:
-                pass
+                self._log.debug("cleanup failed for %s", tmp_path)
             raise
 
         return {
@@ -485,6 +485,7 @@ class SystemOperationManager:
                         entry = json.load(f)
                     self._rollback_points[label] = entry
                 except Exception as e:
+                    self._log.warning("Failed to load rollback point %s: %s", label, e)
                     result["error"] = f"Failed to load rollback point: {e}"
                     return result
             else:
@@ -511,7 +512,7 @@ class SystemOperationManager:
                     current_state = self._field.export_full_state()
                 self._persistence.checkpoint(current_state)
             except Exception:
-                pass
+                self._log.error("Post-rollback checkpoint failed for %s", label, exc_info=True)
 
         result["rolled_back"] = True
         result["nodes_before"] = before_count
@@ -586,7 +587,7 @@ class SystemOperationManager:
                     item["file_size_bytes"] = size
                     item["file_size_mb"] = round(size / (1024 * 1024), 2)
                 except OSError:
-                    pass
+                    self._log.debug("cleanup failed for %s", state_path)
             result.append(item)
         return result
 
@@ -596,8 +597,8 @@ class SystemOperationManager:
         ):
             try:
                 self.create_scheduled_backup("daily")
-            except Exception:
-                pass
+            except Exception as exc:
+                self._log.warning("Periodic backup failed: %s", exc)
 
     def _check_persistence(self) -> Dict[str, Any]:
         try:
@@ -612,6 +613,7 @@ class SystemOperationManager:
                 "is_dirty": p.is_dirty(),
             }
         except Exception as e:
+            self._log.warning("Persistence check failed: %s", e)
             return {"status": "degraded", "error": str(e)}
 
     def _check_lattice_integrity(self) -> Dict[str, Any]:
@@ -642,6 +644,7 @@ class SystemOperationManager:
                 "orphan_rate": round(orphan_rate, 3),
             }
         except Exception as e:
+            self._log.warning("Lattice integrity check failed: %s", e)
             return {"status": "degraded", "error": str(e)}
 
     def _check_memory_pressure(self) -> Dict[str, Any]:
@@ -661,7 +664,7 @@ class SystemOperationManager:
                 "rss_mb": round(mem_mb, 1),
             }
         except ImportError:
-            pass
+            self._log.debug("optional dep not available: psutil")
         try:
             import resource as _resource
 
@@ -678,7 +681,7 @@ class SystemOperationManager:
                 "rss_mb": round(mem_mb, 1),
             }
         except Exception:
-            pass
+            self._log.debug("memory monitoring via resource module unavailable")
         return {"status": "ok", "note": "memory monitoring unavailable"}
 
     def _check_disk_space(self) -> Dict[str, Any]:
@@ -704,6 +707,7 @@ class SystemOperationManager:
                 "free_gb": round(free_gb, 2),
             }
         except Exception:
+            self._log.warning("Disk space check failed for %s", self._storage_dir, exc_info=True)
             return {"status": "ok", "note": "disk monitoring unavailable"}
 
     def _check_pulse_engine(self) -> Dict[str, Any]:
@@ -716,6 +720,7 @@ class SystemOperationManager:
                 "pulse_count": stats.get("pulse_count", 0),
             }
         except Exception as e:
+            self._log.warning("Pulse engine check failed: %s", e)
             return {"status": "degraded", "error": str(e)}
 
     def _check_background_threads(self) -> Dict[str, Any]:
@@ -731,6 +736,7 @@ class SystemOperationManager:
                 "total_threads": threading.active_count(),
             }
         except Exception as e:
+            self._log.warning("Background threads check failed: %s", e)
             return {"status": "degraded", "error": str(e)}
 
     def _check_wal_size(self) -> Dict[str, Any]:
@@ -749,6 +755,7 @@ class SystemOperationManager:
                 "max_bytes": max_size,
             }
         except Exception as e:
+            self._log.warning("WAL size check failed: %s", e)
             return {"status": "degraded", "error": str(e)}
 
     def _check_checkpoint_freshness(self) -> Dict[str, Any]:
@@ -766,6 +773,7 @@ class SystemOperationManager:
                 "max_acceptable_age": max_age,
             }
         except Exception as e:
+            self._log.warning("Checkpoint freshness check failed: %s", e)
             return {"status": "degraded", "error": str(e)}
 
     def _compute_degradation(self, checks: Dict[str, Dict]) -> int:
@@ -795,6 +803,7 @@ class SystemOperationManager:
             )
             return True
         except Exception:
+            self._log.error("Recovery failed for stale_checkpoint", exc_info=True)
             return False
 
     def _recover_wal_too_large(self) -> bool:
@@ -807,6 +816,7 @@ class SystemOperationManager:
             )
             return True
         except Exception:
+            self._log.error("Recovery failed for wal_too_large", exc_info=True)
             return False
 
     def _recover_pulse_dead(self) -> bool:
@@ -820,6 +830,7 @@ class SystemOperationManager:
                 return True
             return False
         except Exception:
+            self._log.error("Recovery failed for pulse_dead", exc_info=True)
             return False
 
     def _recover_orphan_nodes(self) -> bool:
@@ -830,6 +841,7 @@ class SystemOperationManager:
             )
             return True
         except Exception:
+            self._log.error("Recovery failed for orphan_nodes", exc_info=True)
             return False
 
     def _recover_memory_high(self) -> bool:
@@ -845,6 +857,7 @@ class SystemOperationManager:
             )
             return True
         except Exception:
+            self._log.error("Recovery failed for memory_high", exc_info=True)
             return False
 
     def _recover_disk_low(self) -> bool:
@@ -859,7 +872,7 @@ class SystemOperationManager:
                 self._persistence.checkpoint(state)
                 pruned = True
             except Exception:
-                pass
+                self._log.warning("Checkpoint during disk-low recovery failed", exc_info=True)
         if pruned:
             self._recovery_successes["disk_low"] = (
                 self._recovery_successes.get("disk_low", 0) + 1
@@ -880,7 +893,7 @@ class SystemOperationManager:
             try:
                 shutil.rmtree(entry["path"], ignore_errors=True)
             except Exception:
-                pass
+                self._log.warning("Failed to remove backup directory %s", entry.get("path", "?"))
             if entry in self._backup_index:
                 self._backup_index.remove(entry)
 
@@ -892,6 +905,7 @@ class SystemOperationManager:
                 ) as f:
                     return json.load(f)
             except Exception:
+                self._log.warning("Failed to load backup index from %s", self._backup_index_path, exc_info=True)
                 return []
         return []
 
@@ -907,4 +921,4 @@ class SystemOperationManager:
                     indent=2,
                 )
         except Exception:
-            pass
+            self._log.error("Failed to save backup index to %s", self._backup_index_path, exc_info=True)

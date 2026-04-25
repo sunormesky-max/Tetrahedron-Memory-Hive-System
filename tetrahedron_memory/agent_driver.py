@@ -265,7 +265,7 @@ class AgentMemoryDriver:
                         if hebbian_w > 0:
                             step_cost /= (1.0 + hebbian_w * 0.5)
                         if field._reflection_field:
-                            energy = field._reflection_field._node_energy.get(nnid, 0.5)
+                            energy = field._reflection_field._node_energy.get(nnid, 0.5) if field._reflection_field else 0.5
                             step_cost *= (0.8 + energy * 0.4)
                     new_cost = cost + step_cost
                     new_path = path + [nnid]

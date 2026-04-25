@@ -27,6 +27,10 @@ class HebbianPathMemory:
         self._edges: Dict[Tuple[str, str], float] = defaultdict(float)
         self._traversal_count: Dict[Tuple[str, str], int] = defaultdict(int)
         self._max_paths = max_paths
+        self._prune_high_watermark = int(max_paths * 1.5)
+        self._prune_low_watermark = int(max_paths * 0.8)
+        self._record_count = 0
+        self._prune_check_interval = 50
         self._decay = decay
         self._reinforce = reinforce_factor
         self._min_weight = min_weight
@@ -67,8 +71,11 @@ class HebbianPathMemory:
         if success:
             self._success_count += 1
 
-        if len(self._edges) > self._max_paths:
-            self._prune()
+        self._record_count += 1
+        if self._record_count >= self._prune_check_interval:
+            self._record_count = 0
+            if len(self._edges) > self._prune_high_watermark:
+                self._prune()
 
     def get_path_bias(self, from_id: str, to_id: str) -> float:
         w = self._edges.get((from_id, to_id), 0.0)
@@ -87,10 +94,16 @@ class HebbianPathMemory:
         self._total_decay_count += 1
 
     def _prune(self):
-        sorted_edges = sorted(self._edges.items(), key=lambda x: x[1])
-        to_remove = len(self._edges) - self._max_paths
-        for i in range(min(to_remove, len(sorted_edges))):
-            key = sorted_edges[i][0]
+        if not self._edges:
+            return
+        target = self._prune_low_watermark
+        if len(self._edges) <= target:
+            return
+        to_remove_count = len(self._edges) - target
+        items = list(self._edges.items())
+        items.sort(key=lambda x: x[1])
+        for i in range(min(to_remove_count, len(items))):
+            key = items[i][0]
             del self._edges[key]
             self._traversal_count.pop(key, None)
 

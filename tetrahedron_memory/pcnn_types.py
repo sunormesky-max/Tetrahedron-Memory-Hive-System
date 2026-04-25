@@ -180,6 +180,75 @@ class PCNNConfig:
     PULSE_BUDGET_PER_CYCLE = 50
     CASCADE_ENERGY_BUDGET = 0.3
 
+    QUERY_WEIGHTS = {
+        "text": 0.11,
+        "trigram": 0.10,
+        "label": 0.12,
+        "activation": 0.08,
+        "weight": 0.05,
+        "hebbian": 0.06,
+        "crystal": 0.06,
+        "pulse": 0.02,
+        "spatial_quality": 0.05,
+        "geometric_quality": 0.04,
+        "cell_effective": 0.03,
+        "neighbor_density": 0.03,
+        "geo_topo_divergence": 0.02,
+        "bcc_coherence": 0.02,
+        "autocorr": 0.01,
+        "dream": 0.01,
+        "recency": 0.06,
+        "temporal": 0.04,
+        "spatial_proximity": 0.05,
+        "plane_priority": 0.04,
+    }
+
+    ATTENTION_MULTIPLIER = 0.5
+    ATTENTION_ADDITIVE = 0.15
+
+    PULSE_CYCLE_INTERVALS = {
+        "convergence_check": 60,
+        "global_decay": 120,
+        "pcnn_step": 30,
+        "crystal_maintenance": 60,
+        "lattice_check": 600,
+        "self_organize": 60,
+        "dream": 300,
+        "cell_density": 120,
+        "reflection": 150,
+        "attention": 50,
+        "resonance": 300,
+        "emergence": 500,
+    }
+
+    DARK_PLANE_CONFIG = {
+        "surface": {"pulse_weight": 3.0, "query_priority": 1.0, "dream_focus": 0.3},
+        "shallow": {"pulse_weight": 2.0, "query_priority": 0.8, "dream_focus": 1.0},
+        "deep": {"pulse_weight": 0.8, "query_priority": 0.5, "dream_focus": 0.6},
+        "abyss": {"pulse_weight": 0.2, "query_priority": 0.2, "dream_focus": 0.1},
+    }
+
+    LIFECYCLE_THRESHOLDS = {
+        "fresh_seconds": 3600,
+        "consolidating_seconds": 86400,
+        "crystallized_reinforcement": 5,
+        "ancient_days": 7,
+    }
+
+    ATTENTION_CONFIG = {
+        "decay_rate": 0.05,
+        "diffusion_rate": 0.3,
+        "max_foci": 3,
+    }
+
+    LATTICE_EXPANSION = {
+        "occupancy_threshold": 0.85,
+        "density_check_threshold": 0.60,
+        "dense_ratio_threshold": 0.3,
+        "dense_neighbor_count": 5,
+        "sample_size": 200,
+    }
+
 
 class NeuralPulse:
     __slots__ = (

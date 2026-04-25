@@ -30,7 +30,7 @@ class InsightAggregator:
             insights = [i for i in insights if i.get("priority") == priority]
         priority_order = {"high": 0, "medium": 1, "low": 2}
         insights.sort(key=lambda x: priority_order.get(x.get("priority", "medium"), 3))
-        return insights[-n:]
+        return insights[:n]
 
     def clear(self):
         with self._lock:
