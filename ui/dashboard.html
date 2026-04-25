@@ -262,7 +262,7 @@ if(!window.THREE){document.body.innerHTML='<h2 style="color:red;padding:40px">Th
 <script>
 window._ocReady=true;
 
-const CREDS={tetramem:'tetramem123',admin:'admin123'};
+const CREDS={};
 let API='/api/v1/';
 if(sessionStorage.getItem('apiBase'))API=sessionStorage.getItem('apiBase');
 let refreshTimer=null;
@@ -315,13 +315,20 @@ function doLogin(){
   const u=document.getElementById('user').value,p=document.getElementById('pass').value;
   const ab=document.getElementById('apiBase').value.trim();
   if(ab){API=ab.replace(/\/+$/,'')+'/api/v1/';localStorage.setItem('tetramem_api_base',ab);}
-  if(CREDS[u]&&CREDS[u]===p){
+  const errEl=document.getElementById('loginErr');
+  errEl.textContent='';
+  fetch(API+'login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:p}),signal:AbortSignal.timeout(5000)}).then(r=>{
+    if(!r.ok){errEl.textContent='Invalid password';return null;}
+    return r.json();
+  }).then(d=>{
+    if(!d)return;
+    if(d.token)sessionStorage.setItem('tetramem_token',d.token);
     document.getElementById('loginPage').classList.add('hidden');
     document.getElementById('appPage').classList.remove('hidden');
     sessionStorage.setItem('auth',btoa(u+':'+p));
     sessionStorage.setItem('apiBase',API);
     initApp();
-  }else{document.getElementById('loginErr').textContent='用户名或密码错误';}
+  }).catch(()=>{errEl.textContent='Cannot connect to API';});
 }
 document.getElementById('pass').onkeydown=function(e){if(e.key==='Enter')doLogin()};
 function doLogout(){

@@ -1182,7 +1182,7 @@ class HoneycombNeuralField:
 
                 attention_boost = 0.0
                 attention_multiplier = 1.0
-                if self._attention_mask:
+                if self._attention_mask and self._attention_foci:
                     attn = self._attention_mask.get(nid, 0.0)
                     if attn > 0.1:
                         attention_boost = attn * PCNNConfig.ATTENTION_ADDITIVE
@@ -1250,6 +1250,11 @@ class HoneycombNeuralField:
                     self._self_regulation.notify_query_result(
                         results[0].get("distance", 0), k, len(results)
                     )
+                if self._dark_plane_engine:
+                    for r in results[:5]:
+                        self._dark_plane_engine.inject_query_energy(
+                            r["id"], r.get("distance", 0.5)
+                        )
 
             return results
 
@@ -1714,6 +1719,13 @@ class HoneycombNeuralField:
             result = self._dark_plane_engine.run_flow_cycle()
             self._dark_plane_transitions = self._dark_plane_engine._total_transitions
             self._dark_plane_reawakenings = self._dark_plane_engine._total_reawakenings
+
+            if self._self_regulation:
+                self._self_regulation.notify_dark_plane_transitions(
+                    result.get("transitions", 0),
+                    result.get("reawakenings", 0),
+                    len(self._occupied_ids),
+                )
 
             for nid in self._occupied_ids:
                 node = self._nodes.get(nid)
@@ -4082,9 +4094,11 @@ class HoneycombNeuralField:
                     "autonomic_mode": self._self_regulation._autonomic_mode,
                     "circadian_phase": self._self_regulation._circadian_phase,
                     "immune_total_repairs": self._self_regulation._immune_total_repairs,
+                    "immune_anomaly_count": self._self_regulation._immune_anomaly_count,
                     "regulation_count": self._self_regulation._regulation_count,
-                    "query_success_history": list(self._self_regulation._query_success_history[-50:]),
+                    "query_success_history": list(self._self_regulation._query_success_history)[-50:],
                     "start_time": float(self._self_regulation._start_time),
+                    "dark_plane_feedback_score": float(self._self_regulation._dark_plane_feedback_score),
                 }
 
             return state
@@ -4299,7 +4313,12 @@ class HoneycombNeuralField:
                 self._self_regulation._autonomic_mode = sr_raw.get("autonomic_mode", "balanced")
                 self._self_regulation._circadian_phase = sr_raw.get("circadian_phase", "work")
                 self._self_regulation._immune_total_repairs = int(sr_raw.get("immune_total_repairs", 0))
+                self._self_regulation._immune_anomaly_count = int(sr_raw.get("immune_anomaly_count", 0))
                 self._self_regulation._regulation_count = int(sr_raw.get("regulation_count", 0))
-                self._self_regulation._query_success_history = sr_raw.get("query_success_history", [])
+                qh_raw = sr_raw.get("query_success_history", [])
+                self._self_regulation._query_success_history = deque(qh_raw[-100:], maxlen=100)
                 self._self_regulation._start_time = float(sr_raw.get("start_time", time.time()))
+                self._self_regulation._dark_plane_feedback_score = float(
+                    sr_raw.get("dark_plane_feedback_score", 0)
+                )
 

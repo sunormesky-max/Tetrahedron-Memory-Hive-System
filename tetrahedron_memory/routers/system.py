@@ -103,15 +103,22 @@ def setup_info():
 def login(request: Request, body: Dict[str, str] = None):
     state = _get_state(request)
     req = body or {}
-    api_key = req.get("api_key", "")
+
+    ui_password = req.get("password", "")
+    if ui_password and ui_password == _ui_password:
+        token = state.auth_manager.create_token("ui-session") or "ui-access"
+        state.metrics.increment("auth_successes")
+        return {"token": token, "mode": "ui"}
+
+    api_key = req.get("api_key", ui_password)
     if not api_key:
-        raise HTTPException(400, "api_key is required")
+        raise HTTPException(400, "api_key or password is required")
     token = state.auth_manager.create_token(api_key)
     if token is None:
         state.metrics.increment("auth_failures")
         raise HTTPException(401, "Invalid API key")
     state.metrics.increment("auth_successes")
-    return {"token": token}
+    return {"token": token, "mode": "api"}
 
 
 @router.post("/admin/api-key")

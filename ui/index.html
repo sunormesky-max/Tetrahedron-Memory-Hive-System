@@ -1725,13 +1725,14 @@ body {
       // ===== ACTIONS =====
       function doLogin() {
         if (!loginForm.username) { loginError.value = 'Please enter your name'; return; }
-        if (!loginForm.password || loginForm.password !== 'Hive@2026') { loginError.value = 'Invalid password'; return; }
+        if (!loginForm.password) { loginError.value = 'Please enter password'; return; }
         loggingIn.value = true;
         loginError.value = '';
         currentUser.value = loginForm.username;
 
-        // Try API auth first
-        api('/health').then(() => {
+        const headers = {'Content-Type': 'application/json'};
+        api('/login', 'POST', {password: loginForm.password}, headers).then(d => {
+          if (d.token) { sessionStorage.setItem('tetramem_token', d.token); }
           loginTransitioning.value = true;
           setTimeout(() => {
             authenticated.value = true;
@@ -1739,15 +1740,9 @@ body {
             if (loginAnimId) cancelAnimationFrame(loginAnimId);
             nextTick(() => { initDashboard(); });
           }, 800);
-        }).catch(() => {
-          // Even if API is unreachable, allow entry for demo
-          loginTransitioning.value = true;
-          setTimeout(() => {
-            authenticated.value = true;
-            loggingIn.value = false;
-            if (loginAnimId) cancelAnimationFrame(loginAnimId);
-            nextTick(() => { initDashboard(); });
-          }, 800);
+        }).catch(err => {
+          loggingIn.value = false;
+          loginError.value = 'Invalid password';
         });
       }
 
