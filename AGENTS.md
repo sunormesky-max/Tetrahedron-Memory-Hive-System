@@ -1,29 +1,4 @@
-# TetraMem-XL v6.5 — Agent Integration Guide
-
-## Agent Self-Memory Protocol
-
-This system is the persistent memory backend for the opencode agent. Follow this protocol every session:
-
-### On Session Start (Mandatory)
-1. Read back agent identity: `POST /api/v1/query` with `{"query": "agent identity opencode", "k": 3}`
-2. Read back user context: `POST /api/v1/query` with `{"query": "用户偏好 BOSS 项目状态", "k": 5}`
-3. Restore full context from returned memories before doing any work
-
-### During Work
-- Store important discoveries: `POST /api/v1/store` with `{"content": "...", "labels": ["discovery"], "weight": 1.0}`
-- Store user preferences: `POST /api/v1/store` with `{"content": "...", "labels": ["user-preference"], "weight": 1.5}`
-- Store project decisions: `POST /api/v1/store` with `{"content": "...", "labels": ["decision"], "weight": 1.5}`
-- Store critical info (BOSS, passwords, endpoints): `weight: 2.0` with label `"critical"`
-
-### Connection Info
-- **API**: `http://${TETRAMEM_HOST:-localhost}:${TETRAMEM_PORT:-8000}/api/v1/`
-- **SSH**: Use your server credentials
-- **Query field**: Use `"query"` not `"text"` in POST body
-
-### SSH Caveats (Windows → Linux)
-- PowerShell single quotes break inside SSH commands — write Python scripts with paramiko instead
-- Upload JSON file via SFTP, then `curl -d @/tmp/file.json`
-- Always clean up temp files after
+# TetraMem-XL v7.1 — Agent Integration Guide
 
 ## What is this?
 
@@ -56,62 +31,72 @@ Base URL: `http://<host>:8000/api/v1/`
 ```bash
 curl -X POST http://localhost:8000/api/v1/store \
   -H "Content-Type: application/json" \
+  -H "X-API-Key: your-key" \
   -d '{"content": "Remember this", "labels": ["important"], "weight": 1.0}'
-# Returns: {"id": "...", "status": "ok"}
+# Returns: {"id": "..."}
 ```
 
 ### Query memories
 ```bash
-curl "http://localhost:8000/api/v1/query?text=remember&k=5"
-# Returns: [{"id":"...", "content":"...", "distance":0.85, "weight":1.0, "labels":[...]}]
+curl -X POST http://localhost:8000/api/v1/query \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-key" \
+  -d '{"query": "remember", "k": 5}'
+# Returns: {"results": [{"id":"...", "content":"...", "distance":0.85, ...}]}
 ```
 
 ### Get all stats
 ```bash
-curl http://localhost:8000/api/v1/stats
+curl http://localhost:8000/api/v1/stats -H "X-API-Key: your-key"
 ```
 
 ### Health check
 ```bash
 curl http://localhost:8000/api/v1/health
-# Returns: {"status":"ok","version":"6.5.0"}
+# Returns: {"status":"ok","version":"7.0.0"}
 ```
 
 ### List memories
 ```bash
-curl "http://localhost:8000/api/v1/browse?direction=newest&limit=20"
-```
-
-### Delete a memory
-```bash
-curl -X DELETE http://localhost:8000/api/v1/tetrahedra/<ID>
+curl "http://localhost:8000/api/v1/browse?direction=newest&limit=20" -H "X-API-Key: your-key"
 ```
 
 ### Trigger self-organization
 ```bash
-curl -X POST http://localhost:8000/api/v1/self-organize/run
+curl -X POST http://localhost:8000/api/v1/self-organize -H "X-API-Key: your-key"
 ```
 
-### Trigger dream cycle (creative recombination)
+### Trigger dream cycle
 ```bash
-curl -X POST http://localhost:8000/api/v1/dream/run
+curl -X POST http://localhost:8000/api/v1/dream -H "X-API-Key: your-key"
 ```
 
 ### Trigger cascade pulse
 ```bash
-curl -X POST http://localhost:8000/api/v1/cascade/trigger
+curl -X POST http://localhost:8000/api/v1/cascade/trigger -H "X-API-Key: your-key"
 ```
 
-### Export all memories
+### Dark plane flow
 ```bash
-curl http://localhost:8000/api/v1/export
+curl -X POST http://localhost:8000/api/v1/dark-plane/flow -H "X-API-Key: your-key"
+```
+
+### Self-regulation trigger
+```bash
+curl -X POST http://localhost:8000/api/v1/regulation/trigger -H "X-API-Key: your-key"
+```
+
+### Export memories
+```bash
+curl http://localhost:8000/api/v1/export -H "X-API-Key: your-key"
 ```
 
 ### Import memories
 ```bash
 curl -X POST http://localhost:8000/api/v1/import \
   -H "Content-Type: application/json" \
-  -d @export.json
+  -H "X-API-Key: your-key" \
+  -d '{"memories": [{"content": "...", "labels": [...], "weight": 1.0}]}'
 ```
 
 ## Key Environment Variables
@@ -129,17 +114,19 @@ curl -X POST http://localhost:8000/api/v1/import \
 - **Crystallized Pathways**: Permanent structural fast-paths (zero-decay)
 - **Dream Engine**: Cross-domain creative memory recombination
 - **Self-Organization**: Automatic clustering, consolidation, and migration
+- **Dark Plane**: Thermodynamic energy landscape with adaptive thresholds
+- **Self-Regulation**: Six-layer physiological control (PID + circadian + autonomic + immune + endocrine + stress)
 - **Spatial Reflection Field**: Energy-based phase transition detection
 
 ## UI
 
-- Embedded: `http://<host>:<ui_port>/ui/`
+- Embedded: `http://<host>:8000/ui/`
 - Standalone dashboard: Open `ui/dashboard.html` in any browser, enter API address
 
 ## Management
 
 ```bash
-systemctl restart tetramem   # Restart
-systemctl stop tetramem      # Stop
-journalctl -u tetramem -f    # View logs
+systemctl restart tetramem-api   # Restart
+systemctl stop tetramem-api      # Stop
+journalctl -u tetramem-api -f    # View logs
 ```
