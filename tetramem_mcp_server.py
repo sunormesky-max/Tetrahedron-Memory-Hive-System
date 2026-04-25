@@ -397,7 +397,7 @@ def _handle_request(req: Dict[str, Any]) -> str:
             },
             "serverInfo": {
                 "name": "tetramem-x",
-                "version": "6.5.0",
+                "version": "7.1.0",
                 "description": "TetraMem-XL Eternal Memory — BCC Lattice Honeycomb + PCNN"
             }
         })
