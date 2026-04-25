@@ -148,17 +148,22 @@ class DarkPlaneSubstrate:
         self._state.dark_energy = self._compute_dark_energy()
         self._state.channel_energy = self._compute_channel_energy()
 
+        all_ph = self._state.features_h0 + self._state.features_h1 + self._state.features_h2
+        self._state.persistent_entropy = self._compute_persistent_entropy(all_ph)
+
+        coupling = self._compute_cross_dim_coupling()
+
         h1_count = len(self._state.features_h1)
         h2_count = len(self._state.features_h2)
 
         self._state.h3 = self._update_h3_dynamics(
-            h1_count, h2_count, stress, activity_rate, n_total, self._dt
+            h1_count, h2_count, stress, activity_rate, n_total, self._dt, coupling
         )
         self._state.h4 = self._update_h4_dynamics(
-            stress, dream_active, n_total, self._dt
+            stress, dream_active, n_total, self._dt, coupling
         )
         self._state.h5 = self._update_h5_dynamics(
-            self._state.h4, self._state.coherence, stress, n_total, self._dt
+            self._state.h4, self._state.coherence, stress, n_total, self._dt, coupling
         )
         self._state.h6 = self._update_h6_dynamics(
             self._state.h5,
@@ -166,6 +171,7 @@ class DarkPlaneSubstrate:
             self._state.last_phase_transition,
             n_total,
             self._dt,
+            coupling,
         )
 
         self._state.coherence = self._compute_coherence()
@@ -190,6 +196,8 @@ class DarkPlaneSubstrate:
             "psi_field": self._psi_field,
             "total_dim_energy": self._state.total_dim_energy,
             "cascade_potential": self._state.cascade_potential,
+            "persistent_entropy": self._state.persistent_entropy,
+            "cross_dim_coupling": coupling,
             "phase_transitions": transitions,
         }
 
@@ -538,8 +546,42 @@ class DarkPlaneSubstrate:
     def _compute_channel_energy(self) -> float:
         return sum(f.persistence * (1.0 + f.topo_charge) for f in self._state.features_h1)
 
+    def _compute_persistent_entropy(self, features: list) -> float:
+        if not features:
+            return 0.0
+        persistences = np.array([f.persistence for f in features], dtype=np.float64)
+        total = persistences.sum()
+        if total < 1e-12:
+            return 0.0
+        probs = persistences / total
+        mask = probs > 1e-12
+        return float(-np.sum(probs[mask] * np.log(probs[mask])))
+
+    def _compute_cross_dim_coupling(self) -> dict:
+        e_h0 = len(self._state.features_h0) * 0.05
+        e_h1 = sum(f.persistence * (1.0 + 0.4 * f.topo_charge) for f in self._state.features_h1) * 0.20
+        e_h2 = sum(f.persistence * (1.0 + 0.6 * f.topo_charge) for f in self._state.features_h2) * 0.35
+        e_h3 = self._state.h3.energy * 0.25
+        e_h4 = self._state.h4.energy * 0.15
+        e_h5 = self._state.h5.energy * 0.12
+        return {
+            "e_h0": e_h0,
+            "e_h1": e_h1,
+            "e_h2": e_h2,
+            "e_h3": e_h3,
+            "e_h4": e_h4,
+            "e_h5": e_h5,
+            "e_lower_total": e_h0 + e_h1 + e_h2 + e_h3 + e_h4 + e_h5,
+            "coupling_h01": e_h0 * 0.10 if e_h0 > 0 else 0.0,
+            "coupling_h12": e_h1 * 0.25 if e_h1 > 0 else 0.0,
+            "coupling_h23": e_h2 * 0.30 if e_h2 > 0 else 0.0,
+            "coupling_h34": e_h3 * 0.35 if e_h3 > 0 else 0.0,
+            "coupling_h45": e_h4 * 0.40 if e_h4 > 0 else 0.0,
+        }
+
     def _update_h3_dynamics(
-        self, h1_count, h2_count, stress, activity_rate, n_total, dt
+        self, h1_count, h2_count, stress, activity_rate, n_total, dt,
+        coupling: dict = None,
     ) -> HighDimState:
         alpha3 = 0.5
         beta3 = 0.2
@@ -571,8 +613,13 @@ class DarkPlaneSubstrate:
             alpha3 * (h1_count + h2_count) * e_void / n_total
             - beta3 * stress * state.count
             + gamma3 * i_density * math.log(1.0 + state.count)
+            + 0.20 * (coupling.get("coupling_h12", 0.0) if coupling else 0.0)
         )
-        d_energy = delta3 * state.count * h12_avg - epsilon3 * activity_rate * state.energy
+        d_energy = (
+            delta3 * state.count * h12_avg
+            - epsilon3 * activity_rate * state.energy
+            + 0.15 * (coupling.get("e_h2", 0.0) if coupling else 0.0)
+        )
 
         new_count = self._euler_step(state.count, d_count, dt, (0, 0.5 * n_total))
         new_energy = self._euler_step(state.energy, d_energy, dt, (0, e_void))
@@ -581,7 +628,7 @@ class DarkPlaneSubstrate:
             count=new_count, energy=new_energy, growth_rate=d_count
         )
 
-    def _update_h4_dynamics(self, stress, dream_active, n_total, dt):
+    def _update_h4_dynamics(self, stress, dream_active, n_total, dt, coupling: dict = None):
         alpha4 = 0.85
         beta4 = 0.35
         gamma4 = 0.6
@@ -620,8 +667,8 @@ class DarkPlaneSubstrate:
         if self._state.features_h1 + self._state.features_h2:
             p_avg = float(np.mean([f.persistence for f in self._state.features_h1 + self._state.features_h2]))
 
-        d_count = alpha4 * e_multi * c - beta4 * stress * h4 + gamma4 * dream_injection
-        d_energy = delta4 * h4 * p_avg - epsilon4 * fill_rate * e_multi + zeta4 * pulse_sync
+        d_count = alpha4 * e_multi * c - beta4 * stress * h4 + gamma4 * dream_injection + 0.25 * (coupling.get("coupling_h23", 0.0) if coupling else 0.0)
+        d_energy = delta4 * h4 * p_avg - epsilon4 * fill_rate * e_multi + zeta4 * pulse_sync + 0.20 * (coupling.get("e_h3", 0.0) if coupling else 0.0)
 
         new_count = self._euler_step(h4, d_count, dt, (0, 0.3 * n_total))
         new_energy = self._euler_step(e_multi, d_energy, dt, (0, 2.0 * e_void))
@@ -630,7 +677,7 @@ class DarkPlaneSubstrate:
             count=new_count, energy=new_energy, growth_rate=d_count
         )
 
-    def _update_h5_dynamics(self, h4, coherence, stress, n_total, dt):
+    def _update_h5_dynamics(self, h4, coherence, stress, n_total, dt, coupling: dict = None):
         alpha5 = 0.6
         beta5 = 0.25
         gamma5 = 0.4
@@ -652,8 +699,9 @@ class DarkPlaneSubstrate:
             alpha5 * phi * h4_ratio
             - beta5 * state.count * (1.0 - phi)
             + gamma5 * dh4_dt * (1.0 if dh4_dt > 0 else -1.0)
+            + 0.30 * (coupling.get("coupling_h34", 0.0) if coupling else 0.0)
         )
-        d_energy = delta5 * state.count * phi ** 2 - epsilon5 * stress * state.energy
+        d_energy = delta5 * state.count * phi ** 2 - epsilon5 * stress * state.energy + 0.25 * (coupling.get("e_h4", 0.0) if coupling else 0.0)
 
         regulation = eta5 * (h4_target - h4.count) * phi - theta5 * self._h5_regulation
         self._h5_regulation = self._euler_step(
@@ -672,7 +720,7 @@ class DarkPlaneSubstrate:
             count=new_count, energy=new_energy, growth_rate=d_count
         )
 
-    def _update_h6_dynamics(self, h5, total_energy, last_pt_time, n_total, dt):
+    def _update_h6_dynamics(self, h5, total_energy, last_pt_time, n_total, dt, coupling: dict = None):
         alpha6 = 0.3
         beta6 = 0.1
         lam6 = 0.05
@@ -695,10 +743,12 @@ class DarkPlaneSubstrate:
             alpha6 * h5.count * e_total / e_max
             - beta6 * state.count * math.exp(-lam6 * t_since_cascade)
             + gamma6 * cascade_trigger
+            + 0.35 * (coupling.get("coupling_h45", 0.0) if coupling else 0.0)
         )
 
         t_elapsed = max(time.time() - (self._state.last_phase_transition or time.time()), 1.0)
-        d_energy = delta6 * state.count ** 2 * phi - epsilon6 * state.energy / (1.0 + t_elapsed)
+        lower_coupling = 0.30 * (coupling.get("e_lower_total", 0.0) if coupling else 0.0)
+        d_energy = delta6 * state.count ** 2 * phi - epsilon6 * state.energy / (1.0 + t_elapsed) + lower_coupling
 
         stress = 0.0
         reg = self._field._self_regulation
@@ -907,6 +957,7 @@ class DarkPlaneSubstrate:
             "h5_regulation": self._h5_regulation,
             "total_phase_transitions": self._state.total_phase_transitions,
             "last_phase_transition": self._state.last_phase_transition,
+            "cross_dim_coupling": self._compute_cross_dim_coupling(),
         }
 
     def get_state(self) -> dict:
