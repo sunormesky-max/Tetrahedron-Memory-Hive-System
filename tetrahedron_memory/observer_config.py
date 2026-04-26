@@ -31,8 +31,8 @@ logger = logging.getLogger("tetramem.observer_config")
 
 DEFAULT_CONFIG = {
     "enabled": True,
-    "window_seconds": 300,
-    "max_stores_per_minute": 30,
+    "window_seconds": 180,
+    "max_stores_per_minute": 60,
     "queue_max_size": 200,
     "min_events_for_window": 2,
     "enable_behavior": True,

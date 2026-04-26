@@ -388,13 +388,16 @@ class _ResonanceDetector:
     __slots__ = (
         "_store_times", "_suppressed", "_cooling_until",
         "_threshold_burst", "_threshold_sustained", "_window",
+        "_cooling_duration", "_cooling_decay",
     )
 
     def __init__(
         self,
-        burst_threshold: int = 10,
-        sustained_threshold: float = 0.8,
+        burst_threshold: int = 20,
+        sustained_threshold: float = 0.70,
         window: float = 10.0,
+        cooling_duration: float = 60.0,
+        cooling_decay: float = 300.0,
     ):
         self._store_times: deque = deque()
         self._suppressed: int = 0
@@ -402,6 +405,8 @@ class _ResonanceDetector:
         self._threshold_burst = burst_threshold
         self._threshold_sustained = sustained_threshold
         self._window = window
+        self._cooling_duration = cooling_duration
+        self._cooling_decay = cooling_decay
 
     def record_store(self) -> None:
         now = time.time()
@@ -416,11 +421,16 @@ class _ResonanceDetector:
         now = time.time()
         if now < self._cooling_until:
             self._suppressed += 1
+            elapsed = now - (self._cooling_until - self._cooling_duration)
+            decay_factor = max(0.0, 1.0 - elapsed / self._cooling_decay)
+            if decay_factor < 0.1:
+                self._cooling_until = 0.0
+                return False
             return True
         burst = len(self._store_times) >= self._threshold_burst
         sustained = ratio > self._threshold_sustained and events_in_period > 20
         if burst or sustained:
-            self._cooling_until = now + 60.0
+            self._cooling_until = now + self._cooling_duration
             return True
         return False
 
@@ -442,17 +452,17 @@ class _AdaptiveRateLimiter:
 
     def __init__(
         self,
-        base_limit: int = 30,
-        min_limit: int = 5,
-        max_limit: int = 60,
+        base_limit: int = 60,
+        min_limit: int = 15,
+        max_limit: int = 120,
         adjustment_interval: float = 30.0,
     ):
         self._base_limit = base_limit
         self._current_limit = float(base_limit)
         self._last_adjustment = 0.0
         self._adjustment_interval = adjustment_interval
-        self._min_limit = float(min_limit)
-        self._max_limit = float(max_limit)
+        self._min_limit = min(float(min_limit), float(base_limit))
+        self._max_limit = max(float(max_limit), float(base_limit))
 
     def get_limit(self) -> int:
         return int(self._current_limit)
@@ -523,8 +533,8 @@ class RuntimeObserver:
     def __init__(
         self,
         field: Any,
-        window_seconds: float = 300.0,
-        max_stores_per_minute: int = 30,
+        window_seconds: float = 180.0,
+        max_stores_per_minute: int = 60,
         queue_max_size: int = 200,
         min_events_for_window: int = 2,
         enable_behavior: bool = True,

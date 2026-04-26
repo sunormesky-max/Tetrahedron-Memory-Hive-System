@@ -166,7 +166,7 @@ RuntimeObserver 在 `initialize()` 时自动启动。它捕获 `tetramem` logger
 ### 数据流
 
 ```
-日志 → 语义分类(6类) → 聚合窗口(300s) → 轨迹叙述 → 速率控制(30/min) → store(低权重)
+日志 → 语义分类(6类) → 聚合窗口(180s) → 轨迹叙述 → 自适应速率控制(60/min base) → store(低权重)
                                                                            ↓
                                                                     暗位面自动拾取整合
 ```
@@ -257,8 +257,8 @@ observer = auto_attach(field, config_path="./observer_config.json")
 ```json
 {
   "enabled": true,
-  "window_seconds": 300,
-  "max_stores_per_minute": 30,
+  "window_seconds": 180,
+  "max_stores_per_minute": 60,
   "log_sources": {
     "python_logging": {
       "enabled": true,
@@ -341,7 +341,7 @@ LogFileTailer 默认匹配以下格式：
 - 不需要手动调用 store 来存运行日志 — observer 自动处理
 - 不需要担心循环 — observer 自己产生的日志会被自动丢弃
 - 不需要担心隐私 — api_key/password/token 自动脱敏
-- 不需要担心性能 — 速率硬上限 30/min，溢出自动丢弃低权重
+- 不需要担心性能 — 自适应速率控制 15~180/min，根据系统负载自动调节，共振自动阻断
 
 ### 三种接入方式对比
 
