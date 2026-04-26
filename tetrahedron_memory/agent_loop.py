@@ -119,20 +119,20 @@ class AgentMemoryLoop:
         with field._lock:
             stats = field.stats()
             fb_stats = {}
-            if hasattr(field, "_feedback") and field._feedback is not None:
-                fb_stats = field._feedback.get_stats()
+            if hasattr(field, "_feedback_loop") and field._feedback_loop is not None:
+                fb_stats = field._feedback_loop.get_stats()
             so_stats = {}
             if field._self_organize is not None:
                 so_stats = field._self_organize.stats()
             dp_stats = {}
-            if hasattr(field, "_dark_substrate") and field._dark_substrate is not None:
-                dp_stats = field._dark_substrate.get_stats()
+            if hasattr(field, "_dark_plane_substrate") and field._dark_plane_substrate is not None:
+                dp_stats = field._dark_plane_substrate.get_stats()
             vc_stats = {}
             if hasattr(field, "_void_channel") and field._void_channel is not None:
                 vc_stats = field._void_channel.get_stats()
             reg_status = {}
-            if hasattr(field, "_regulation") and field._regulation is not None:
-                reg_status = field._regulation.status()
+            if hasattr(field, "_self_regulation") and field._self_regulation is not None:
+                reg_status = field._self_regulation.status()
             obs_stats = {}
             if hasattr(field, "_runtime_observer") and field._runtime_observer is not None:
                 obs_stats = field._runtime_observer.get_stats()
@@ -229,8 +229,8 @@ class AgentMemoryLoop:
                     }
                 )
 
-            if hasattr(field, "_dark_substrate") and field._dark_substrate is not None:
-                substrate = field._dark_substrate
+            if hasattr(field, "_dark_plane_substrate") and field._dark_plane_substrate is not None:
+                substrate = field._dark_plane_substrate
                 pe = substrate._state.persistent_entropy
                 coherence = substrate._state.coherence
                 last_pt = substrate._state.last_phase_transition
@@ -272,8 +272,8 @@ class AgentMemoryLoop:
                                 "dim3_count": dim3_channels,
                             })
 
-            if hasattr(field, "_regulation") and field._regulation is not None:
-                reg = field._regulation.status()
+            if hasattr(field, "_self_regulation") and field._self_regulation is not None:
+                reg = field._self_regulation.status()
                 stress = reg.get("stress", {}).get("level", 0)
                 mode = reg.get("autonomic", {}).get("mode", "balanced")
                 hormones = reg.get("hormones", {})
@@ -296,8 +296,8 @@ class AgentMemoryLoop:
                         "dopamine": round(dopamine, 3),
                     })
 
-            if hasattr(field, "_feedback") and field._feedback is not None:
-                insights = field._feedback.get_learning_insights()
+            if hasattr(field, "_feedback_loop") and field._feedback_loop is not None:
+                insights = field._feedback_loop.get_learning_insights()
                 for ins in insights:
                     neg = ins.get("negative_count", 0)
                     if neg > ins.get("positive_count", 0):
@@ -453,8 +453,8 @@ class AgentMemoryLoop:
                             domain_labels.add(l)
 
             dark_plane_context = {}
-            if hasattr(field, "_dark_substrate") and field._dark_substrate is not None:
-                sub = field._dark_substrate
+            if hasattr(field, "_dark_plane_substrate") and field._dark_plane_substrate is not None:
+                sub = field._dark_plane_substrate
                 domain_in_dark = False
                 for nid, _ in domain_nodes[:20]:
                     channels = []
@@ -711,8 +711,8 @@ class AgentMemoryLoop:
         iso_rate = isolated_count / max(1, occupied)
 
         should_regulate = False
-        if hasattr(field, "_regulation") and field._regulation is not None:
-            reg = field._regulation.status()
+        if hasattr(field, "_self_regulation") and field._self_regulation is not None:
+            reg = field._self_regulation.status()
             stress = reg.get("stress", {}).get("level", 0)
             if stress > 0.8:
                 should_regulate = True
@@ -723,8 +723,8 @@ class AgentMemoryLoop:
             or (self._evolution_metrics["total_cycles"] % 5 == 0)
         )
 
-        if hasattr(field, "_dark_substrate") and field._dark_substrate is not None:
-            sub = field._dark_substrate
+        if hasattr(field, "_dark_plane_substrate") and field._dark_plane_substrate is not None:
+            sub = field._dark_plane_substrate
             coherence = sub._state.coherence
             if coherence < 0.2:
                 should_organize = True
@@ -735,17 +735,17 @@ class AgentMemoryLoop:
             or bridge_nodes < occupied * 0.1
         )
 
-        if hasattr(field, "_dark_substrate") and field._dark_substrate is not None:
-            sub = field._dark_substrate
+        if hasattr(field, "_dark_plane_substrate") and field._dark_plane_substrate is not None:
+            sub = field._dark_plane_substrate
             pe = sub._state.persistent_entropy
             if pe > 2.0:
                 should_dream = True
 
         if should_regulate:
             try:
-                reg_result = field._regulation.regulate()
+                reg_result = field._self_regulation.regulate()
                 result["regulation_trigger"] = {
-                    "stress_before": field._regulation.status().get("stress", {}).get("level", 0),
+                    "stress_before": field._self_regulation.status().get("stress", {}).get("level", 0),
                     "actions": reg_result if isinstance(reg_result, list) else [],
                 }
                 result["actions_taken"].append("regulation")
@@ -808,11 +808,11 @@ class AgentMemoryLoop:
         field = self._field
         stats = field.stats()
         fb = {}
-        if hasattr(field, "_feedback") and field._feedback is not None:
-            fb = field._feedback.get_stats()
+        if hasattr(field, "_feedback_loop") and field._feedback_loop is not None:
+            fb = field._feedback_loop.get_stats()
         dp = {}
-        if hasattr(field, "_dark_substrate") and field._dark_substrate is not None:
-            sub = field._dark_substrate
+        if hasattr(field, "_dark_plane_substrate") and field._dark_plane_substrate is not None:
+            sub = field._dark_plane_substrate
             dp = {
                 "pe": sub._state.persistent_entropy,
                 "coherence": sub._state.coherence,
@@ -840,9 +840,9 @@ class AgentMemoryLoop:
             "cascade_potential": 0.0, "psi_field": 0.0,
             "cross_dim_coupling": {},
         }
-        if not hasattr(field, "_dark_substrate") or field._dark_substrate is None:
+        if not hasattr(field, "_dark_plane_substrate") or field._dark_plane_substrate is None:
             return result
-        sub = field._dark_substrate
+        sub = field._dark_plane_substrate
         result["available"] = True
         result["pe"] = sub._state.persistent_entropy
         result["coherence"] = sub._state.coherence
@@ -868,9 +868,9 @@ class AgentMemoryLoop:
             "mode": "balanced", "hormones": {}, "stress": 0.0,
             "circadian_phase": "work", "emergency": False,
         }
-        if not hasattr(field, "_regulation") or field._regulation is None:
+        if not hasattr(field, "_self_regulation") or field._self_regulation is None:
             return result
-        reg = field._regulation.status()
+        reg = field._self_regulation.status()
         result["available"] = True
         result["mode"] = reg.get("autonomic", {}).get("mode", "balanced")
         result["hormones"] = reg.get("hormones", {})
@@ -948,8 +948,8 @@ class AgentMemoryLoop:
         ]
 
         fb_stats = {}
-        if hasattr(field, "_feedback") and field._feedback is not None:
-            fb_stats = field._feedback.get_stats()
+        if hasattr(field, "_feedback_loop") and field._feedback_loop is not None:
+            fb_stats = field._feedback_loop.get_stats()
         sense["feedback_summary"] = fb_stats
 
         so_stats = {}
@@ -1054,8 +1054,8 @@ class AgentMemoryLoop:
                     }
                 )
 
-            if hasattr(field, "_feedback") and field._feedback is not None:
-                insights = field._feedback.get_learning_insights()
+            if hasattr(field, "_feedback_loop") and field._feedback_loop is not None:
+                insights = field._feedback_loop.get_learning_insights()
                 for ins in insights:
                     neg = ins.get("negative_count", 0)
                     pos = ins.get("positive_count", 0)
@@ -1379,8 +1379,8 @@ class AgentMemoryLoop:
 
         stats_after = field.stats()
         fb_after = {}
-        if hasattr(field, "_feedback") and field._feedback is not None:
-            fb_after = field._feedback.get_stats()
+        if hasattr(field, "_feedback_loop") and field._feedback_loop is not None:
+            fb_after = field._feedback_loop.get_stats()
 
         delta: Dict[str, Any] = {
             "occupied_delta": stats_after.get("occupied_nodes", 0)
@@ -1473,7 +1473,7 @@ class AgentMemoryLoop:
         if not hasattr(field, "_runtime_observer") or field._runtime_observer is None:
             return
         try:
-            from .runtime_runtime_observer import LogEvent
+            from .runtime_observer import LogEvent
             obs = field._runtime_observer
             if not obs._enabled:
                 return
@@ -1505,5 +1505,5 @@ class AgentMemoryLoop:
                 self._evolution_metrics.get("observer_trajectories_injected", 0) + 1
             )
         except Exception:
-            pass
+            _log.debug("trajectory injection failed", exc_info=True)
 

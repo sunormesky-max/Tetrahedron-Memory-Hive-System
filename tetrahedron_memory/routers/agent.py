@@ -376,7 +376,7 @@ def closed_loop(request: Request, body: dict = None):
         integration_count = 0
         if should_integrate:
             so_result = s.field.run_self_organize()
-            integration_count = so_result.get("merged", 0) + so_result.get("shortcuts_created", 0)
+            integration_count = so_result.get("consolidations_done", 0) + so_result.get("shortcuts_created", 0)
             s.field._check_convergence_bridges()
             if think["confidence"] >= 0.4 and think["patterns"]:
                 insight = f"Closed-loop insight: patterns={think['patterns'][:3]}, avg_weight={think['avg_weight']:.2f}"
@@ -387,7 +387,7 @@ def closed_loop(request: Request, body: dict = None):
         result["phases"].append("DREAM")
         if should_dream:
             dream_result = s.field.run_dream_cycle()
-            result["dream"] = {"triggered": True, "summary": {k: dream_result.get(k) for k in ["creativity", "domains", "synthesized"] if k in dream_result}}
+            result["dream"] = {"triggered": True, "summary": {k: dream_result.get(k) for k in ["dreams_created", "cross_domain", "insights", "depth_levels"] if k in dream_result}}
         else:
             result["dream"] = {"triggered": False}
 

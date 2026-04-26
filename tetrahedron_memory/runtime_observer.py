@@ -678,11 +678,10 @@ class RuntimeObserver:
         if category == CATEGORY_SYSTEM and not self._enable_system:
             return False
 
-        self._stats.category_counts[category] = (
-            self._stats.category_counts.get(category, 0) + 1
-        )
-
         with self._lock:
+            self._stats.category_counts[category] = (
+                self._stats.category_counts.get(category, 0) + 1
+            )
             if immediate:
                 self._immediate_queue.append((event, category, weight))
             else:

@@ -48,6 +48,10 @@ async def lifespan(application):
     application.state.tetramem = state
     state.initialize()
     state.register_signal_handlers()
+    obs = getattr(state.field, "_runtime_observer", None)
+    if obs is not None:
+        from tetrahedron_memory.routers.observer import _store_hook
+        obs.register_on_store(_store_hook)
     yield
     try:
         if state.persistence is not None and state.persistence.is_dirty():

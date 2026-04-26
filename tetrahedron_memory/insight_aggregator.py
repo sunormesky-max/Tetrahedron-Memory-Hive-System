@@ -66,3 +66,42 @@ class InsightAggregator:
                 by_type[t] = by_type.get(t, 0) + 1
                 by_priority[p] = by_priority.get(p, 0) + 1
         return {"total": total, "by_type": by_type, "by_priority": by_priority}
+
+    def register_agent(self, agent_id: str) -> None:
+        with self._lock:
+            if not hasattr(self, "_registered_agents"):
+                self._registered_agents: Dict[str, Dict] = {}
+            if agent_id not in self._registered_agents:
+                self._registered_agents[agent_id] = {
+                    "registered_at": time.time(),
+                    "consumed_ids": set(),
+                }
+
+    def get_notifications(self, agent_id: str, unread_only: bool = True) -> List[Dict]:
+        self.register_agent(agent_id)
+        with self._lock:
+            consumed = self._registered_agents.get(agent_id, {}).get("consumed_ids", set())
+            insights = list(self._insights)
+        result = []
+        for i, ins in enumerate(insights):
+            ins_id = f"ins-{i}"
+            if unread_only and ins_id in consumed:
+                continue
+            result.append({
+                "id": ins_id,
+                "type": ins.get("type", "unknown"),
+                "title": ins.get("title", ""),
+                "description": ins.get("description", ""),
+                "priority": ins.get("priority", "medium"),
+                "action": ins.get("metadata", {}).get("action", ""),
+                "ts": ins.get("ts", 0),
+            })
+        return result
+
+    def mark_consumed(self, agent_id: str, notification_ids: List[str]) -> int:
+        self.register_agent(agent_id)
+        with self._lock:
+            consumed = self._registered_agents.get(agent_id, {}).get("consumed_ids", set())
+            before = len(consumed)
+            consumed.update(notification_ids)
+            return len(notification_ids)
