@@ -134,8 +134,8 @@ class AgentMemoryLoop:
             if hasattr(field, "_regulation") and field._regulation is not None:
                 reg_status = field._regulation.status()
             obs_stats = {}
-            if hasattr(field, "_observer") and field._observer is not None:
-                obs_stats = field._observer.get_stats()
+            if hasattr(field, "_runtime_observer") and field._runtime_observer is not None:
+                obs_stats = field._runtime_observer.get_stats()
 
         return {
             "metrics": dict(self._evolution_metrics),
@@ -879,15 +879,15 @@ class AgentMemoryLoop:
         result["emergency"] = reg.get("stress", {}).get("emergency_mode", False)
         return result
 
-    def _sense_observer(self, field: "HoneycombNeuralField") -> Dict[str, Any]:
+    def _sense_runtime_observer(self, field: "HoneycombNeuralField") -> Dict[str, Any]:
         result: Dict[str, Any] = {
             "available": False,
             "enabled": False, "memories_stored": 0,
             "total_events": 0, "dropped_loop": 0,
         }
-        if not hasattr(field, "_observer") or field._observer is None:
+        if not hasattr(field, "_runtime_observer") or field._runtime_observer is None:
             return result
-        obs = field._observer.get_stats()
+        obs = field._runtime_observer.get_stats()
         result["available"] = True
         result["enabled"] = obs.get("enabled", False)
         result["memories_stored"] = obs.get("memories_stored", 0)
@@ -966,7 +966,7 @@ class AgentMemoryLoop:
 
         sense["dark_plane"] = self._sense_dark_plane(field)
         sense["regulation"] = self._sense_regulation(field)
-        sense["observer"] = self._sense_observer(field)
+        sense["observer"] = self._sense_runtime_observer(field)
         sense["void_channels"] = self._sense_void_channels(field)
 
         return sense
@@ -1332,7 +1332,7 @@ class AgentMemoryLoop:
                                 self._evolution_metrics["void_channel_navigations"] += 1
 
             except Exception:
-                _log.warning("planned action %s failed, skipping", action.get("type", "unknown"))
+                _log.error("planned action %s failed, skipping", action.get("type", "unknown"), exc_info=True)
                 continue
 
         strategy = plan.get("strategy", "balanced")
@@ -1348,7 +1348,7 @@ class AgentMemoryLoop:
                     else 0,
                 }
             except Exception:
-                _log.warning("dream cycle in ACT phase failed", exc_info=True)
+                _log.error("dream cycle in ACT phase failed", exc_info=True)
 
         if should_organize:
             try:
@@ -1470,11 +1470,11 @@ class AgentMemoryLoop:
     def _inject_trajectory(
         self, field: "HoneycombNeuralField", report: Dict[str, Any]
     ) -> None:
-        if not hasattr(field, "_observer") or field._observer is None:
+        if not hasattr(field, "_runtime_observer") or field._runtime_observer is None:
             return
         try:
-            from .runtime_observer import LogEvent
-            obs = field._observer
+            from .runtime_runtime_observer import LogEvent
+            obs = field._runtime_observer
             if not obs._enabled:
                 return
             cycle = report.get("cycle", 0)

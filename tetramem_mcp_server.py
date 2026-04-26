@@ -30,6 +30,8 @@ from typing import Any, Dict, List, Optional
 from urllib.request import Request, urlopen
 from urllib.error import URLError, HTTPError
 
+from tetrahedron_memory import __version__ as _VERSION
+
 logging.basicConfig(level=logging.INFO, format="[TetraMem-MCP] %(message)s")
 log = logging.getLogger(__name__)
 
@@ -397,7 +399,7 @@ def _handle_request(req: Dict[str, Any]) -> str:
             },
             "serverInfo": {
                 "name": "tetramem-x",
-                "version": "8.0.0",
+                "version": _VERSION,
                 "description": "TetraMem-XL Eternal Memory — BCC Lattice Honeycomb + PCNN"
             }
         })

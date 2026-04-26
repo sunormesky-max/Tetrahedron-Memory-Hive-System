@@ -416,11 +416,15 @@ WantedBy=multi-user.target
 
 | 端点 | 方法 | 说明 |
 |------|------|------|
-| `/api/v1/observer/stats` | GET | 观察器状态（事件数/存储数/分类统计） |
+| `/api/v1/observer/stats` | GET | 观察器状态（事件数/存储数/分类统计/自适应限速/共振检测） |
 | `/api/v1/observer/flush` | POST | 手动 flush 所有聚合窗口 |
 | `/api/v1/observer/enable` | POST | 启用观察器 |
 | `/api/v1/observer/disable` | POST | 禁用观察器 |
 | `/api/v1/observer/observe` | POST | 手动注入观察事件 |
+| `/api/v1/observer/batch` | POST | 批量推送 ≤100 日志事件 |
+| `/api/v1/observer/ingest-json` | POST | 原始日志行 ≤200 行，自动格式检测 |
+| `/api/v1/observer/trajectories` | GET | SSE 实时轨迹流 |
+| `/api/v1/observer/register-classifier` | POST | 远程正则分类器注册 |
 
 ### 4.10 OpenClaw 兼容端点
 

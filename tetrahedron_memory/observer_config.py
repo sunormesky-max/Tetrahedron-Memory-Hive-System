@@ -74,12 +74,6 @@ DEFAULT_CONFIG = {
             "immediate": False,
         },
         {
-            "category": "behavior",
-            "pattern": "(store|query|dream|organize)",
-            "weight": 0.4,
-            "immediate": False,
-        },
-        {
             "category": "agent_reasoning",
             "pattern": "(reasoning|inference|plan|decide|think|conclude)",
             "weight": 0.5,
@@ -258,13 +252,15 @@ def auto_attach(
     rules_raw = cfg.get("rules")
     if rules_raw:
         compiled_rules = []
+        from .runtime_observer import CLASSIFICATION_RULES
+        compiled_rules.extend(CLASSIFICATION_RULES)
         for r in rules_raw:
             compiled_rules.append({
                 "category": r.get("category", "behavior"),
                 "weight": float(r.get("weight", 0.3)),
                 "immediate": bool(r.get("immediate", False)),
                 "level_filter": set(r["level_filter"]) if "level_filter" in r else None,
-                "pattern": __import__("re").compile(r["pattern"], __import__("re").IGNORECASE) if r.get("pattern") else None,
+                "pattern": re.compile(r["pattern"], re.IGNORECASE) if r.get("pattern") else None,
             })
         observer._compiled_rules = compiled_rules
         observer._custom_rules = compiled_rules

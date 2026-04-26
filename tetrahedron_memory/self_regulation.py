@@ -60,6 +60,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
+from .pcnn_types import PCNNConfig
+
 logger = logging.getLogger("tetramem.self_regulation")
 
 
@@ -840,6 +842,3 @@ class SelfRegulationEngine:
     @property
     def dream_frequency_multiplier(self) -> float:
         return self._params["dream_frequency_multiplier"]
-
-
-from .pcnn_types import PCNNConfig

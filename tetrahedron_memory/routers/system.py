@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hmac
 import json
 import logging
 import os
@@ -55,8 +56,11 @@ def get_metrics(request: Request):
 
 
 @router.post("/setup/set-password")
-def set_password(body: Dict[str, str]):
+def set_password(request: Request, body: Dict[str, str]):
     global _ui_password
+    client_host = request.client.host if request.client else "unknown"
+    if client_host not in ("127.0.0.1", "::1", "localhost"):
+        raise HTTPException(403, "Password setup only allowed from localhost")
     new_pw = body.get("new_password", "")
     if not new_pw or len(new_pw) < 4:
         raise HTTPException(400, "Password must be at least 4 characters")
@@ -90,7 +94,7 @@ def login(request: Request, body: Dict[str, str] = None):
     req = body or {}
 
     ui_password = req.get("password", "")
-    if ui_password and ui_password == _ui_password:
+    if ui_password and hmac.compare_digest(ui_password, _ui_password):
         token = state.auth_manager.create_token("ui-session") or "ui-access"
         state.metrics.increment("auth_successes")
         return {"token": token, "mode": "ui"}

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import time
-import threading
 
 import numpy as np
 from fastapi import APIRouter, HTTPException, Request

@@ -7,7 +7,7 @@ services:
       - "${TETRAMEM_PORT:-8000}:8000"
     environment:
       - TETRAMEM_STORAGE=/data/tetramem_data_v2
-      - TETRAMEM_UI_PASSWORD=${TETRAMEM_PASSWORD:-CHANGE_ME}
+      - TETRAMEM_UI_PASSWORD=${TETRAMEM_UI_PASSWORD:-CHANGE_ME}
     volumes:
       - tetramem_data:/data/tetramem_data_v2
 
