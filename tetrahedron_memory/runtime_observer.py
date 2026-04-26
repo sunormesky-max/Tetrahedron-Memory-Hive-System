@@ -983,6 +983,12 @@ class RuntimeObserver:
                     if elapsed >= self._window_seconds:
                         if win.count >= self._min_events_for_window:
                             self._flush_window(win)
+                        elif win.count >= 1:
+                            evt = win.events[0]
+                            self._try_store(
+                                self._narrate_single(evt, cat), cat,
+                                self._window_weight(win), evt,
+                            )
                         del self._active_windows[cat]
                 while self._immediate_queue:
                     event, cat, weight = self._immediate_queue.popleft()
