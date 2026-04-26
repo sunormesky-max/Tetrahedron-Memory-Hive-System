@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ============================================================
-# TetraMem-XL v7.1 — One-Click Installer
+# TetraMem-XL v8.0 — One-Click Installer
 # BCC Lattice Honeycomb + PCNN Neural Pulse Memory System
 #
 # Usage:
@@ -49,7 +49,7 @@ warn() { echo -e "${YELLOW}[WARN]${NC} $*"; }
 fail() { echo -e "${RED}[FAIL]${NC} $*"; exit 1; }
 
 # --- Preflight ---
-log "TetraMem-XL v7.1 Installer"
+log "TetraMem-XL v8.0 Installer"
 log "============================"
 
 [[ "$(id -u)" -ne 0 ]] && fail "Please run as root (or with sudo)"
@@ -90,7 +90,7 @@ ok "Python dependencies installed"
 log "Step 4/7: Initializing data directory..."
 mkdir -p "$TETRAMEM_DIR/tetramem_data_v2"
 if [[ ! -f "$TETRAMEM_DIR/tetramem_data_v2/mesh_index.json" ]]; then
-  echo '{"metadata":{"version":"7.1.0","created":"'$(date -Iseconds)'"},"tetrahedra":{}}' > "$TETRAMEM_DIR/tetramem_data_v2/mesh_index.json"
+  echo '{"metadata":{"version":"8.0.0","created":"'$(date -Iseconds)'"},"tetrahedra":{}}' > "$TETRAMEM_DIR/tetramem_data_v2/mesh_index.json"
 fi
 ok "Data directory ready"
 
@@ -120,7 +120,7 @@ sleep 2
 # Create systemd service
 cat > /etc/systemd/system/tetramem.service << EOF
 [Unit]
-Description=TetraMem-XL v7.1 Memory API
+Description=TetraMem-XL v8.0 Memory API
 After=network.target
 
 [Service]
@@ -205,7 +205,7 @@ PUBLIC_IP="$(curl -sf ifconfig.me 2>/dev/null || curl -sf icanhazip.com 2>/dev/n
 
 echo ""
 echo -e "${GREEN}========================================${NC}"
-echo -e "${GREEN}  TetraMem-XL v7.1 Installation Complete${NC}"
+echo -e "${GREEN}  TetraMem-XL v8.0 Installation Complete${NC}"
 echo -e "${GREEN}========================================${NC}"
 echo ""
 echo -e "  API:  ${CYAN}http://$PUBLIC_IP:$TETRAMEM_PORT/api/v1/health${NC}"

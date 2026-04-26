@@ -219,6 +219,7 @@ class SystemOperationManager:
             raise
 
         entry = {
+            "id": backup_id,
             "level": level,
             "ts": ts,
             "path": backup_path,

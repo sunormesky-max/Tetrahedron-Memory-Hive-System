@@ -1,5 +1,5 @@
 [Unit]
-Description=TetraMem-XL v7.1 Watchdog
+Description=TetraMem-XL v8.0 Watchdog
 After=tetramem-api.service
 Requires=tetramem-api.service
 

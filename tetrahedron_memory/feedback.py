@@ -360,7 +360,6 @@ class FeedbackLoop:
 
             temporal: Dict[str, Dict[str, int]] = defaultdict(lambda: {"positive": 0, "negative": 0})
             for r in self._records:
-                import time as _time
                 hour_bucket = str(int(r.timestamp // 3600) % 24)
                 temporal[hour_bucket][r.outcome] += 1
             for hour, counts in temporal.items():

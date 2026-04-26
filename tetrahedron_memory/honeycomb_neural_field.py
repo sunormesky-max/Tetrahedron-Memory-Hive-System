@@ -1,7 +1,7 @@
 """
 HoneycombNeuralField - BCC Lattice Honeycomb + PCNN-Grounded Neural Pulse Engine.
 
-Version 5.0 - Structural Cascade + Lattice Integrity + Crystallized Pathways
+Version 8.0 - Dark Plane H₀~H₆ + RuntimeObserver + Persistent Entropy + Cross-Dimensional Coupling
 
 This module contains the main HoneycombNeuralField orchestrator class.
 Supporting classes have been extracted into separate modules for maintainability.

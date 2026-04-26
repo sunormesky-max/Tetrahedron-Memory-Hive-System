@@ -1,5 +1,5 @@
 [Unit]
-Description=TetraMem-XL v7.1 API Server
+Description=TetraMem-XL v8.0 API Server
 After=network.target
 
 [Service]

@@ -135,15 +135,6 @@ def self_organize(request: Request):
     return {"stats": result}
 
 
-@router.post("/self-organize/run")
-def self_organize_run(request: Request):
-    s = _get_state(request)
-    with s.state_lock:
-        result = s.field.run_self_organize()
-    s.log_op("self_organize_run")
-    return result
-
-
 @router.get("/self-organize/status")
 def self_organize_status(request: Request):
     s = _get_state(request)

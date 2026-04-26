@@ -17,10 +17,10 @@
     "Cognitive Closed Loop",
     "Dream Cycle"
   ],
-  "license": "CC-BY-NC-4.0",
+  "license": "AGPL-3.0-or-later",
   "upload_type": "software",
   "access_right": "open",
-  "version": "7.1.0",
+  "version": "8.0.0",
   "related_identifiers": [
     {
       "scheme": "url",

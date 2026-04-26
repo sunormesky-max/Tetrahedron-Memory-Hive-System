@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TetraMem-XL v7.1 · Meleo天庭</title>
+<title>TetraMem-XL v8.0 · Meleo天庭</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Raleway:wght@300;400;500;600;700&family=Fira+Code:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/element-plus/dist/index.css">
@@ -675,7 +675,7 @@ body {
     <div class="login-error">{{ loginError }}</div>
   </div>
 
-  <div class="login-version">TetraMem-XL v7.1 · Meleo Celestial Court</div>
+  <div class="login-version">TetraMem-XL v8.0 · Meleo Celestial Court</div>
 </div>
 
 <!-- ===== MAIN APP ===== -->
@@ -684,7 +684,7 @@ body {
   <!-- TOP BAR -->
   <header class="top-bar">
     <div class="top-logo">TETRAMEM-XL</div>
-    <span class="top-version">v7.1</span>
+    <span class="top-version">v8.0</span>
     <div class="top-stats">
       <div class="top-stat"><i class="fas fa-cube"></i> Nodes <span class="val">{{ stats.total_nodes || 0 }}</span></div>
       <div class="top-stat"><i class="fas fa-brain"></i> Memories <span class="val">{{ stats.occupied_nodes || 0 }}</span></div>
@@ -1917,7 +1917,7 @@ body {
       }
 
       function triggerPhaseShift() {
-        api('/self-organize/run', { method: 'POST' })
+        api('/self-organize', { method: 'POST' })
           .then(d => {
             phaseResult.value = d.stats || d;
             toast('Phase shift completed', 'success');
@@ -1926,7 +1926,7 @@ body {
       }
 
       function runSelfOrganize() {
-        api('/self-organize/run', { method: 'POST' })
+        api('/self-organize', { method: 'POST' })
           .then(d => {
             toast('Self-organization complete: ' + JSON.stringify(d.stats || d).substring(0, 60), 'success');
             fetchStats(); fetchSceneNodes(); fetchClusters();

@@ -109,10 +109,10 @@ class AppState:
                 self.field.import_full_state(latest)
                 n_nodes = len(latest.get("nodes", {}))
                 log.info("Restored %d nodes from checkpoint", n_nodes)
-                print(f"[TetraMem v7.0] Restored {n_nodes} nodes from checkpoint")
+                print(f"[TetraMem v8.0] Restored {n_nodes} nodes from checkpoint")
             except Exception as e:
                 log.error("Checkpoint restore failed: %s", e)
-                print(f"[TetraMem v7.0] Checkpoint restore failed: {e}")
+                print(f"[TetraMem v8.0] Checkpoint restore failed: {e}")
 
         self.auth_manager = AuthManager(secret_key=os.environ.get("TETRAMEM_SECRET_KEY"))
         self.quota_manager = QuotaManager()
@@ -144,7 +144,7 @@ class AppState:
         threading.Thread(target=self._auto_checkpoint_loop, daemon=True, name="auto-checkpoint").start()
 
         self.loading_complete = True
-        print(f"[TetraMem v7.0] Initialized: resolution={resolution}, spacing={spacing}")
+        print(f"[TetraMem v8.0] Initialized: resolution={resolution}, spacing={spacing}")
 
     def _proactive_loop(self) -> None:
         cycle = 0
@@ -264,7 +264,7 @@ class AppState:
                     log.error("Auto-checkpoint failed: %s", e)
 
     def emergency_save(self, signum=None, frame=None) -> None:
-        print(f"[TetraMem v7.0] Signal {signum} received — emergency save starting")
+        print(f"[TetraMem v8.0] Signal {signum} received — emergency save starting")
         if not self.loading_complete or self.field is None or self.persistence is None:
             return
         try:
@@ -272,9 +272,9 @@ class AppState:
                 state = self.field.export_full_state()
             self.persistence.checkpoint(state)
             n = len(state.get("nodes", {}))
-            print(f"[TetraMem v7.0] Emergency save completed: {n} memories")
+            print(f"[TetraMem v8.0] Emergency save completed: {n} memories")
         except Exception as e:
-            print(f"[TetraMem v7.0] Emergency save failed: {e}")
+            print(f"[TetraMem v8.0] Emergency save failed: {e}")
         finally:
             if self.persistence is not None:
                 self.persistence.close()

@@ -149,6 +149,6 @@ ui/                               # 前端 (Vue 3 + Three.js)
 
 ## 许可证
 
-CC BY-NC 4.0 (个人和非商业用途)
+AGPL-3.0-or-later (GNU Affero General Public License v3)
 
 **作者**: sunorme (刘启航)

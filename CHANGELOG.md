@@ -2,6 +2,50 @@
 
 All notable changes to TetraMem-XL are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [8.0.0] - 2026-04-26
+
+### Added — Dark Plane H₀~H₆ + RuntimeObserver + Persistent Entropy
+
+#### Dark Plane Substrate — 7-Dimensional Homology
+- **H₀~H₂ persistent homology**: actual filtration-based PH computation (Betti numbers, persistence diagrams)
+- **H₃~H₆ ODE dynamics**: continuous homology evolution (34 parameters, coupled ODEs)
+- **Cross-dimensional coupling**: H₀→H₁→H₂→H₃→H₄→H₅→H₆ energy flow
+- **Persistent Entropy**: Shannon entropy over H₀+H₁+H₂ persistence → self_regulation neurochemical feedback
+- **Phase transitions**: H₄ emergence, H₅ complexification, H₆ cascade thresholds
+- **Void channels**: topological handle channels dim 1/2/3 with cascade upgrade and decay
+- **Export/import persistence**: substrate + void_channels survive checkpoint/restore
+
+#### RuntimeObserver — Self-Observation Layer
+- **Semantic classifier**: 6 categories (error/anomaly/system/performance/behavior/noise)
+- **Aggregation window**: 300s with trajectory narration
+- **Rate limiting**: 30 stores/min hard cap
+- **Loop isolation**: auto-drops self-observation logs
+- **Privacy redaction**: api_key/password/token/Bearer → [REDACTED]
+- **LogFileTailer**: file tail + rotation detection for external agent logs
+- **Three attach modes**: file tail, callback injection, auto_attach (zero-touch)
+- **5 API endpoints**: stats/flush/enable/disable/observe
+- **42 unit tests** passing
+
+#### API Changes
+- Removed duplicate endpoints: `/status` → use `/system/status`, `/self-organize/run` → use `/self-organize`
+- Added 5 observer endpoints under `/api/v1/observer/*`
+- Added 7 dark plane substrate endpoints under `/api/v1/dark-plane/*`
+
+#### Code Quality
+- Unified all version strings to 8.0.0
+- Deleted dead code: `rw_lock.py`, `llm_tool.py`, `test_api_v2_integration.py`
+- Fixed `system_ops.py` backup index missing `id` field
+- Fixed `feedback.py` inline import
+- `__init__.py` now exports all 20+ subsystems
+- `monitoring.py` stubs upgraded to actual recording
+- License changed from CC BY-NC 4.0 to **AGPL-3.0-or-later**
+
+#### Performance
+- Store/Query: zero overhead vs v7.1
+- Dark plane flow: +2.3% (within noise margin)
+- Memory overhead: +0.1% (+1 MB for substrate state)
+- PH computation: O(n²), executed every 10 cycles; ODE: O(1) per cycle
+
 ## [7.1.0] - 2026-04-24
 
 ### Added — Dark Plane Thermodynamics + PID Self-Regulation + Security
@@ -288,7 +332,7 @@ All notable changes to TetraMem-XL are documented here. Format follows [Keep a C
 - Maximum 3 shortcuts per cycle, 500 total with LRU eviction
 
 #### New API Endpoints (5)
-- `POST /api/v1/self-organize/run` — trigger self-organization cycle
+- `POST /api/v1/self-organize` — trigger self-organization cycle
 - `GET /api/v1/self-organize/status` — engine status, clusters, shortcuts, entropy
 - `GET /api/v1/self-organize/history` — previous organize cycle results
 - `GET /api/v1/clusters` — detected semantic clusters

@@ -19,7 +19,7 @@
         │              │                 │
         ▼              ▼                 ▼
 ┌─────────────────────────────────────────────────────┐
-│              FastAPI 网关层 (v7.1)                    │
+│              FastAPI 网关层 (v8.0)                    │
 │              AppState 依赖注入容器                     │
 │                                                      │
 │  routers/memory   — store, query, browse, export     │
@@ -303,7 +303,7 @@ TETRAMEM_PASSWORD=mypass docker compose up -d
 ```ini
 # /etc/systemd/system/tetramem-api.service
 [Unit]
-Description=TetraMem-XL v7.1 API Server
+Description=TetraMem-XL v8.0 API Server
 After=network.target
 
 [Service]
@@ -399,7 +399,7 @@ WantedBy=multi-user.target
 | `/api/v1/clusters` | GET | 语义簇 |
 | `/api/v1/shortcuts` | GET | 拓扑捷径 |
 
-### 4.8 暗位面与调节 (routers/darkplane) — v7.1 新增
+### 4.8 暗位面与调节 (routers/darkplane)
 
 | 端点 | 方法 | 说明 |
 |------|------|------|
@@ -731,14 +731,14 @@ curl -X POST http://127.0.0.1:8000/api/v1/query \
 # → {"results": [{"id": "...", "content": "...", "distance": 0.3, "weight": 5.0, ...}]}
 ```
 
-### 暗位面统计（v7.1 新增）
+### 暗位面统计
 ```bash
 curl http://127.0.0.1:8000/api/v1/dark-plane/stats -H "X-API-Key: your-key"
 # → {"plane_distribution": {"surface": 0.42, "shallow": 0.14, "deep": 0.19, "abyss": 0.24},
 #     "temperature": 1.23, "thresholds": [-0.75, -0.04, 0.75], ...}
 ```
 
-### 自我调节状态（v7.1 新增）
+### 自我调节状态
 ```bash
 curl http://127.0.0.1:8000/api/v1/regulation/status -H "X-API-Key: your-key"
 # → {"pid_controllers": {...}, "hormones": {"dopamine": 0.49, "cortisol": 0.15, ...},
@@ -784,8 +784,8 @@ Tetrahedron-Memory-Hive-System/
 ├── tetrahedron_memory/
 │   ├── honeycomb_neural_field.py    # 核心编排器 (~4320 行)
 │   ├── runtime_observer.py          # 运行观察器 (v8.0)
-│   ├── dark_plane_engine.py         # 暗位面热力学引擎 (v7.1)
-│   ├── self_regulation.py           # PID 自我调节引擎 (v7.1)
+│   ├── dark_plane_engine.py         # 暗位面热力学引擎
+│   ├── self_regulation.py           # PID 自我调节引擎
 │   ├── self_check.py                # 自检脉冲引擎
 │   ├── insight_aggregator.py        # 洞察聚合器
 │   ├── pcnn_types.py                # PCNN 类型与配置常量

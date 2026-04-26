@@ -262,7 +262,7 @@ def export(request: Request):
     s = _get_state(request)
     with s.state_lock:
         items = s.field.list_occupied()
-    lines = ["# TetraMem-XL v3.0 Memory Export\n"]
+    lines = ["# TetraMem-XL v8.0 Memory Export\n"]
     lines.append(f"Total memories: {len(items)}\n")
     for item in items:
         labels_str = ", ".join(item.get("labels", [])) or "-"

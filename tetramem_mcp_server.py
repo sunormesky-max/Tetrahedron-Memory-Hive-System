@@ -56,7 +56,7 @@ def _api(method: str, path: str, body: Optional[dict] = None) -> Any:
 
 
 # ═══════════════════════════════════════════════════════════════
-# Tool definitions — mapped 1:1 from llm_tool.py + REST API
+# Tool definitions — mapped 1:1 from REST API
 # ═══════════════════════════════════════════════════════════════
 
 TOOLS = [
@@ -345,7 +345,7 @@ def execute_tool(name: str, args: Dict[str, Any]) -> Any:
         "tetramem_stats": lambda: _api("GET", "/api/v1/stats"),
         "tetramem_health": lambda: _api("GET", "/api/v1/health"),
         "tetramem_dream": lambda: _api("POST", "/api/v1/dream"),
-        "tetramem_self_organize": lambda: _api("POST", "/api/v1/self-organize/run"),
+        "tetramem_self_organize": lambda: _api("POST", "/api/v1/self-organize"),
         "tetramem_cascade": lambda: _api("POST", "/api/v1/cascade/trigger"),
         "tetramem_export": lambda: _api("GET", "/api/v1/export"),
         "tetramem_timeline": lambda: _api("POST", "/api/v1/timeline", {
@@ -397,7 +397,7 @@ def _handle_request(req: Dict[str, Any]) -> str:
             },
             "serverInfo": {
                 "name": "tetramem-x",
-                "version": "7.1.0",
+                "version": "8.0.0",
                 "description": "TetraMem-XL Eternal Memory — BCC Lattice Honeycomb + PCNN"
             }
         })
