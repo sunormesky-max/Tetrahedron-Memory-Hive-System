@@ -9,6 +9,7 @@ mesh_index*.json
 *.bak2
 .env
 .env.local
+observer_config.json
 
 # === Python ===
 __pycache__/
