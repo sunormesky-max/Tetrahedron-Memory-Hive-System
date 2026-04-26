@@ -50,6 +50,19 @@ class AppState:
         self.agent_loop: Optional[AgentMemoryLoop] = None
         self.event_subscribers: List = []
         self.event_subscriber_lock: Optional[threading.Lock] = None
+        self._event_cooldowns: Dict[str, float] = {}
+        self._event_cooldown_duration: Dict[str, float] = {
+            "self_check_alert": 600,
+            "self_organize_update": 600,
+            "agent_idle": 600,
+            "sessions_expired": 1800,
+            "insight_high_priority": 1800,
+            "auto_recovery": 600,
+            "auto_recovery_failed": 300,
+            "degradation_alert": 900,
+            "evolution_cycle_completed": 60,
+            "proactive_triggered": 60,
+        }
         self.storage_dir: str = ""
         self.auth_manager: Optional[AuthManager] = None
         self.quota_manager: Optional[QuotaManager] = None
@@ -59,6 +72,11 @@ class AppState:
         self.metrics: Optional[SimpleMetrics] = None
 
     def emit_event(self, event_name: str, data: dict) -> None:
+        now = time.time()
+        min_interval = self._event_cooldowns.get(event_name, 0)
+        if now < min_interval:
+            return
+        self._event_cooldowns[event_name] = now + self._event_cooldown_duration.get(event_name, 300)
         msg = json.dumps({"event": event_name, **data})
         with self.event_subscriber_lock:
             stale = [q for q in self.event_subscribers if q.full()]
@@ -149,7 +167,7 @@ class AppState:
     def _proactive_loop(self) -> None:
         cycle = 0
         while not self.proactive_engine_stop.is_set():
-            self.proactive_engine_stop.wait(10)
+            self.proactive_engine_stop.wait(30)
             if self.proactive_engine_stop.is_set() or not self.loading_complete:
                 continue
             cycle += 1
@@ -206,7 +224,7 @@ class AppState:
 
     def _insight_loop(self) -> None:
         while not self.proactive_engine_stop.is_set():
-            self.proactive_engine_stop.wait(30)
+            self.proactive_engine_stop.wait(120)
             if self.proactive_engine_stop.is_set() or not self.loading_complete:
                 continue
             if self.insight_aggregator is None:
@@ -226,7 +244,7 @@ class AppState:
 
     def _system_health_loop(self) -> None:
         while not self.proactive_engine_stop.is_set():
-            self.proactive_engine_stop.wait(60)
+            self.proactive_engine_stop.wait(120)
             if self.proactive_engine_stop.is_set() or not self.loading_complete:
                 continue
             if self.system_ops is None:
