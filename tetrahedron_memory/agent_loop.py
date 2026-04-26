@@ -61,12 +61,9 @@ class AgentMemoryLoop:
             "observer_trajectories_injected": 0,
         }
         self._last_cycle_time: float = 0.0
-        self._cycle_count_since_report: int = 0
         self._quality_samples: List[float] = []
         self._pe_history: deque = deque(maxlen=20)
         self._coherence_history: deque = deque(maxlen=20)
-        self._last_regulation_status: Optional[Dict] = None
-        self._last_substrate_stats: Optional[Dict] = None
 
     def run_evolution_cycle(self) -> Dict[str, Any]:
         field = self._field
@@ -206,7 +203,8 @@ class AgentMemoryLoop:
         with field._lock:
             isolated = field.detect_isolated()
             high_weight_isolated = []
-            for nid in isolated:
+            for iso in isolated:
+                nid = iso["id"]
                 node = field._nodes.get(nid)
                 if node and node.is_occupied and node.weight >= 2.0:
                     high_weight_isolated.append(
@@ -862,7 +860,6 @@ class AgentMemoryLoop:
         result["cross_dim_coupling"] = sub._compute_cross_dim_coupling()
         self._pe_history.append(result["pe"])
         self._coherence_history.append(result["coherence"])
-        self._last_substrate_stats = result
         return result
 
     def _sense_regulation(self, field: "HoneycombNeuralField") -> Dict[str, Any]:
@@ -880,7 +877,6 @@ class AgentMemoryLoop:
         result["stress"] = reg.get("stress", {}).get("level", 0)
         result["circadian_phase"] = reg.get("circadian", {}).get("phase", "work")
         result["emergency"] = reg.get("stress", {}).get("emergency_mode", False)
-        self._last_regulation_status = result
         return result
 
     def _sense_observer(self, field: "HoneycombNeuralField") -> Dict[str, Any]:
@@ -1032,7 +1028,8 @@ class AgentMemoryLoop:
                     )
 
         isolated = field.detect_isolated()
-        for nid in isolated:
+        for iso in isolated:
+            nid = iso["id"]
             node = field._nodes.get(nid)
             if node and node.is_occupied and node.weight >= 1.5:
                 analyze["isolated_high_weight"].append(

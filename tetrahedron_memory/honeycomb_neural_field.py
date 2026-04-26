@@ -3484,7 +3484,7 @@ class HoneycombNeuralField:
 
                 if occupied_neighbors == 0:
                     isolated.append({
-                        "id": nid[:12],
+                        "id": nid,
                         "content": node.content[:60],
                         "weight": float(node.weight),
                         "activation": round(node.activation, 4),
