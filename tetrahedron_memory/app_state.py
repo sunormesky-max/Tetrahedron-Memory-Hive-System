@@ -173,7 +173,7 @@ class AppState:
             cycle += 1
             try:
                 if cycle % 5 == 0:
-                    s = self.field.self_check_status() if hasattr(self.field, '_self_check') and self.field._self_check else {}
+                    s = state.self_check_status()
                     anomalies = s.get("latest_check", {}).get("anomalies_found", 0)
                     if anomalies > 0:
                         self.emit_event("self_check_alert", {
@@ -183,7 +183,7 @@ class AppState:
 
                 if cycle % 12 == 0:
                     with self.state_lock:
-                        so = self.field._self_organize.stats() if self.field._self_organize else {}
+                        so = self.field.self_organize_stats()
                     if so.get("active_shortcuts", 0) > 0:
                         self.emit_event("self_organize_update", {
                             "clusters": so.get("active_clusters", 0),

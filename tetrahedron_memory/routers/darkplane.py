@@ -3,7 +3,6 @@ import logging
 from fastapi import APIRouter, HTTPException, Request
 
 from tetrahedron_memory.app_state import AppState, _resolve_node
-from tetrahedron_memory.spatial_reflection import SpatialReflectionField
 
 log = logging.getLogger("tetramem.api")
 
@@ -93,18 +92,17 @@ def attention_status_api(request: Request):
 def reflection_field_status(request: Request):
     state = _get_state(request)
     with state.state_lock:
-        if state.field._reflection_field is None:
+        result = state.field.reflection_field_status()
+        if not result.get("active"):
             return {"status": "not_initialized"}
-        return state.field._reflection_field.stats()
+        return result
 
 
 @router.post("/reflection-field/run")
 def reflection_field_run(request: Request):
     state = _get_state(request)
     with state.state_lock:
-        if state.field._reflection_field is None:
-            state.field._reflection_field = SpatialReflectionField()
-        return state.field._reflection_field.run_reflection_cycle(state.field)
+        return state.field.reflection_field_run()
 
 
 @router.get("/reflection-field/energy/{node_id}")
@@ -115,40 +113,37 @@ def reflection_field_energy(node_id: str, request: Request):
             nid = _resolve_node(state.field, node_id)
         except ValueError as e:
             raise HTTPException(400, str(e))
-        if state.field._reflection_field is None:
+        report = state.field.reflection_node_report(nid)
+        if not report.get("energy"):
             return {"node_id": nid, "energy": 0.5}
-        energy = state.field._reflection_field.get_node_energy(nid)
-        quality = state.field._reflection_field.get_spatial_quality(state.field, nid)
-        return {"node_id": nid, "energy": round(energy, 4), "spatial_quality": round(quality, 4)}
+        return {"node_id": nid, "energy": round(report["energy"], 4), "spatial_quality": round(report.get("quality", 0), 4)}
 
 
 @router.get("/regulation/status")
 def regulation_status_api(request: Request):
     state = _get_state(request)
     with state.state_lock:
-        if state.field._self_regulation is None:
-            return {"active": False}
-        return {"active": True, **state.field._self_regulation.status()}
+        return state.field.regulation_status()
 
 
 @router.post("/regulation/trigger")
 def regulation_trigger_api(request: Request):
     state = _get_state(request)
     with state.state_lock:
-        if state.field._self_regulation is None:
+        result = state.field.regulation_trigger()
+        if not result.get("active", True):
             raise HTTPException(400, "Self-regulation not initialized")
-        record = state.field._self_regulation.regulate()
-        return record
+        return result
 
 
 @router.post("/regulation/force-mode")
 def regulation_force_mode_api(req: dict, request: Request):
     state = _get_state(request)
+    mode = req.get("mode", "")
     with state.state_lock:
-        if state.field._self_regulation is None:
+        result = state.field.regulation_force_mode(mode)
+        if not result.get("active"):
             raise HTTPException(400, "Self-regulation not initialized")
-        mode = req.get("mode", "")
-        state.field._self_regulation.force_mode(mode)
         return {"status": "ok", "mode": mode}
 
 
@@ -156,9 +151,7 @@ def regulation_force_mode_api(req: dict, request: Request):
 def regulation_history_api(n: int = 20, request: Request = None):
     state = _get_state(request)
     with state.state_lock:
-        if state.field._self_regulation is None:
-            return {"count": 0, "history": []}
-        history = state.field._self_regulation.get_history(n)
+        history = state.field.regulation_history(n)
         return {"count": len(history), "history": history}
 
 
@@ -166,10 +159,7 @@ def regulation_history_api(n: int = 20, request: Request = None):
 def substrate_stats_api(request: Request):
     state = _get_state(request)
     with state.state_lock:
-        substrate = getattr(state.field, "_dark_plane_substrate", None)
-        if substrate is None:
-            return {"error": "substrate not initialized"}
-        return substrate.get_stats()
+        return state.field.dark_plane_stats()
 
 
 @router.get("/dark-plane/substrate/features")

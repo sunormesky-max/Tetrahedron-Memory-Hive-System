@@ -4407,3 +4407,86 @@ class HoneycombNeuralField:
             if self._runtime_observer and not self._runtime_observer._flush_thread:
                 self._runtime_observer.start()
 
+    # ── Public facade methods: stable API surface for routers/agents ──
+
+    def regulation_status(self) -> Dict[str, Any]:
+        if self._self_regulation is None:
+            return {"active": False}
+        return {"active": True, **self._self_regulation.status()}
+
+    def regulation_trigger(self) -> Dict[str, Any]:
+        if self._self_regulation is None:
+            return {"active": False}
+        record = self._self_regulation.regulate()
+        return record if isinstance(record, dict) else {"record": str(record)}
+
+    def regulation_force_mode(self, mode: str) -> Dict[str, Any]:
+        if self._self_regulation is None:
+            return {"active": False}
+        self._self_regulation.force_mode(mode)
+        return {"active": True, "mode": mode}
+
+    def regulation_history(self, n: int = 20) -> List[Dict]:
+        if self._self_regulation is None:
+            return []
+        hist = self._self_regulation.get_history(n)
+        return hist if isinstance(hist, list) else []
+
+    def dark_plane_stats(self) -> Dict[str, Any]:
+        if self._dark_plane_substrate is None:
+            return {"active": False}
+        return {"active": True, **self._dark_plane_substrate.get_stats()}
+
+    def dark_plane_substrate(self):
+        return self._dark_plane_substrate
+
+    def observer_stats(self) -> Dict[str, Any]:
+        if self._runtime_observer is None:
+            return {"active": False}
+        return {"active": True, **self._runtime_observer.get_stats()}
+
+    def observer_ref(self):
+        return self._runtime_observer
+
+    def feedback_stats(self) -> Dict[str, Any]:
+        if self._feedback_loop is None:
+            return {"active": False, "total_feedback": 0}
+        return {"active": True, **self._feedback_loop.get_stats()}
+
+    def feedback_insights(self) -> Dict[str, Any]:
+        if self._feedback_loop is None:
+            return {"active": False, "insights": {}}
+        return {"active": True, **self._feedback_loop.get_learning_insights()}
+
+    def void_channel_stats(self) -> Dict[str, Any]:
+        if self._void_channel is None:
+            return {"active": False, "active_channels": 0}
+        return {"active": True, **self._void_channel.get_stats()}
+
+    def reflection_field_status(self) -> Dict[str, Any]:
+        if self._reflection_field is None:
+            return {"active": False}
+        return {"active": True, **self._reflection_field.stats()}
+
+    def reflection_field_run(self) -> Dict[str, Any]:
+        if self._reflection_field is None:
+            self._reflection_field = SpatialReflectionField()
+        return self._reflection_field.run_reflection_cycle(self)
+
+    def reflection_node_report(self, node_id: str) -> Dict[str, Any]:
+        if self._reflection_field is None:
+            return {"active": False}
+        energy = self._reflection_field.get_node_energy(node_id)
+        quality = self._reflection_field.get_spatial_quality(self, node_id)
+        return {"energy": energy, "quality": quality}
+
+    def self_check_status(self) -> Dict[str, Any]:
+        if self._self_check is None:
+            return {}
+        return self._self_check.status() if hasattr(self._self_check, 'status') else {}
+
+    def self_organize_stats(self) -> Dict[str, Any]:
+        if self._self_organize is None:
+            return {}
+        return self._self_organize.stats()
+
