@@ -181,6 +181,89 @@ DEFAULT_LOG_PATTERN = re.compile(
     r"(\S+)\s*[:\-]?\s*(.*)$"
 )
 
+STRUCTURED_LOG_PATTERNS = [
+    re.compile(
+        r"^\[(\d{4}-\d{2}-\d{2}[\sT]\d{2}:\d{2}:\d{2}(?:\.\d+)?)\]\s*"
+        r"\[(DEBUG|INFO|WARN(?:ING)?|ERROR|FATAL|CRITICAL)\]\s*"
+        r"\[([^\]]+)\]\s*(.*)$"
+    ),
+    re.compile(
+        r"^(\d{4}/\d{2}/\d{2}\s+\d{2}:\d{2}:\d{2}(?:\.\d+)?)\s+"
+        r"\[(DEBUG|INFO|WARN(?:ING)?|ERROR|FATAL|CRITICAL)\]\s*"
+        r"(\S+)\s*[:\-]?\s*(.*)$"
+    ),
+    re.compile(
+        r"^(\d{2}:\d{2}:\d{2}(?:\.\d+)?)\s+"
+        r"(DEBUG|INFO|WARN(?:ING)?|ERROR|FATAL|CRITICAL)\s+"
+        r"(\S+)\s*[:\-]?\s*(.*)$"
+    ),
+]
+
+LEVEL_ALIASES = {
+    "WARN": "WARNING",
+    "FATAL": "CRITICAL",
+    "TRACE": "DEBUG",
+    "NOTICE": "INFO",
+}
+
+
+def _try_parse_json_line(line: str) -> Optional[Tuple[str, str, str, Dict[str, Any]]]:
+    if not line.startswith("{"):
+        return None
+    try:
+        obj = json.loads(line)
+    except (json.JSONDecodeError, ValueError):
+        return None
+    if not isinstance(obj, dict):
+        return None
+
+    level = obj.get("level", obj.get("severity", obj.get("levelname", "INFO")))
+    level = LEVEL_ALIASES.get(str(level).upper(), str(level).upper())
+
+    message = obj.get("message", obj.get("msg", obj.get("text", obj.get("m", ""))))
+    if not message:
+        message = line[:200]
+
+    module = obj.get("logger", obj.get("module", obj.get("name", obj.get("source", ""))))
+
+    ts = 0.0
+    ts_val = obj.get("timestamp", obj.get("ts", obj.get("time", obj.get("@timestamp", ""))))
+    if isinstance(ts_val, (int, float)):
+        ts = float(ts_val)
+    elif isinstance(ts_val, str):
+        for fmt in ("%Y-%m-%dT%H:%M:%S.%f", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S"):
+            try:
+                import datetime
+                ts = datetime.datetime.strptime(ts_val[:26], fmt).timestamp()
+                break
+            except (ValueError, TypeError):
+                continue
+
+    extra = {k: v for k, v in obj.items()
+             if k not in ("level", "severity", "levelname", "message", "msg", "text", "m",
+                          "logger", "module", "name", "source", "timestamp", "ts", "time", "@timestamp")}
+    return level, module, str(message), {"json_fields": extra, "original_timestamp": ts} if extra else {}
+
+
+def _parse_line_auto(line: str) -> Tuple[str, str, str, Dict[str, Any]]:
+    json_result = _try_parse_json_line(line)
+    if json_result is not None:
+        return json_result
+
+    m = DEFAULT_LOG_PATTERN.match(line)
+    if m:
+        ts_str, level, module, message = m.groups()
+        return level.upper(), module, message, {}
+
+    for pat in STRUCTURED_LOG_PATTERNS:
+        m = pat.match(line)
+        if m:
+            ts_str, level, module, message = m.groups()
+            level = LEVEL_ALIASES.get(level.upper(), level.upper())
+            return level, module, message, {}
+
+    return "INFO", "external", line, {}
+
 
 class LogFileTailer:
     """
@@ -274,20 +357,156 @@ class LogFileTailer:
     def _parse_and_observe(self, line: str) -> None:
         self._lines_read += 1
         self._observer._stats.file_tailer_lines_read = self._lines_read
-        m = self._log_pattern.match(line)
-        if m:
-            ts_str, level, module, message = m.groups()
-            module = self._module_override or module
-        else:
-            level = "INFO"
-            module = self._module_override or "external"
-            message = line
+
+        if self._log_pattern is not DEFAULT_LOG_PATTERN:
+            m = self._log_pattern.match(line)
+            if m:
+                ts_str, level, module, message = m.groups()
+                module = self._module_override or module
+            else:
+                level, module, message = "INFO", self._module_override or "external", line
+            self._observer.observe(
+                level=level,
+                module=module,
+                message=message,
+                source="file-tailer",
+            )
+            return
+
+        level, module, message, extra = _parse_line_auto(line)
+        module = self._module_override or module
         self._observer.observe(
             level=level,
             module=module,
             message=message,
             source="file-tailer",
+            metadata=extra if extra else None,
         )
+
+
+class _ResonanceDetector:
+    __slots__ = (
+        "_store_times", "_suppressed", "_cooling_until",
+        "_threshold_burst", "_threshold_sustained", "_window",
+    )
+
+    def __init__(
+        self,
+        burst_threshold: int = 10,
+        sustained_threshold: float = 0.8,
+        window: float = 10.0,
+    ):
+        self._store_times: deque = deque()
+        self._suppressed: int = 0
+        self._cooling_until: float = 0.0
+        self._threshold_burst = burst_threshold
+        self._threshold_sustained = sustained_threshold
+        self._window = window
+
+    def record_store(self) -> None:
+        now = time.time()
+        self._store_times.append(now)
+        while self._store_times and now - self._store_times[0] > self._window:
+            self._store_times.popleft()
+
+    def check_resonance(self, events_in_period: int, stores_in_period: int) -> bool:
+        if stores_in_period == 0:
+            return False
+        ratio = stores_in_period / max(events_in_period, 1)
+        now = time.time()
+        if now < self._cooling_until:
+            self._suppressed += 1
+            return True
+        burst = len(self._store_times) >= self._threshold_burst
+        sustained = ratio > self._threshold_sustained and events_in_period > 20
+        if burst or sustained:
+            self._cooling_until = now + 60.0
+            return True
+        return False
+
+    @property
+    def stats(self) -> Dict[str, Any]:
+        return {
+            "suppressed_total": self._suppressed,
+            "cooling_active": time.time() < self._cooling_until,
+            "cooling_remaining": max(0, self._cooling_until - time.time()),
+            "recent_stores_in_window": len(self._store_times),
+        }
+
+
+class _AdaptiveRateLimiter:
+    __slots__ = (
+        "_base_limit", "_current_limit", "_last_adjustment",
+        "_adjustment_interval", "_min_limit", "_max_limit",
+    )
+
+    def __init__(
+        self,
+        base_limit: int = 30,
+        min_limit: int = 5,
+        max_limit: int = 60,
+        adjustment_interval: float = 30.0,
+    ):
+        self._base_limit = base_limit
+        self._current_limit = float(base_limit)
+        self._last_adjustment = 0.0
+        self._adjustment_interval = adjustment_interval
+        self._min_limit = float(min_limit)
+        self._max_limit = float(max_limit)
+
+    def get_limit(self) -> int:
+        return int(self._current_limit)
+
+    def adjust(self, field_stats: Dict[str, Any]) -> None:
+        now = time.time()
+        if now - self._last_adjustment < self._adjustment_interval:
+            return
+        self._last_adjustment = now
+
+        stress = 0.0
+        reg = field_stats.get("regulation", {})
+        if isinstance(reg, dict):
+            stress = reg.get("stress", 0.0)
+
+        occupied = field_stats.get("occupied_nodes", 0)
+        total = max(field_stats.get("total_nodes", 1), 1)
+        occupancy = occupied / total
+
+        dp = field_stats.get("dark_plane", {})
+        coherence = dp.get("coherence", 0.5) if isinstance(dp, dict) else 0.5
+        pe = dp.get("pe", 0.0) if isinstance(dp, dict) else 0.0
+
+        factor = 1.0
+        if stress > 0.7:
+            factor *= 0.4
+        elif stress > 0.4:
+            factor *= 0.7
+
+        if occupancy > 0.8:
+            factor *= 0.6
+        elif occupancy > 0.5:
+            factor *= 0.85
+
+        if coherence < 0.3:
+            factor *= 0.5
+        elif coherence < 0.5:
+            factor *= 0.8
+
+        if pe > 2.5:
+            factor *= 0.7
+
+        target = self._base_limit * factor
+        self._current_limit = self._current_limit * 0.7 + target * 0.3
+        self._current_limit = max(self._min_limit, min(self._max_limit, self._current_limit))
+
+    @property
+    def stats(self) -> Dict[str, Any]:
+        return {
+            "base_limit": self._base_limit,
+            "current_limit": int(self._current_limit),
+            "min_limit": int(self._min_limit),
+            "max_limit": int(self._max_limit),
+        }
 
 
 class RuntimeObserver:
@@ -333,6 +552,13 @@ class RuntimeObserver:
         self._compiled_rules = CLASSIFICATION_RULES
         self._tailers: List[LogFileTailer] = []
         self._custom_rules: Optional[List[Dict]] = None
+        self._custom_classifiers: List[Callable] = []
+        self._recent_categories: deque = deque(maxlen=50)
+        self._on_store_callbacks: List[Callable] = []
+        self._resonance_detector = _ResonanceDetector()
+        self._adaptive_limiter = _AdaptiveRateLimiter(base_limit=max_stores_per_minute)
+        self._config_path: Optional[str] = None
+        self._config_corrupted: bool = False
 
     def start(self) -> None:
         if self._flush_thread is not None and self._flush_thread.is_alive():
@@ -520,14 +746,45 @@ class RuntimeObserver:
                 for t in self._tailers
             ],
             "custom_rules": self._custom_rules is not None,
+            "custom_classifiers": len(self._custom_classifiers),
+            "recent_categories": list(self._recent_categories)[-10:],
+            "adaptive_limiter": self._adaptive_limiter.stats,
+            "resonance": self._resonance_detector.stats,
+            "config_path": self._config_path,
+            "config_corrupted": self._config_corrupted,
         }
 
     def set_enabled(self, enabled: bool) -> None:
         self._enabled = enabled
 
+    def register_on_store(self, callback: Callable) -> None:
+        self._on_store_callbacks.append(callback)
+
+    def register_classifier(
+        self,
+        classifier: Callable[[ObservedEvent], Optional[Tuple[str, float, bool]]],
+    ) -> None:
+        self._custom_classifiers.append(classifier)
+
     def _classify(
         self, event: ObservedEvent
     ) -> Tuple[str, float, bool]:
+        for classifier in self._custom_classifiers:
+            try:
+                result = classifier(event)
+                if result is not None:
+                    self._recent_categories.append(result[0])
+                    return result
+            except Exception:
+                continue
+
+        json_fields = event.metadata.get("json_fields", {})
+        if json_fields:
+            cat_result = self._classify_json_fields(event, json_fields)
+            if cat_result is not None:
+                self._recent_categories.append(cat_result[0])
+                return cat_result
+
         for rule in self._compiled_rules:
             cat = rule["category"]
             level_ok = True
@@ -535,14 +792,52 @@ class RuntimeObserver:
                 level_ok = event.level in rule["level_filter"]
             pattern_ok = True
             if rule["pattern"]:
-                pattern_ok = bool(rule["pattern"].search(event.message))
+                search_text = event.message
+                for v in json_fields.values():
+                    if isinstance(v, str):
+                        search_text += " " + v
+                pattern_ok = bool(rule["pattern"].search(search_text))
             if level_ok and pattern_ok:
+                self._recent_categories.append(cat)
                 return cat, rule["weight"], rule["immediate"]
         if event.level in ("ERROR", "CRITICAL"):
             return CATEGORY_ERROR, 2.0, True
         if event.level == "WARNING":
             return CATEGORY_SYSTEM, 0.8, False
+        self._recent_categories.append(CATEGORY_BEHAVIOR)
         return CATEGORY_BEHAVIOR, 0.2, False
+
+    def _classify_json_fields(
+        self, event: ObservedEvent, fields: Dict[str, Any]
+    ) -> Optional[Tuple[str, float, bool]]:
+        status_code = fields.get("status_code", fields.get("statusCode", fields.get("status")))
+        if isinstance(status_code, (int, str)):
+            try:
+                code = int(status_code)
+            except (ValueError, TypeError):
+                code = 0
+            if code >= 500:
+                return CATEGORY_ERROR, 2.0, True
+            if code >= 400:
+                return CATEGORY_ANOMALY, 1.2, True
+
+        duration_ms = fields.get("duration_ms", fields.get("duration", fields.get("elapsed")))
+        if isinstance(duration_ms, (int, float)):
+            if duration_ms > 5000:
+                return CATEGORY_PERFORMANCE, 1.0, False
+            if duration_ms > 1000:
+                return CATEGORY_PERFORMANCE, 0.5, False
+
+        error_field = fields.get("error", fields.get("error_code", fields.get("errorCode")))
+        if error_field:
+            return CATEGORY_ERROR, 1.8, True
+
+        request_method = fields.get("method", fields.get("httpMethod"))
+        request_path = fields.get("path", fields.get("url", fields.get("uri")))
+        if request_method and request_path:
+            return CATEGORY_BEHAVIOR, 0.3, False
+
+        return None
 
     def _redact(self, text: str) -> str:
         for pat in SENSITIVE_PATTERNS:
@@ -610,7 +905,26 @@ class RuntimeObserver:
         while self._store_timestamps and now - self._store_timestamps[0] > 60.0:
             self._store_timestamps.popleft()
 
-        if len(self._store_timestamps) >= self._max_stores_per_minute:
+        try:
+            field_stats = self._field.stats() if hasattr(self._field, 'stats') else {}
+            if hasattr(self._field, '_regulation') and self._field._regulation is not None:
+                field_stats["regulation"] = self._field._regulation.status()
+            if hasattr(self._field, '_dark_substrate') and self._field._dark_substrate is not None:
+                field_stats["dark_plane"] = self._field._dark_substrate.get_stats()
+        except Exception:
+            field_stats = {}
+
+        self._adaptive_limiter.adjust(field_stats)
+        current_limit = self._adaptive_limiter.get_limit()
+
+        total_events = self._stats.total_events_received
+        total_stores = self._stats.memories_stored
+        if self._resonance_detector.check_resonance(total_events, total_stores):
+            self._stats.events_dropped_rate += 1
+            self._stats.memories_rejected += 1
+            return False
+
+        if len(self._store_timestamps) >= current_limit:
             self._stats.events_dropped_rate += 1
             self._stats.memories_rejected += 1
             return False
@@ -630,7 +944,18 @@ class RuntimeObserver:
             )
             self._store_timestamps.append(now)
             self._stats.memories_stored += 1
+            self._resonance_detector.record_store()
             logger.debug("Observer stored trajectory memory: %s (%.2f)", memory_id, weight)
+            for cb in self._on_store_callbacks:
+                try:
+                    cb(narration, category, weight, {
+                        "source": OBSERVER_SOURCE_TAG,
+                        "category": category,
+                        "observer_component": event.module,
+                        "observer_level": event.level,
+                    })
+                except Exception:
+                    pass
             return True
         except Exception as e:
             self._stats.memories_rejected += 1

@@ -22,6 +22,8 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
+import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -123,11 +125,80 @@ def load_config(path: str = "./observer_config.json") -> Dict[str, Any]:
     try:
         with open(p, "r", encoding="utf-8") as f:
             cfg = json.load(f)
-        logger.info("Observer config loaded from %s", p)
-        return cfg
-    except (json.JSONDecodeError, OSError) as e:
-        logger.warning("Failed to load config from %s: %s, using defaults", p, e)
+    except json.JSONDecodeError as e:
+        logger.warning("Config corrupted at %s: %s — auto-repairing with defaults", p, e)
+        repaired = dict(DEFAULT_CONFIG)
+        repaired["_repair_note"] = f"Auto-repaired from corrupted JSON at {time.strftime('%Y-%m-%d %H:%M:%S')}"
+        try:
+            backup_path = str(p) + f".corrupted.{int(time.time())}"
+            p.rename(backup_path)
+            write_default_config(str(p))
+            logger.info("Corrupted config backed up to %s, default written to %s", backup_path, p)
+        except OSError:
+            pass
+        return repaired
+    except OSError as e:
+        logger.warning("Cannot read config at %s: %s, using defaults", p, e)
         return dict(DEFAULT_CONFIG)
+
+    repaired = _validate_and_repair(cfg)
+    if repaired.get("_repaired"):
+        try:
+            with open(p, "w", encoding="utf-8") as f:
+                json.dump(repaired, f, indent=2, ensure_ascii=False)
+            logger.info("Config auto-repaired and saved to %s", p)
+        except OSError:
+            pass
+    return repaired
+
+
+def _validate_and_repair(cfg: Dict[str, Any]) -> Dict[str, Any]:
+    repairs = []
+    if not isinstance(cfg.get("enabled"), bool):
+        cfg["enabled"] = DEFAULT_CONFIG["enabled"]
+        repairs.append("enabled")
+    if not isinstance(cfg.get("window_seconds"), (int, float)) or cfg.get("window_seconds", 0) <= 0:
+        cfg["window_seconds"] = DEFAULT_CONFIG["window_seconds"]
+        repairs.append("window_seconds")
+    if not isinstance(cfg.get("max_stores_per_minute"), int) or cfg.get("max_stores_per_minute", 0) <= 0:
+        cfg["max_stores_per_minute"] = DEFAULT_CONFIG["max_stores_per_minute"]
+        repairs.append("max_stores_per_minute")
+    if not isinstance(cfg.get("log_sources"), dict):
+        cfg["log_sources"] = DEFAULT_CONFIG["log_sources"]
+        repairs.append("log_sources")
+    elif not isinstance(cfg["log_sources"].get("file_tail"), list):
+        ft = cfg["log_sources"].get("file_tail")
+        if isinstance(ft, dict):
+            cfg["log_sources"]["file_tail"] = [ft]
+        else:
+            cfg["log_sources"]["file_tail"] = []
+        repairs.append("log_sources.file_tail")
+    if not isinstance(cfg.get("rules"), list):
+        cfg["rules"] = DEFAULT_CONFIG["rules"]
+        repairs.append("rules")
+    else:
+        valid_rules = []
+        for i, r in enumerate(cfg["rules"]):
+            if not isinstance(r, dict):
+                continue
+            if "category" not in r:
+                r["category"] = "behavior"
+                repairs.append(f"rules[{i}].category")
+            if "weight" not in r or not isinstance(r.get("weight"), (int, float)):
+                r["weight"] = 0.3
+                repairs.append(f"rules[{i}].weight")
+            if r.get("pattern") is not None:
+                try:
+                    re.compile(r["pattern"])
+                except re.error:
+                    r["pattern"] = None
+                    repairs.append(f"rules[{i}].pattern_invalid")
+            valid_rules.append(r)
+        cfg["rules"] = valid_rules
+    if repairs:
+        cfg["_repaired"] = True
+        cfg["_repair_details"] = repairs
+    return cfg
 
 
 def _env_override(cfg: Dict[str, Any]) -> Dict[str, Any]:
