@@ -61,7 +61,7 @@ class PCNNConfig:
     MAX_HOPS_REINFORCING = 8
     MAX_HOPS_TENSION = 5
 
-    BRIDGE_THRESHOLD = 0.40
+    BRIDGE_THRESHOLD = 0.30
     MIN_BRIDGE_SOURCES = 2
 
     BASE_PULSE_INTERVAL = 0.50
@@ -141,8 +141,8 @@ class PCNNConfig:
     TETRA_MAX_CELLS_PER_ANALYSIS = 500
     TETRA_DENSITY_PENALTY = 0.5
 
-    DREAM_CYCLE_INTERVAL = 300
-    DREAM_MAX_RECOMBINATIONS = 10
+    DREAM_CYCLE_INTERVAL = 180
+    DREAM_MAX_RECOMBINATIONS = 20
     DREAM_MIN_SOURCE_WEIGHT = 1.0
     DREAM_INSIGHT_WEIGHT = 1.5
     DREAM_CROSS_DOMAIN_BONUS = 2.0
@@ -150,7 +150,7 @@ class PCNNConfig:
     DREAM_MIN_DOMAIN_DEPTH = 0.3
     DREAM_SOURCE_MIN_WEIGHT = 1.5
     DREAM_SOURCE_MIN_ACTIVATION = 0.5
-    DREAM_INSIGHT_MIN_CREATIVITY = 0.6
+    DREAM_INSIGHT_MIN_CREATIVITY = 0.45
 
     AGENT_CONTEXT_MAX_MEMORIES = 15
     AGENT_REASONING_MAX_HOPS = 5
@@ -219,6 +219,8 @@ class PCNNConfig:
         "attention": 50,
         "resonance": 300,
         "emergence": 500,
+        "feedback_evolve": 200,
+        "dark_plane_flow": 60,
     }
 
     DARK_PLANE_CONFIG = {
@@ -236,7 +238,7 @@ class PCNNConfig:
     }
 
     ATTENTION_CONFIG = {
-        "decay_rate": 0.05,
+        "decay_rate": 0.03,
         "diffusion_rate": 0.3,
         "max_foci": 3,
     }

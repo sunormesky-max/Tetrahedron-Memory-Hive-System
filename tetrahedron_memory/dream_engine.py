@@ -68,6 +68,7 @@ class DreamEngine:
         self._lock = threading.Lock()
         self._dream_effectiveness: Dict[str, Dict[str, Any]] = {}
         self._max_effectiveness_tracking = 200
+        self._is_dreaming = False
 
     def _extract_content_summary(self, content: str, max_chars: int = 40) -> str:
         if not content:
@@ -374,6 +375,7 @@ class DreamEngine:
         return insight
 
     def run_dream_cycle(self) -> DreamCycleResult:
+        self._is_dreaming = True
         result = DreamCycleResult()
         field = self._field
         cfg = PCNNConfig
@@ -388,6 +390,7 @@ class DreamEngine:
             ]
             if len(occupied) < 4:
                 result.insights = [{"note": "insufficient source memories for dreaming"}]
+                self._is_dreaming = False
                 return result
 
             label_domains: Dict[str, List[Tuple[str, Any]]] = defaultdict(list)
@@ -403,6 +406,7 @@ class DreamEngine:
 
             if len(top_domains) < 2:
                 result.insights = [{"note": "insufficient label diversity for dreaming"}]
+                self._is_dreaming = False
                 return result
 
             domain_depths = {}
@@ -631,6 +635,7 @@ class DreamEngine:
             if len(self._history) > self._max_history:
                 self._history = self._history[-self._max_history // 2:]
 
+        self._is_dreaming = False
         return result
 
     def _create_deep_dream(self, field, result, nid_a, nid_b, node_a, node_b,

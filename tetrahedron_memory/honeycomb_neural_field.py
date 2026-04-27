@@ -33,6 +33,7 @@ from .dream_engine import DreamCycleResult, DreamEngine
 from .agent_driver import AgentMemoryDriver
 from .feedback import FeedbackRecord, FeedbackLoop
 from .session import SessionRecord, Session, SessionManager
+from .phase_transition_honeycomb import HoneycombPhaseTransition
 from .insight_aggregator import InsightAggregator
 from .geometry import TextToGeometryMapper
 from .self_regulation import SelfRegulationEngine
@@ -682,7 +683,7 @@ class HoneycombNeuralField:
         for fnid in node.face_neighbors[:6]:
             if fnid in occ:
                 attraction += self._nodes[fnid].weight
-        for enid in node.edge_neighbors[:4]:
+        for enid in node.edge_neighbors[:8]:
             if enid in occ:
                 attraction += self._nodes[enid].weight * 0.5
         return attraction
@@ -696,7 +697,7 @@ class HoneycombNeuralField:
             fn = self._nodes.get(fnid)
             if fn and not fn.is_occupied:
                 self._frontier_empty[fnid] = self._frontier_empty.get(fnid, 0) + 1.0
-        for enid in node.edge_neighbors[:4]:
+        for enid in node.edge_neighbors[:8]:
             en = self._nodes.get(enid)
             if en and not en.is_occupied:
                 self._frontier_empty[enid] = self._frontier_empty.get(enid, 0) + 0.5
@@ -712,7 +713,7 @@ class HoneycombNeuralField:
                 fn = self._nodes.get(fnid)
                 if fn and not fn.is_occupied:
                     self._frontier_empty[fnid] = self._frontier_empty.get(fnid, 0) + 1.0
-            for enid in node.edge_neighbors[:4]:
+            for enid in node.edge_neighbors[:8]:
                 en = self._nodes.get(enid)
                 if en and not en.is_occupied:
                     self._frontier_empty[enid] = self._frontier_empty.get(enid, 0) + 0.5
@@ -782,7 +783,7 @@ class HoneycombNeuralField:
         for fnid in node.face_neighbors[:6]:
             if fnid in self._nodes and not self._nodes[fnid].is_occupied:
                 self._frontier_empty[fnid] = self._frontier_empty.get(fnid, 0) + 1.0
-        for enid in node.edge_neighbors[:4]:
+        for enid in node.edge_neighbors[:8]:
             if enid in self._nodes and not self._nodes[enid].is_occupied:
                 self._frontier_empty[enid] = self._frontier_empty.get(enid, 0) + 0.5
 
@@ -987,7 +988,7 @@ class HoneycombNeuralField:
                         for fnid in rn.face_neighbors[:6]:
                             if fnid in self._frontier_empty:
                                 label_empty.add(fnid)
-                        for enid in rn.edge_neighbors[:4]:
+                        for enid in rn.edge_neighbors[:8]:
                             if enid in self._frontier_empty:
                                 label_empty.add(enid)
                 if label_empty:
@@ -1909,7 +1910,7 @@ class HoneycombNeuralField:
             if not node:
                 continue
             spread_amount = attn * self._attention_diffusion_rate
-            neighbors = node.face_neighbors[:6] + node.edge_neighbors[:4]
+            neighbors = node.face_neighbors[:6] + node.edge_neighbors[:8]
             n_count = max(len(neighbors), 1)
             per_neighbor = spread_amount / n_count
             for nnid in neighbors:
@@ -1917,12 +1918,12 @@ class HoneycombNeuralField:
                     current = new_mask.get(nnid, 0.0)
                     new_mask[nnid] = min(1.0, current + per_neighbor)
             hebbian_boost = 0.0
-            for nnid in node.face_neighbors[:6] + node.edge_neighbors[:4]:
+            for nnid in node.face_neighbors[:6] + node.edge_neighbors[:8]:
                 hw = self._hebbian.get_path_bias(nid, nnid)
                 if hw > 0.5:
                     hebbian_boost += hw * 0.05
             if hebbian_boost > 0:
-                for nnid in node.face_neighbors[:6] + node.edge_neighbors[:4]:
+                for nnid in node.face_neighbors[:6] + node.edge_neighbors[:8]:
                     if nnid in self._occupied_ids:
                         current = new_mask.get(nnid, 0.0)
                         new_mask[nnid] = min(1.0, current + hebbian_boost * 0.1)
@@ -2637,7 +2638,7 @@ class HoneycombNeuralField:
         self._feedback_loop = FeedbackLoop(self)
         self._session_manager = SessionManager(self)
         self._reflection_field = SpatialReflectionField()
-        self._phase_transition = None
+        self._phase_transition = HoneycombPhaseTransition()
         self._pulse_engine = threading.Thread(target=self._pulse_loop, name="neural-pulse", daemon=True)
         self._pulse_engine.start()
         logger.info(
@@ -2708,8 +2709,14 @@ class HoneycombNeuralField:
                     self._reflection_field.run_reflection_cycle(self)
                     self._apply_phase_behavior()
 
-                if cycle % 200 == 0:
+                if cycle % _ci["dark_plane_flow"] == 0:
                     self.dark_plane_flow()
+
+                if cycle % _ci["feedback_evolve"] == 0 and self._feedback_loop:
+                    try:
+                        self._feedback_loop.evolve_weights()
+                    except Exception as e:
+                        logger.error("Feedback evolve error: %s", e)
 
                 if cycle % _ci["attention"] == 0 and self._attention_mask:
                     with self._lock:
@@ -2904,7 +2911,7 @@ class HoneycombNeuralField:
                 fn = self._nodes.get(fnid)
                 if fn and fn.is_occupied:
                     occupied_neighbors += 1
-            for enid in node.edge_neighbors[:4]:
+            for enid in node.edge_neighbors[:8]:
                 en = self._nodes.get(enid)
                 if en and en.is_occupied:
                     occupied_neighbors += 1
@@ -3173,7 +3180,7 @@ class HoneycombNeuralField:
                     fn = self._nodes.get(fnid)
                     if fn and fn.is_occupied:
                         sources.add(fnid)
-                for enid in node.edge_neighbors[:4]:
+                for enid in node.edge_neighbors[:8]:
                     en = self._nodes.get(enid)
                     if en and en.is_occupied:
                         sources.add(enid)

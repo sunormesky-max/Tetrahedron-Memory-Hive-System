@@ -612,4 +612,26 @@ class FeedbackLoop:
                         })
 
         proposals.sort(key=lambda x: -abs(x["delta"]))
-        return proposals[:50]
+        top_proposals = proposals[:50]
+
+        applied = 0
+        for p in top_proposals:
+            full_nid = None
+            for nid, n in field._nodes.items():
+                if nid.startswith(p["node_id"]) and n.is_occupied:
+                    full_nid = nid
+                    break
+            if full_nid:
+                node = field._nodes[full_nid]
+                if p["action"] == "increase":
+                    node.weight = min(10.0, node.weight + abs(p["delta"]) * 0.5)
+                    node.activation = min(10.0, node.activation + abs(p["delta"]) * 0.2)
+                    applied += 1
+                elif p["action"] == "decrease":
+                    node.weight = max(0.1, node.weight - abs(p["delta"]) * 0.3)
+                    applied += 1
+
+        if applied > 0:
+            logger.info("FeedbackLoop: applied %d weight adjustments from %d proposals", applied, len(top_proposals))
+
+        return top_proposals

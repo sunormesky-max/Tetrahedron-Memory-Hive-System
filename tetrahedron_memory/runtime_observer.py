@@ -922,8 +922,8 @@ class RuntimeObserver:
             field_stats = self._field.stats() if hasattr(self._field, 'stats') else {}
             if hasattr(self._field, '_regulation') and self._field._regulation is not None:
                 field_stats["regulation"] = self._field._regulation.status()
-            if hasattr(self._field, '_dark_substrate') and self._field._dark_substrate is not None:
-                field_stats["dark_plane"] = self._field._dark_substrate.get_stats()
+            if hasattr(self._field, '_dark_plane_substrate') and self._field._dark_plane_substrate is not None:
+                field_stats["dark_plane"] = self._field._dark_plane_substrate.get_stats()
         except Exception:
             field_stats = {}
 
