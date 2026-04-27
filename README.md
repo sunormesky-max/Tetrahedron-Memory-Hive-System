@@ -82,8 +82,8 @@ r = requests.post(f"{BASE}/self-organize", headers=H)
 | **Adaptive Regulation** | Six-layer physiological control system maintains memory health autonomously. |
 | **Topological Analysis** | High-dimensional topological invariants drive the memory energy landscape. |
 | **Attention Mechanism** | Focus, diffuse, decay — controllable attention over the memory space. |
-| **93 REST Endpoints** | Full API for store, query, dream, organize, observe, regulate, and more. |
-| **MCP Server** | 42 tools for Claude Desktop / Cursor integration out of the box. |
+| **144 REST Endpoints** | Full API for store, query, dream, organize, observe, regulate, and more. |
+| **MCP Server** | 17 tools for Claude Desktop / Cursor integration out of the box. |
 | **3D Visualization** | Real-time Three.js honeycomb crystal browser. |
 
 ---
@@ -154,7 +154,7 @@ observer.observe("ERROR", "my_agent", "Connection timeout")
 
 ### For LLM Tools (MCP)
 
-Built-in Model Context Protocol server with 42 tools — works with Claude Desktop, Cursor, and any MCP-compatible client.
+Built-in Model Context Protocol server with 17 tools — works with Claude Desktop, Cursor, and any MCP-compatible client.
 
 ---
 
@@ -165,7 +165,7 @@ Built-in Model Context Protocol server with 42 tools — works with Claude Deskt
 | `TETRAMEM_STORAGE` | `./tetramem_data_v2` | Data directory |
 | `TETRAMEM_UI_PASSWORD` | `CHANGE_ME` | UI login password |
 | `TETRAMEM_PORT` | `8000` | API port |
-| `TETRAMEM_CORS_ORIGINS` | `http://localhost:3000` | CORS origins |
+| `TETRAMEM_CORS_ORIGINS` | `http://localhost:3000,http://localhost:8082` | CORS origins |
 
 ---
 
