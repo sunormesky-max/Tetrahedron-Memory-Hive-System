@@ -99,17 +99,6 @@ log "Step 5/7: Configuring..."
 export TETRAMEM_STORAGE="$TETRAMEM_DIR/tetramem_data_v2"
 export TETRAMEM_UI_PASSWORD="$TETRAMEM_PASSWORD"
 
-# Fix static directory
-mkdir -p "$TETRAMEM_DIR/static"
-if [[ -f "$TETRAMEM_DIR/ui/index.html" ]]; then
-  cp "$TETRAMEM_DIR/ui/index.html" "$TETRAMEM_DIR/static/index.html"
-fi
-if [[ -f "$TETRAMEM_DIR/ui/dashboard.html" ]]; then
-  cp "$TETRAMEM_DIR/ui/dashboard.html" "$TETRAMEM_DIR/static/dashboard.html"
-fi
-if [[ -d "$TETRAMEM_DIR/libs" ]]; then
-  cp -r "$TETRAMEM_DIR/libs/"* "$TETRAMEM_DIR/static/" 2>/dev/null || true
-fi
 ok "Configuration complete"
 
 # --- Step 6: Start API ---
@@ -169,7 +158,7 @@ server {
     server_name _;
 
     location /ui/ {
-        alias $TETRAMEM_DIR/static/;
+        alias $TETRAMEM_DIR/ui/;
         index index.html;
         try_files \$uri \$uri/ /ui/index.html;
     }
