@@ -215,6 +215,10 @@ tr:hover td{background:rgba(184,134,11,.02)}
   <button onclick="switchMode('feedback',this)">反馈闭环</button>
   <button onclick="switchMode('session',this)">会话管理</button>
   <button onclick="switchMode('events',this)">事件流</button>
+  <div class="section">高级</div>
+  <button onclick="switchMode('darkplane',this)">暗位面</button>
+  <button onclick="switchMode('observer',this)">观察者</button>
+  <button onclick="switchMode('regulation',this)">自适应调节</button>
 </div>
 
 <div id="mode3d" class="content-3d">
@@ -440,6 +444,9 @@ async function renderPanelMode(mode){
     case 'session':await renderSession(el);break;
     case 'events':await renderEvents(el);break;
     case 'phase':await renderPhase(el);break;
+    case 'darkplane':await renderDarkPlane(el);break;
+    case 'observer':await renderObserver(el);break;
+    case 'regulation':await renderRegulation(el);break;
   }
 }
 
@@ -927,7 +934,7 @@ function fetchPulses(){
         trail.userData={born:now,life:5000};
         pulseGroup.add(trail);
         pulseTrails.push(trail);
-        const sparkGeo=new THREE.SphereGeometry(0.04+((p.strength||1)*0.02),6,6);
+        const sparkGeo=new THREE.TetrahedronGeometry(0.04+((p.strength||1)*0.02),0);
         const sparkMat=new THREE.MeshBasicMaterial({color:PULSE_TRAIL_COLORS[ci],transparent:true,opacity:0.95});
         const spark=new THREE.Mesh(sparkGeo,sparkMat);
         spark.position.copy(origin);
@@ -1033,7 +1040,7 @@ function buildFallback(tetras){
     const pos=new THREE.Vector3(t.centroid[0],t.centroid[1],t.centroid[2]).sub(center).multiplyScalar(sc);
     const isDream=t.labels&&(t.labels.includes('__dream__')||t.labels.includes('__pulse_bridge__'));
     const color=weightToColor(t.weight||1,isDream);
-    const dot=new THREE.Mesh(new THREE.SphereGeometry(0.08,8,8),new THREE.MeshBasicMaterial({color}));
+    const dot=new THREE.Mesh(new THREE.TetrahedronGeometry(0.08,0),new THREE.MeshBasicMaterial({color}));
     dot.position.copy(pos);    dot.userData={id:t.id,weight:t.weight||1,isDream};
     meshGroup.add(dot);tetraMeshMap[t.id]=dot;
   });
@@ -1529,6 +1536,72 @@ function disconnectSSE(){
   var d=document.getElementById('sseDot'),st=document.getElementById('sseStatusText');
   if(d)d.style.background='rgba(92,61,30,0.55)';
   if(st){st.textContent='已断开';st.style.color='rgba(92,61,30,0.55)';}
+}
+
+async function renderDarkPlane(el){
+  let html='<div style="margin-bottom:20px"><h1 style="margin:0;font-size:20px;color:#B8860B">暗位面引擎 — 热力学能量景观</h1><p style="color:rgba(92,61,30,0.55);font-size:11px;margin-top:4px">H₀~H₆ 六层位面 + ODE 连续动力学 + 空洞通道</p></div>';
+  html+='<div class="card"><h2>能量景观状态</h2><div id="dpStatus">加载中...</div></div>';
+  html+='<div class="card" style="margin-top:10px"><h2>操作</h2><button onclick="triggerDarkFlow()" class="btn btn-accent" style="font-size:12px;padding:8px 20px"><i class="fas fa-water"></i> 触发暗位面流</button></div>';
+  html+='<div class="card" style="margin-top:10px"><h2>层级详情 H₀ ~ H₆</h2><div id="dpTiers">加载中...</div></div>';
+  el.innerHTML=html;
+  loadDarkPlaneData();
+}
+async function loadDarkPlaneData(){
+  const d=await api('/dark-plane/status').catch(()=>({}));
+  const s=document.getElementById('dpStatus');
+  if(s)s.innerHTML='<div class="stat-row"><span class="stat-label">状态</span><span class="stat-value">'+(d.status||'待初始化')+'</span></div><div class="stat-row"><span class="stat-label">PH 采样点</span><span class="stat-value">'+(d.ph_points||0)+'</span></div><div class="stat-row"><span class="stat-label">ODE 积分步数</span><span class="stat-value">'+(d.ode_steps||0)+'</span></div><div class="stat-row"><span class="stat-label">空洞通道</span><span class="stat-value">'+(d.void_channels||0)+'</span></div>';
+  const t=document.getElementById('dpTiers');
+  if(t){
+    const tiers=d.tiers||[];
+    if(tiers.length===0){t.innerHTML='<p style="color:rgba(92,61,30,0.55);font-size:12px">运行暗位面流后显示层级数据</p>';}
+    else{let h='';const names=['表面','浅层','深层','深渊','ODE·H₃','ODE·H₄','ODE·H₅','ODE·H₆'];tiers.forEach((tier,i)=>{h+='<div class="dark-h-tier"><div class="tier-name">H'+i+' — '+(names[i]||'层级 '+i)+'</div><div class="tier-val">能量: '+(tier.energy||0).toFixed(4)+' · 熵: '+(tier.entropy||0).toFixed(4)+'</div></div>';});t.innerHTML=h;}
+  }
+}
+async function triggerDarkFlow(){
+  const d=await api('/dark-plane/flow',{method:'POST'}).catch(e=>({error:e.message}));
+  if(d.error)alert('失败: '+d.error);else{alert('暗位面流已触发');loadDarkPlaneData();}
+}
+
+async function renderObserver(el){
+  let html='<div style="margin-bottom:20px"><h1 style="margin:0;font-size:20px;color:#B8860B">运行观察者 — 自省观察层</h1><p style="color:rgba(92,61,30,0.55);font-size:11px;margin-top:4px">系统记忆自身运行轨迹，蒸馏为低权重自省记忆</p></div>';
+  html+='<div class="card"><h2>观察者状态</h2><div id="obsStatus">加载中...</div></div>';
+  html+='<div class="card" style="margin-top:10px"><h2>操作</h2><div style="display:flex;gap:6px"><button onclick="toggleObs(true)" class="btn btn-green" style="font-size:12px;padding:8px 16px"><i class="fas fa-play"></i> 启用</button><button onclick="toggleObs(false)" class="btn btn-warn" style="font-size:12px;padding:8px 16px"><i class="fas fa-pause"></i> 禁用</button><button onclick="flushObs()" class="btn btn-accent" style="font-size:12px;padding:8px 16px"><i class="fas fa-save"></i> 立即刷新</button></div></div>';
+  html+='<div class="card" style="margin-top:10px"><h2>事件流 <button onclick="loadObsData()" class="btn" style="margin-left:8px;font-size:10px;padding:3px 10px"><i class="fas fa-sync-alt"></i></button></h2><div id="obsEvents" style="max-height:400px;overflow-y:auto">加载中...</div></div>';
+  el.innerHTML=html;
+  loadObsData();
+}
+async function loadObsData(){
+  const d=await api('/observer/stats').catch(()=>({}));
+  const s=document.getElementById('obsStatus');
+  if(s)s.innerHTML='<div class="stat-row"><span class="stat-label">启用状态</span><span class="stat-value" style="color:'+(d.enabled?'#5eb88a':'#cf6b6b')+'">'+(d.enabled?'已启用':'已禁用')+'</span></div><div class="stat-row"><span class="stat-label">已存储记忆</span><span class="stat-value">'+(d.memories_stored||0)+'</span></div><div class="stat-row"><span class="stat-label">已处理事件</span><span class="stat-value">'+(d.events_processed||0)+'</span></div><div class="stat-row"><span class="stat-label">循环丢弃</span><span class="stat-value">'+(d.events_dropped_loop||0)+'</span></div><div class="stat-row"><span class="stat-label">存储速率</span><span class="stat-value">'+(d.current_rate||0)+' / 分钟</span></div>';
+  const ev=document.getElementById('obsEvents');
+  if(ev){const events=d.recent_events||[];if(events.length===0){ev.innerHTML='<p style="color:rgba(92,61,30,0.55);font-size:12px">暂无观察事件</p>';}else{let h='';events.forEach(e=>{const cat=e.category||'system';h+='<div class="obs-event"><div class="ev-time">'+(e.timestamp?new Date(e.timestamp).toLocaleString():'')+'</div><span class="ev-cat '+cat+'">'+cat+'</span><span style="color:#5C3D1E;font-size:11px">'+(e.message||e.summary||'')+'</span></div>';});ev.innerHTML=h;}}
+}
+async function toggleObs(en){const r=await api('/observer/'+(en?'enable':'disable'),{method:'POST'}).catch(e=>({error:e.message}));if(!r.error)alert(en?'观察者已启用':'观察者已禁用');loadObsData();}
+async function flushObs(){const r=await api('/observer/flush',{method:'POST'}).catch(e=>({error:e.message}));if(!r.error)alert('观察者已刷新');loadObsData();}
+
+async function renderRegulation(el){
+  let html='<div style="margin-bottom:20px"><h1 style="margin:0;font-size:20px;color:#B8860B">自适应调节 — 六层生理控制</h1><p style="color:rgba(92,61,30,0.55);font-size:11px;margin-top:4px">PID稳态 · 昼夜节律 · 自主神经 · 免疫防御 · 内分泌代谢 · 应激反应</p></div>';
+  html+='<div class="card"><h2>调节层级</h2><div id="regLayers">加载中...</div></div>';
+  html+='<div class="card" style="margin-top:10px"><h2>操作</h2><button onclick="triggerReg()" class="btn btn-accent" style="font-size:12px;padding:8px 20px"><i class="fas fa-play"></i> 触发调节周期</button></div>';
+  html+='<div class="card" style="margin-top:10px"><h2>调节结果</h2><div id="regResult">等待触发...</div></div>';
+  el.innerHTML=html;
+  loadRegData();
+}
+async function loadRegData(){
+  const d=await api('/regulation/status').catch(()=>({}));
+  const l=document.getElementById('regLayers');
+  if(l){
+    const layers=d.layers||[];
+    if(layers.length===0){l.innerHTML='<p style="color:rgba(92,61,30,0.55);font-size:12px">触发调节后显示层级数据</p>';}
+    else{let h='';const icons=['fas fa-balance-scale','fas fa-sun','fas fa-heartbeat','fas fa-shield-alt','fas fa-flask','fas fa-bolt'];const names=['PID 稳态','昼夜节律','自主神经','免疫防御','内分泌代谢','应激反应'];layers.forEach((ly,i)=>{h+='<div class="reg-layer"><div class="layer-icon"><i class="'+(icons[i]||'fas fa-circle')+'"></i></div><div class="layer-name">'+(ly.name||names[i]||'层级 '+(i+1))+'</div><div class="layer-status">'+(ly.status||'--')+(ly.value!==undefined?' ('+(ly.value||0).toFixed(3)+')':'')+'</div></div>';});l.innerHTML=h;}
+  }
+}
+async function triggerReg(){
+  const d=await api('/regulation/trigger',{method:'POST'}).catch(e=>({error:e.message}));
+  const r=document.getElementById('regResult');
+  if(d.error){if(r)r.innerHTML='<p style="color:#cf6b6b">失败: '+d.error+'</p>';}
+  else{if(r)r.innerHTML='<pre style="font-family:monospace;font-size:10px;white-space:pre-wrap;color:#5C3D1E;background:rgba(255,253,248,0.6);padding:10px;border-radius:8px;max-height:300px;overflow-y:auto">'+JSON.stringify(d,null,2)+'</pre>';loadRegData();}
 }
 </script>
 

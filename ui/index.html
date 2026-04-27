@@ -45,16 +45,13 @@ body{font-family:var(--font-body);background:var(--void);color:#5C3D1E;-webkit-f
 ::-webkit-scrollbar-thumb{background:rgba(184,134,11,0.2);border-radius:3px}
 ::-webkit-scrollbar-thumb:hover{background:rgba(184,134,11,0.35)}
 
-/* === GRADIENT TEXT === */
 .gradient-text{background:linear-gradient(135deg,var(--cyan),var(--purple),var(--pink),var(--rose));background-size:300% 300%;-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:gradShift 6s ease infinite}
 @keyframes gradShift{0%{background-position:0%}50%{background-position:100%}100%{background-position:0%}}
 
-/* === CONIC BG === */
 .conic-bg{position:relative}
 .conic-bg::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%;background:conic-gradient(transparent 0deg,rgba(100,60,255,0.03) 60deg,transparent 120deg,rgba(212,175,55,0.02) 200deg,transparent 280deg,rgba(205,133,63,0.03) 340deg,transparent 360deg);animation:rotateBg 90s linear infinite;z-index:0;pointer-events:none}
 @keyframes rotateBg{to{transform:rotate(360deg)}}
 
-/* === LOGIN === */
 .login-page{position:fixed;inset:0;z-index:9999;background:var(--void);display:flex;align-items:center;justify-content:center;overflow:hidden}
 .login-page::before{content:'';position:absolute;width:600px;height:600px;border-radius:50%;background:radial-gradient(circle,rgba(184,134,11,0.12),transparent 70%);top:15%;left:25%;animation:floatA 8s ease-in-out infinite;filter:blur(60px)}
 .login-page::after{content:'';position:absolute;width:500px;height:500px;border-radius:50%;background:radial-gradient(circle,rgba(205,133,63,0.08),transparent 70%);bottom:10%;right:20%;animation:floatB 10s ease-in-out infinite;filter:blur(60px)}
@@ -76,7 +73,6 @@ body{font-family:var(--font-body);background:var(--void);color:#5C3D1E;-webkit-f
 .app-enter{animation:appIn .5s ease-out}
 @keyframes appIn{from{opacity:0}to{opacity:1}}
 
-/* === TOP BAR === */
 .top-bar{height:var(--topbar-h);display:flex;align-items:center;padding:0 20px;gap:12px;background:rgba(250,245,235,0.9);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);position:relative;z-index:100;flex-shrink:0}
 .top-logo{font-family:var(--font-display);font-size:14px;font-weight:400;letter-spacing:3px;white-space:nowrap}
 .top-logo span{font-weight:800;background:linear-gradient(135deg,var(--cyan),var(--pink));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
@@ -91,11 +87,9 @@ body{font-family:var(--font-body);background:var(--void);color:#5C3D1E;-webkit-f
 .top-logout{cursor:pointer;transition:color .2s}
 .top-logout:hover{color:var(--cyan)}
 
-/* === MAIN LAYOUT === */
 .app-layout{display:flex;flex-direction:column;height:100vh}
 .main-area{display:flex;flex:1;overflow:hidden;position:relative;z-index:2}
 
-/* === SIDEBAR === */
 .sidebar{width:var(--sidebar-w);background:rgba(250,245,235,0.7);backdrop-filter:blur(10px);border-right:1px solid var(--border);padding:10px 8px;flex-shrink:0;overflow-y:auto}
 .sidebar-section{font-family:var(--font-display);font-size:8px;color:rgba(212,175,55,0.2);text-transform:uppercase;letter-spacing:2px;padding:14px 10px 6px}
 .sidebar-item{display:block;width:100%;text-align:left;padding:9px 12px;margin-bottom:2px;background:none;border:none;color:rgba(212,175,55,0.35);font-size:12px;cursor:pointer;border-radius:8px;font-family:var(--font-body);transition:all .2s;border-left:2px solid transparent}
@@ -103,10 +97,8 @@ body{font-family:var(--font-body);background:var(--void);color:#5C3D1E;-webkit-f
 .sidebar-item.active{background:linear-gradient(135deg,rgba(184,134,11,0.1),rgba(205,133,63,0.05));color:var(--purple);border-left-color:var(--purple)}
 .sidebar-item i{width:16px;margin-right:8px;font-size:12px}
 
-/* === CONTENT === */
 .content-area{flex:1;overflow-y:auto;padding:20px;background:transparent}
 
-/* === GLASS CARD === */
 .glass-card{background:var(--void-card);backdrop-filter:blur(12px);border:1px solid var(--border);border-radius:12px;padding:18px;transition:all .3s;position:relative;overflow:hidden}
 .glass-card::before{content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(184,134,11,0.03),transparent);transition:left .6s;pointer-events:none}
 .glass-card:hover::before{left:100%}
@@ -114,13 +106,11 @@ body{font-family:var(--font-body);background:var(--void);color:#5C3D1E;-webkit-f
 .card-title{font-family:var(--font-display);font-size:10px;font-weight:400;letter-spacing:2px;text-transform:uppercase;color:rgba(92,61,30,0.5);margin-bottom:14px;display:flex;align-items:center;gap:8px}
 .card-title i{color:var(--purple);font-size:12px}
 
-/* === DASHBOARD GRID === */
 .dash-grid{display:grid;grid-template-columns:1fr 300px;grid-template-rows:auto 1fr;gap:14px;height:calc(100vh - var(--topbar-h) - 40px - 56px)}
 .dash-3d{grid-row:1/3;min-height:280px;position:relative;border-radius:12px;overflow:hidden;background:linear-gradient(135deg,#0D1B2A,#1A3050)}
 .dash-3d canvas{border-radius:12px}
 .dash-clusters{overflow-y:auto;max-height:100%}
 
-/* === CLUSTER CARD === */
 .cluster-card{background:rgba(255,253,248,0.8);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px;cursor:pointer;transition:all .3s}
 .cluster-card:hover{border-color:var(--border-hover);box-shadow:0 0 15px rgba(184,134,11,0.05);transform:translateY(-1px)}
 .cluster-label{font-family:var(--font-display);font-size:10px;color:var(--purple);font-weight:600;letter-spacing:1px;margin-bottom:4px}
@@ -128,7 +118,6 @@ body{font-family:var(--font-body);background:var(--void);color:#5C3D1E;-webkit-f
 .cluster-bar{height:3px;border-radius:2px;margin-top:6px;background:rgba(184,134,11,0.1);overflow:hidden}
 .cluster-bar-fill{height:100%;border-radius:2px;background:linear-gradient(90deg,var(--cyan),var(--purple));transition:width .5s}
 
-/* === BOTTOM TOOLBAR === */
 .bottom-toolbar{height:56px;display:flex;align-items:center;gap:10px;padding:0 20px;background:rgba(250,245,235,0.8);border-top:1px solid var(--border);flex-shrink:0}
 .toolbar-search{flex:1;max-width:380px;position:relative}
 .toolbar-search i{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--purple);font-size:12px}
@@ -136,7 +125,6 @@ body{font-family:var(--font-body);background:var(--void);color:#5C3D1E;-webkit-f
 .toolbar-search input:focus{border-color:rgba(212,175,55,0.3);box-shadow:0 0 12px rgba(184,134,11,0.08)}
 .toolbar-actions{display:flex;gap:6px;margin-left:auto}
 
-/* === BUTTONS === */
 .btn{background:rgba(184,134,11,0.06);color:rgba(212,175,55,0.6);border:1px solid rgba(212,175,55,0.08);padding:6px 14px;border-radius:6px;font-size:11px;cursor:pointer;transition:all .3s;font-family:var(--font-body);white-space:nowrap}
 .btn:hover{background:rgba(184,134,11,0.12);box-shadow:0 0 15px rgba(184,134,11,0.08)}
 .btn i{margin-right:4px;font-size:10px}
@@ -144,8 +132,8 @@ body{font-family:var(--font-body);background:var(--void);color:#5C3D1E;-webkit-f
 .btn-accent:hover{background:linear-gradient(135deg,rgba(184,134,11,0.25),rgba(205,133,63,0.15));box-shadow:0 0 20px rgba(184,134,11,0.12)}
 .btn-warn{color:var(--gold);border-color:rgba(212,175,55,0.12);background:rgba(212,175,55,0.04)}
 .btn-danger{color:var(--red);border-color:rgba(207,107,107,0.12);background:rgba(207,107,107,0.04)}
+.btn-green{color:var(--green);border-color:rgba(94,184,138,0.12);background:rgba(94,184,138,0.04)}
 
-/* === MEMORIES TABLE === */
 .mem-table{width:100%;border-collapse:separate;border-spacing:0}
 .mem-table th{padding:8px 12px;text-align:left;font-size:9px;font-family:var(--font-display);letter-spacing:1px;color:rgba(92,61,30,0.5);border-bottom:1px solid var(--border);font-weight:400;text-transform:uppercase}
 .mem-table td{padding:10px 12px;font-size:12px;border-bottom:1px solid rgba(212,175,55,0.03);vertical-align:middle}
@@ -162,7 +150,6 @@ body{font-family:var(--font-body);background:var(--void);color:#5C3D1E;-webkit-f
 .page-btn:disabled{opacity:.3;cursor:default}
 .page-info{font-family:var(--font-mono);font-size:10px;color:rgba(92,61,30,0.5)}
 
-/* === TOPOLOGY === */
 .topology-full{position:relative;width:100%;height:calc(100vh - var(--topbar-h) - 40px);border-radius:12px;overflow:hidden;background:linear-gradient(135deg,#FFF8EE,#0d1b30,#FFF8EE);box-shadow:inset 0 0 60px rgba(184,134,11,0.03)}
 .topology-full canvas{border-radius:12px}
 .topo-legend{position:absolute;top:14px;right:14px;background:rgba(248,243,233,0.88);backdrop-filter:blur(15px);padding:12px 16px;border-radius:10px;border:1px solid var(--border);font-size:10px;color:rgba(92,61,30,0.5)}
@@ -171,7 +158,6 @@ body{font-family:var(--font-body);background:var(--void);color:#5C3D1E;-webkit-f
 .topo-info{position:absolute;bottom:14px;left:14px;background:rgba(248,243,233,0.88);backdrop-filter:blur(15px);border-radius:10px;padding:12px 16px;border:1px solid var(--border);font-family:var(--font-mono);font-size:11px;color:#5C3D1E;max-width:300px;display:none}
 .topo-info.visible{display:block}
 
-/* === DREAM / PCNN / SYSTEM === */
 .dream-grid,.pcnn-grid,.sys-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .dream-trigger-btn{width:130px;height:130px;border-radius:50%;background:linear-gradient(135deg,rgba(6,6,24,0.9),rgba(255,248,238,0.95));border:2px solid rgba(184,134,11,0.15);color:var(--purple);font-size:12px;font-family:var(--font-display);cursor:pointer;transition:all .4s;letter-spacing:2px;box-shadow:0 0 20px rgba(184,134,11,0.08);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;margin:0 auto}
 .dream-trigger-btn i{font-size:24px}
@@ -183,7 +169,14 @@ body{font-family:var(--font-body);background:var(--void);color:#5C3D1E;-webkit-f
 .health-icon.ok{background:rgba(94,184,138,0.12);color:var(--green)}
 .health-icon.err{background:rgba(207,107,107,0.12);color:var(--red)}
 
-/* === DIALOG === */
+.panel-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.stat-row{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(212,175,55,0.03);font-size:12px}
+.stat-row .stat-label{color:rgba(92,61,30,0.5)}
+.stat-row .stat-value{color:#5C3D1E;font-weight:500;font-family:var(--font-mono)}
+.stat-big{font-size:32px;font-family:var(--font-display);color:var(--purple);font-weight:800}
+.bar-chart{height:18px;background:rgba(184,134,11,0.08);border-radius:4px;overflow:hidden;margin:4px 0}
+.bar-chart-fill{height:100%;border-radius:4px;background:linear-gradient(90deg,var(--cyan),var(--purple));transition:width .5s}
+
 .dialog-overlay{position:fixed;inset:0;background:rgba(253,248,240,0.7);display:flex;align-items:center;justify-content:center;z-index:1000;backdrop-filter:blur(6px)}
 .dialog-box{background:var(--void-light);border:1px solid var(--border);border-radius:16px;padding:24px;width:500px;max-width:90vw;max-height:80vh;overflow-y:auto}
 .dialog-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
@@ -198,7 +191,6 @@ body{font-family:var(--font-body);background:var(--void);color:#5C3D1E;-webkit-f
 .form-select option{background:#FFF5E1;color:#5C3D1E}
 .form-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
 
-/* === TOAST === */
 .toast-container{position:fixed;top:62px;right:16px;z-index:2000;display:flex;flex-direction:column;gap:6px}
 .toast{padding:10px 16px;border-radius:8px;font-size:12px;animation:toastIn .3s ease-out;display:flex;align-items:center;gap:6px;min-width:260px;backdrop-filter:blur(12px)}
 .toast.success{background:rgba(94,184,138,0.12);border:1px solid rgba(94,184,138,0.2);color:var(--green)}
@@ -206,7 +198,6 @@ body{font-family:var(--font-body);background:var(--void);color:#5C3D1E;-webkit-f
 .toast.info{background:rgba(184,134,11,0.1);border:1px solid rgba(212,175,55,0.2);color:var(--purple)}
 @keyframes toastIn{from{opacity:0;transform:translateX(30px)}to{opacity:1;transform:translateX(0)}}
 
-/* === MISC === */
 .empty-state{text-align:center;padding:50px 20px;color:rgba(92,61,30,0.5)}
 .empty-state i{font-size:40px;color:rgba(184,134,11,0.1);margin-bottom:12px}
 .empty-state p{font-size:13px}
@@ -226,14 +217,29 @@ body{font-family:var(--font-body);background:var(--void);color:#5C3D1E;-webkit-f
 .pcnn-config dt{color:rgba(92,61,30,0.5);font-size:10px;margin-top:6px}
 .pcnn-config dd{color:#3D2A1A;font-weight:500}
 .health-status{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(212,175,55,0.04)}
+.dark-h-tier{padding:8px 12px;border-left:3px solid var(--purple);margin-bottom:6px;background:rgba(184,134,11,0.03);border-radius:0 6px 6px 0;font-size:11px}
+.dark-h-tier .tier-name{font-family:var(--font-display);font-size:9px;color:var(--purple);letter-spacing:1px}
+.dark-h-tier .tier-val{color:rgba(92,61,30,0.7);margin-top:2px}
+.obs-event{padding:6px 10px;border-bottom:1px solid rgba(212,175,55,0.03);font-size:11px}
+.obs-event .ev-time{color:rgba(92,61,30,0.4);font-size:9px;font-family:var(--font-mono)}
+.obs-event .ev-cat{display:inline-block;padding:1px 6px;border-radius:3px;font-size:9px;margin:0 4px}
+.obs-event .ev-cat.error{background:rgba(207,107,107,0.1);color:var(--red)}
+.obs-event .ev-cat.anomaly{background:rgba(212,175,55,0.1);color:var(--gold)}
+.obs-event .ev-cat.system{background:rgba(94,184,138,0.1);color:var(--green)}
+.obs-event .ev-cat.behavior{background:rgba(184,134,11,0.08);color:var(--purple)}
+.reg-layer{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid rgba(212,175,55,0.03);font-size:12px}
+.reg-layer .layer-icon{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;background:rgba(184,134,11,0.06);color:var(--purple)}
+.reg-layer .layer-name{font-weight:500;color:#5C3D1E;flex:1}
+.reg-layer .layer-status{font-family:var(--font-mono);font-size:10px;color:rgba(92,61,30,0.5)}
+.agent-suggestion{padding:10px 12px;border:1px solid rgba(184,134,11,0.08);border-radius:8px;margin-bottom:6px;cursor:pointer;transition:all .2s}
+.agent-suggestion:hover{border-color:var(--border-hover);background:rgba(184,134,11,0.04)}
 
-@media(max-width:768px){.sidebar{display:none}.dash-grid{grid-template-columns:1fr}.top-stats{display:none}.pcnn-grid,.sys-grid,.dream-grid{grid-template-columns:1fr}}
+@media(max-width:768px){.sidebar{display:none}.dash-grid{grid-template-columns:1fr}.top-stats{display:none}.pcnn-grid,.sys-grid,.dream-grid,.panel-grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
 <div id="app">
 
-<!-- TOAST -->
 <div class="toast-container">
   <div v-for="(t,i) in toasts" :key="i" :class="['toast',t.type]">
     <i :class="t.type==='success'?'fas fa-check-circle':t.type==='error'?'fas fa-exclamation-circle':'fas fa-info-circle'"></i>
@@ -241,29 +247,27 @@ body{font-family:var(--font-body);background:var(--void);color:#5C3D1E;-webkit-f
   </div>
 </div>
 
-<!-- LOGIN -->
 <div v-if="!authenticated" :class="['login-page',loginTransitioning?'login-transition':'']">
   <div class="login-card">
     <h1 class="login-title"><span class="gradient-text">TETRAMEM-XL</span></h1>
     <div class="login-subtitle">四面体记忆蜂巢 · Honeycomb Memory</div>
     <input class="login-input" v-model="loginForm.username" placeholder="用户名" @keyup.enter="doLogin">
     <input class="login-input" type="password" v-model="loginForm.password" placeholder="密钥" @keyup.enter="doLogin">
-    <button :class="['login-btn',loggingIn?'loading':'']" @click="doLogin">{{loggingIn?'INITIATING...':'ENTER HIVE'}}</button>
+    <button :class="['login-btn',loggingIn?'loading':'']" @click="doLogin">{{loggingIn?'初始化中...':'进入蜂巢'}}</button>
     <div class="login-error">{{loginError}}</div>
   </div>
-  <div class="login-version">TetraMem-XL v8.0 · BCC Lattice Honeycomb</div>
+  <div class="login-version">TetraMem-XL v8.0 · BCC 晶格蜂巢记忆系统</div>
 </div>
 
-<!-- MAIN APP -->
 <div v-else :class="['app-layout','conic-bg','app-enter']">
   <header class="top-bar">
     <div class="top-logo">TETRA<span>MEM</span></div>
-    <span class="top-version">v8.0</span>
+    <span class="top-version">v8.0 脉冲共振</span>
     <div class="top-stats">
-      <div><b>{{stats.total_nodes||0}}</b>Nodes</div>
-      <div><b>{{stats.occupied_nodes||0}}</b>Memories</div>
-      <div><b>{{stats.face_edges||0}}</b>Pulses</div>
-      <div><b>{{stats.bridge_count||0}}</b>Bridges</div>
+      <div><b>{{stats.total_nodes||0}}</b>节点</div>
+      <div><b>{{stats.occupied_nodes||0}}</b>记忆</div>
+      <div><b>{{stats.face_edges||0}}</b>脉冲</div>
+      <div><b>{{stats.bridge_count||0}}</b>桥接</div>
       <div class="pulse-dot" :class="{error:!healthOk}"></div>
     </div>
     <div class="top-user"><i class="fas fa-user-shield"></i><span>{{currentUser}}</span><span class="top-logout" @click="doLogout"><i class="fas fa-sign-out-alt"></i></span></div>
@@ -271,56 +275,59 @@ body{font-family:var(--font-body);background:var(--void);color:#5C3D1E;-webkit-f
 
   <div class="main-area">
     <nav class="sidebar">
-      <div class="sidebar-section">Vision</div>
-      <div :class="['sidebar-item',currentPage==='topology'?'active':'']" @click="navigateTo('topology')"><i class="fas fa-globe"></i>3D Topology</div>
-      <div :class="['sidebar-item',currentPage==='dashboard'?'active':'']" @click="navigateTo('dashboard')"><i class="fas fa-th-large"></i>Dashboard</div>
-      <div :class="['sidebar-item',currentPage==='pcnn'?'active':'']" @click="navigateTo('pcnn')"><i class="fas fa-microchip"></i>PCNN Engine</div>
-      <div class="sidebar-section">Data</div>
-      <div :class="['sidebar-item',currentPage==='memories'?'active':'']" @click="navigateTo('memories')"><i class="fas fa-database"></i>Memories</div>
-      <div :class="['sidebar-item',currentPage==='tension'?'active':'']" @click="navigateTo('tension')"><i class="fas fa-project-diagram"></i>Tension Map</div>
-      <div :class="['sidebar-item',currentPage==='hebbian'?'active':'']" @click="navigateTo('hebbian')"><i class="fas fa-link"></i>Hebbian Paths</div>
-      <div class="sidebar-section">Pulse</div>
-      <div :class="['sidebar-item',currentPage==='phase'?'active':'']" @click="navigateTo('phase')"><i class="fas fa-wave-square"></i>Phase Detect</div>
-      <div :class="['sidebar-item',currentPage==='cascade'?'active':'']" @click="navigateTo('cascade')"><i class="fas fa-bolt"></i>Cascade</div>
-      <div :class="['sidebar-item',currentPage==='dream'?'active':'']" @click="navigateTo('dream')"><i class="fas fa-moon"></i>Dream Engine</div>
-      <div class="sidebar-section">System</div>
-      <div :class="['sidebar-item',currentPage==='system'?'active':'']" @click="navigateTo('system')"><i class="fas fa-cog"></i>Config</div>
-      <div :class="['sidebar-item',currentPage==='backups'?'active':'']" @click="navigateTo('backups')"><i class="fas fa-archive"></i>Backups</div>
-      <div :class="['sidebar-item',currentPage==='audit'?'active':'']" @click="navigateTo('audit')"><i class="fas fa-scroll"></i>Audit Log</div>
+      <div class="sidebar-section">视图</div>
+      <div :class="['sidebar-item',currentPage==='topology'?'active':'']" @click="navigateTo('topology')"><i class="fas fa-globe"></i>3D 拓扑</div>
+      <div :class="['sidebar-item',currentPage==='dashboard'?'active':'']" @click="navigateTo('dashboard')"><i class="fas fa-th-large"></i>总览面板</div>
+      <div :class="['sidebar-item',currentPage==='pcnn'?'active':'']" @click="navigateTo('pcnn')"><i class="fas fa-microchip"></i>PCNN 引擎</div>
+      <div class="sidebar-section">数据</div>
+      <div :class="['sidebar-item',currentPage==='memories'?'active':'']" @click="navigateTo('memories')"><i class="fas fa-database"></i>记忆浏览</div>
+      <div :class="['sidebar-item',currentPage==='tension'?'active':'']" @click="navigateTo('tension')"><i class="fas fa-project-diagram"></i>张力图谱</div>
+      <div :class="['sidebar-item',currentPage==='hebbian'?'active':'']" @click="navigateTo('hebbian')"><i class="fas fa-link"></i>赫布路径</div>
+      <div class="sidebar-section">脉冲</div>
+      <div :class="['sidebar-item',currentPage==='phase'?'active':'']" @click="navigateTo('phase')"><i class="fas fa-wave-square"></i>相变检测</div>
+      <div :class="['sidebar-item',currentPage==='cascade'?'active':'']" @click="navigateTo('cascade')"><i class="fas fa-bolt"></i>级联脉冲</div>
+      <div :class="['sidebar-item',currentPage==='dream'?'active':'']" @click="navigateTo('dream')"><i class="fas fa-moon"></i>梦境引擎</div>
+      <div class="sidebar-section">高级</div>
+      <div :class="['sidebar-item',currentPage==='darkplane'?'active':'']" @click="navigateTo('darkplane')"><i class="fas fa-ghost"></i>暗位面</div>
+      <div :class="['sidebar-item',currentPage==='observer'?'active':'']" @click="navigateTo('observer')"><i class="fas fa-eye"></i>观察者</div>
+      <div :class="['sidebar-item',currentPage==='regulation'?'active':'']" @click="navigateTo('regulation')"><i class="fas fa-balance-scale"></i>自适应调节</div>
+      <div :class="['sidebar-item',currentPage==='agent'?'active':'']" @click="navigateTo('agent')"><i class="fas fa-robot"></i>Agent 驱动</div>
+      <div class="sidebar-section">系统</div>
+      <div :class="['sidebar-item',currentPage==='system'?'active':'']" @click="navigateTo('system')"><i class="fas fa-cog"></i>参数配置</div>
+      <div :class="['sidebar-item',currentPage==='backups'?'active':'']" @click="navigateTo('backups')"><i class="fas fa-archive"></i>备份管理</div>
+      <div :class="['sidebar-item',currentPage==='audit'?'active':'']" @click="navigateTo('audit')"><i class="fas fa-scroll"></i>审计日志</div>
     </nav>
 
     <main class="content-area">
 
-      <!-- DASHBOARD -->
       <div v-if="currentPage==='dashboard'" class="fade-in">
         <div class="dash-grid">
           <div class="glass-card dash-3d">
-            <div class="card-title"><i class="fas fa-globe"></i>Neural Topology</div>
+            <div class="card-title"><i class="fas fa-globe"></i>神经拓扑</div>
             <div ref="dashScene" style="width:100%;height:calc(100% - 36px);min-height:240px;border-radius:10px;overflow:hidden;background:linear-gradient(135deg,#0D1B2A,#1A3050)"></div>
           </div>
           <div class="glass-card dash-clusters">
-            <div class="card-title"><i class="fas fa-layer-group"></i>Memory Clusters</div>
-            <div v-if="clusters.length===0" class="empty-state" style="padding:24px"><p>No clusters loaded</p></div>
+            <div class="card-title"><i class="fas fa-layer-group"></i>记忆集群</div>
+            <div v-if="clusters.length===0" class="empty-state" style="padding:24px"><p>暂无集群数据</p></div>
             <div v-for="(c,ci) in clusters" :key="ci" class="cluster-card" @click="navigateTo('memories')">
-              <div class="cluster-label">{{c.label||'Cluster '+(ci+1)}}</div>
-              <div class="cluster-meta">{{c.count||0}} memories · avg w: {{(c.avg_weight||0).toFixed(2)}}</div>
+              <div class="cluster-label">{{c.label||'集群 '+(ci+1)}}</div>
+              <div class="cluster-meta">{{c.count||0}} 条记忆 · 平均权重: {{(c.avg_weight||0).toFixed(2)}}</div>
               <div class="cluster-bar"><div class="cluster-bar-fill" :style="{width:Math.min(100,(c.avg_activation||0)*100)+'%'}"></div></div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- MEMORIES -->
       <div v-if="currentPage==='memories'" class="fade-in">
         <div class="glass-card">
-          <div class="card-title"><i class="fas fa-database"></i>Memory Browser <span style="margin-left:auto;font-size:11px;font-weight:400;color:rgba(92,61,30,0.5)">{{browseTotal}} total</span><button class="btn btn-accent" style="margin-left:10px" @click="showStoreDialog=true"><i class="fas fa-plus"></i>Store</button></div>
+          <div class="card-title"><i class="fas fa-database"></i>记忆浏览器 <span style="margin-left:auto;font-size:11px;font-weight:400;color:rgba(92,61,30,0.5)">共 {{browseTotal}} 条</span><button class="btn btn-accent" style="margin-left:10px" @click="showStoreDialog=true"><i class="fas fa-plus"></i>存储</button></div>
           <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
-            <input class="form-input" style="max-width:180px" v-model="memFilter.label" placeholder="Filter by label..." @input="debouncedBrowse">
-            <select class="form-select" style="max-width:140px" v-model="memFilter.sort" @change="fetchBrowse"><option value="newest">Newest</option><option value="oldest">Oldest</option><option value="weight_desc">Weight ↓</option><option value="weight_asc">Weight ↑</option><option value="activation_desc">Activation ↓</option></select>
+            <input class="form-input" style="max-width:180px" v-model="memFilter.label" placeholder="按标签筛选..." @input="debouncedBrowse">
+            <select class="form-select" style="max-width:140px" v-model="memFilter.sort" @change="fetchBrowse"><option value="newest">最新优先</option><option value="oldest">最旧优先</option><option value="weight_desc">权重 ↓</option><option value="weight_asc">权重 ↑</option><option value="activation_desc">激活值 ↓</option></select>
           </div>
-          <div v-if="browseLoading" class="loading-overlay"><div class="spinner"></div>Loading...</div>
-          <table v-else class="mem-table"><thead><tr><th>ID</th><th>Content</th><th>Labels</th><th>Weight</th><th>Activation</th><th>Created</th><th></th></tr></thead><tbody>
-            <tr v-if="browseItems.length===0"><td colspan="7" class="empty-state" style="padding:24px">No memories found</td></tr>
+          <div v-if="browseLoading" class="loading-overlay"><div class="spinner"></div>加载中...</div>
+          <table v-else class="mem-table"><thead><tr><th>ID</th><th>内容</th><th>标签</th><th>权重</th><th>激活值</th><th>创建时间</th><th></th></tr></thead><tbody>
+            <tr v-if="browseItems.length===0"><td colspan="7" class="empty-state" style="padding:24px">暂无记忆</td></tr>
             <tr v-for="m in browseItems" :key="m.id" @click="viewMemoryDetail(m)">
               <td style="font-family:var(--font-mono);font-size:10px;color:rgba(92,61,30,0.5)">{{m.id.substring(0,8)}}</td>
               <td class="mem-content">{{m.content}}</td>
@@ -332,185 +339,259 @@ body{font-family:var(--font-body);background:var(--void);color:#5C3D1E;-webkit-f
             </tr>
           </tbody></table>
           <div class="page-controls">
-            <button class="page-btn" :disabled="browseOffset===0" @click="browseOffset=Math.max(0,browseOffset-browseLimit);fetchBrowse()"><i class="fas fa-chevron-left"></i> Prev</button>
-            <span class="page-info">Page {{Math.floor(browseOffset/browseLimit)+1}} of {{Math.ceil(browseTotal/browseLimit)||1}}</span>
-            <button class="page-btn" :disabled="browseOffset+browseLimit>=browseTotal" @click="browseOffset+=browseLimit;fetchBrowse()">Next <i class="fas fa-chevron-right"></i></button>
+            <button class="page-btn" :disabled="browseOffset===0" @click="browseOffset=Math.max(0,browseOffset-browseLimit);fetchBrowse()"><i class="fas fa-chevron-left"></i> 上一页</button>
+            <span class="page-info">第 {{Math.floor(browseOffset/browseLimit)+1}} / {{Math.ceil(browseTotal/browseLimit)||1}} 页</span>
+            <button class="page-btn" :disabled="browseOffset+browseLimit>=browseTotal" @click="browseOffset+=browseLimit;fetchBrowse()">下一页 <i class="fas fa-chevron-right"></i></button>
           </div>
         </div>
       </div>
 
-      <!-- DREAM -->
       <div v-if="currentPage==='dream'" class="fade-in">
         <div class="dream-grid">
           <div class="glass-card">
-            <div class="card-title"><i class="fas fa-moon"></i>Dream Cycle</div>
+            <div class="card-title"><i class="fas fa-moon"></i>梦境周期</div>
             <div style="text-align:center;padding:30px">
-              <button :class="['dream-trigger-btn',dreamRunning?'running':'']" @click="triggerDream"><i class="fas fa-moon"></i><span>{{dreamRunning?'DREAMING':'DREAM'}}</span></button>
-              <p style="margin-top:14px;color:rgba(92,61,30,0.5);font-size:12px">Initiate a creative dream cycle to discover hidden patterns</p>
+              <button :class="['dream-trigger-btn',dreamRunning?'running':'']" @click="triggerDream"><i class="fas fa-moon"></i><span>{{dreamRunning?'梦境中...':'梦境'}}</span></button>
+              <p style="margin-top:14px;color:rgba(92,61,30,0.5);font-size:12px">启动创意梦境周期，发现隐藏模式</p>
             </div>
             <div v-if="dreamResult" class="glass-card" style="margin-top:14px;background:rgba(255,253,248,0.6)">
-              <div class="card-title"><i class="fas fa-lightbulb"></i>Dream Insight</div>
+              <div class="card-title"><i class="fas fa-lightbulb"></i>梦境洞察</div>
               <pre style="font-family:var(--font-mono);font-size:11px;white-space:pre-wrap;color:#5C3D1E">{{JSON.stringify(dreamResult,null,2)}}</pre>
             </div>
           </div>
           <div>
-            <div class="glass-card" style="margin-bottom:14px"><div class="card-title"><i class="fas fa-chart-line"></i>Dream Quality</div><div class="chart-container"><canvas ref="dreamChart"></canvas></div></div>
-            <div class="glass-card"><div class="card-title"><i class="fas fa-history"></i>Dream History</div><div style="max-height:360px;overflow-y:auto"><div v-if="dreamHistory.length===0" class="empty-state" style="padding:16px"><p>No dream cycles recorded</p></div><div v-for="(d,di) in dreamHistory" :key="di" style="padding:8px 10px;border-bottom:1px solid rgba(212,175,55,0.03);font-size:11px;cursor:pointer"><div style="font-family:var(--font-mono);font-size:10px;color:rgba(92,61,30,0.5)">{{d.time}}</div><div style="color:#5C3D1E">{{d.summary}}</div></div></div></div>
+            <div class="glass-card" style="margin-bottom:14px"><div class="card-title"><i class="fas fa-chart-line"></i>梦境质量</div><div class="chart-container"><canvas ref="dreamChart"></canvas></div></div>
+            <div class="glass-card"><div class="card-title"><i class="fas fa-history"></i>梦境历史</div><div style="max-height:360px;overflow-y:auto"><div v-if="dreamHistory.length===0" class="empty-state" style="padding:16px"><p>暂无梦境记录</p></div><div v-for="(d,di) in dreamHistory" :key="di" style="padding:8px 10px;border-bottom:1px solid rgba(212,175,55,0.03);font-size:11px;cursor:pointer"><div style="font-family:var(--font-mono);font-size:10px;color:rgba(92,61,30,0.5)">{{d.time}}</div><div style="color:#5C3D1E">{{d.summary}}</div></div></div></div>
           </div>
         </div>
       </div>
 
-      <!-- PCNN -->
       <div v-if="currentPage==='pcnn'" class="fade-in">
         <div class="pcnn-grid">
-          <div class="glass-card"><div class="card-title"><i class="fas fa-microchip"></i>PCNN Configuration</div><div v-if="pcnnLoading" class="loading-overlay" style="padding:16px"><div class="spinner"></div></div><dl v-else class="pcnn-config"><template v-for="(v,k) in pcnnConfig" :key="k"><dt>{{k}}</dt><dd>{{typeof v==='object'?JSON.stringify(v):v}}</dd></template></dl></div>
-          <div class="glass-card"><div class="card-title"><i class="fas fa-chart-pie"></i>Pulse Distribution</div><div class="chart-container"><canvas ref="pcnnChart"></canvas></div></div>
+          <div class="glass-card"><div class="card-title"><i class="fas fa-microchip"></i>PCNN 配置</div><div v-if="pcnnLoading" class="loading-overlay" style="padding:16px"><div class="spinner"></div></div><dl v-else class="pcnn-config"><template v-for="(v,k) in pcnnConfig" :key="k"><dt>{{k}}</dt><dd>{{typeof v==='object'?JSON.stringify(v):v}}</dd></template></dl></div>
+          <div class="glass-card"><div class="card-title"><i class="fas fa-chart-pie"></i>脉冲分布</div><div class="chart-container"><canvas ref="pcnnChart"></canvas></div></div>
           <div class="glass-card">
-            <div class="card-title"><i class="fas fa-bolt"></i>Cascade Control</div>
-            <p style="font-size:12px;color:rgba(92,61,30,0.5);margin-bottom:14px">Trigger a pulse cascade through the neural network.</p>
-            <button class="btn btn-accent" style="width:100%" @click="triggerCascade" :disabled="cascadeRunning"><i class="fas fa-bolt"></i> {{cascadeRunning?'Cascading...':'Trigger Cascade'}}</button>
+            <div class="card-title"><i class="fas fa-bolt"></i>级联控制</div>
+            <p style="font-size:12px;color:rgba(92,61,30,0.5);margin-bottom:14px">触发全网脉冲级联。</p>
+            <button class="btn btn-accent" style="width:100%" @click="triggerCascade" :disabled="cascadeRunning"><i class="fas fa-bolt"></i> {{cascadeRunning?'级联中...':'触发级联'}}</button>
             <div v-if="cascadeResult" style="margin-top:12px"><pre style="font-family:var(--font-mono);font-size:10px;white-space:pre-wrap;background:rgba(255,253,248,0.6);padding:10px;border-radius:8px;color:#5C3D1E">{{JSON.stringify(cascadeResult,null,2)}}</pre></div>
-            <div style="margin-top:16px"><div class="card-title" style="font-size:9px"><i class="fas fa-heartbeat"></i>Engine Status</div><div style="font-size:11px;color:rgba(92,61,30,0.5)"><div>Status: <span :style="{color:healthOk?'var(--green)':'var(--red)'}">{{healthOk?'Operational':'Degraded'}}</span></div><div>Uptime: {{uptimeStr}}</div><div>Version: {{healthData.version||'N/A'}}</div></div></div>
+            <div style="margin-top:16px"><div class="card-title" style="font-size:9px"><i class="fas fa-heartbeat"></i>引擎状态</div><div style="font-size:11px;color:rgba(92,61,30,0.5)"><div>状态: <span :style="{color:healthOk?'var(--green)':'var(--red)'}">{{healthOk?'运行中':'异常'}}</span></div><div>运行时间: {{uptimeStr}}</div><div>版本: {{healthData.version||'N/A'}}</div></div></div>
           </div>
         </div>
       </div>
 
-      <!-- 3D TOPOLOGY -->
       <div v-if="currentPage==='topology'" class="fade-in">
         <div class="topology-full">
           <div ref="topoScene" style="width:100%;height:100%"></div>
           <div class="topo-legend">
-            <div style="font-family:var(--font-display);font-size:8px;font-weight:600;color:rgba(92,61,30,0.5);margin-bottom:4px;letter-spacing:2px">WEIGHT LEGEND</div>
-            <div class="legend-item"><div class="legend-dot" style="background:#CF6B6B;color:#CF6B6B"></div>High (w > 0.7)</div>
-            <div class="legend-item"><div class="legend-dot" style="background:#E5A443;color:#E5A443"></div>Medium (0.3-0.7)</div>
-            <div class="legend-item"><div class="legend-dot" style="background:#D4AF37;color:#D4AF37"></div>Low (w ≤ 0.3)</div>
-            <div style="margin-top:6px;font-size:10px;color:rgba(92,61,30,0.5)">Nodes: {{sceneNodesCount}}</div>
+            <div style="font-family:var(--font-display);font-size:8px;font-weight:600;color:rgba(92,61,30,0.5);margin-bottom:4px;letter-spacing:2px">权重图例</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#CF6B6B;color:#CF6B6B"></div>高 (w > 0.7)</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#E5A443;color:#E5A443"></div>中 (0.3-0.7)</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#D4AF37;color:#D4AF37"></div>低 (w ≤ 0.3)</div>
+            <div style="margin-top:6px;font-size:10px;color:rgba(92,61,30,0.5)">节点: {{sceneNodesCount}}</div>
           </div>
-          <div ref="topoInfo" class="topo-info"><div v-if="selectedNode"><div style="font-family:var(--font-display);font-weight:600;color:var(--purple);margin-bottom:4px;font-size:9px">Node {{selectedNode.id.substring(0,8)}}</div><div>Position: ({{selectedNode.pos.map(p=>p.toFixed(2)).join(', ')}})</div><div>Weight: {{(selectedNode.w||0).toFixed(4)}}</div></div></div>
+          <div ref="topoInfo" class="topo-info"><div v-if="selectedNode"><div style="font-family:var(--font-display);font-weight:600;color:var(--purple);margin-bottom:4px;font-size:9px">节点 {{selectedNode.id.substring(0,8)}}</div><div>位置: ({{selectedNode.pos.map(p=>p.toFixed(2)).join(', ')}})</div><div>权重: {{(selectedNode.w||0).toFixed(4)}}</div></div></div>
         </div>
       </div>
 
-      <!-- TENSION -->
       <div v-if="currentPage==='tension'" class="fade-in">
-        <div class="glass-card"><div class="card-title"><i class="fas fa-project-diagram"></i>Spatial Autocorrelation</div>
-          <div v-if="spatialLoading" class="loading-overlay"><div class="spinner"></div>Analyzing...</div>
-          <div v-else><div class="sys-grid"><div><div style="font-size:40px;font-family:var(--font-display);color:var(--purple);font-weight:800">{{(spatialData.morans_i||0).toFixed(4)}}</div><div style="font-size:13px;color:rgba(92,61,30,0.5);margin-top:4px">Moran's I Index</div></div><div><div style="font-size:14px;color:#5C3D1E;margin-bottom:6px">{{spatialData.interpretation||'No data'}}</div><p style="font-size:12px;color:rgba(92,61,30,0.5)">Moran's I measures spatial autocorrelation. +1 clustering, -1 dispersion, 0 random.</p></div></div></div>
+        <div class="glass-card"><div class="card-title"><i class="fas fa-project-diagram"></i>空间自相关</div>
+          <div v-if="spatialLoading" class="loading-overlay"><div class="spinner"></div>分析中...</div>
+          <div v-else><div class="sys-grid"><div><div class="stat-big">{{(spatialData.morans_i||0).toFixed(4)}}</div><div style="font-size:13px;color:rgba(92,61,30,0.5);margin-top:4px">Moran's I 指数</div></div><div><div style="font-size:14px;color:#5C3D1E;margin-bottom:6px">{{spatialData.interpretation||'暂无数据'}}</div><p style="font-size:12px;color:rgba(92,61,30,0.5)">Moran's I 衡量空间自相关。+1 聚集，-1 离散，0 随机。</p></div></div></div>
         </div>
       </div>
 
-      <!-- HEBBIAN -->
-      <div v-if="currentPage==='hebbian'" class="fade-in"><div class="glass-card"><div class="card-title"><i class="fas fa-link"></i>Hebbian Paths</div><p style="color:rgba(92,61,30,0.5);font-size:12px">Visualize learned associations through Hebbian strengthening.</p><button class="btn btn-accent" style="margin-top:12px" @click="fetchStats"><i class="fas fa-sync-alt"></i>Refresh</button></div></div>
+      <div v-if="currentPage==='hebbian'" class="fade-in"><div class="glass-card"><div class="card-title"><i class="fas fa-link"></i>赫布路径</div><p style="color:rgba(92,61,30,0.5);font-size:12px">通过赫布强化可视化学习到的关联。</p><button class="btn btn-accent" style="margin-top:12px" @click="fetchStats"><i class="fas fa-sync-alt"></i>刷新</button></div></div>
 
-      <!-- PHASE -->
-      <div v-if="currentPage==='phase'" class="fade-in"><div class="glass-card"><div class="card-title"><i class="fas fa-wave-square"></i>Phase Detection</div><p style="color:rgba(92,61,30,0.5);font-size:12px">Monitor oscillation phases across the network.</p><button class="btn btn-accent" style="margin-top:12px" @click="triggerPhaseShift"><i class="fas fa-random"></i>Phase Shift</button><div v-if="phaseResult" style="margin-top:12px"><pre style="font-family:var(--font-mono);font-size:10px;white-space:pre-wrap;background:rgba(255,253,248,0.6);padding:10px;border-radius:8px;color:#5C3D1E">{{JSON.stringify(phaseResult,null,2)}}</pre></div></div></div>
+      <div v-if="currentPage==='phase'" class="fade-in"><div class="glass-card"><div class="card-title"><i class="fas fa-wave-square"></i>相变检测</div><p style="color:rgba(92,61,30,0.5);font-size:12px">监控全网络振荡相位。</p><button class="btn btn-accent" style="margin-top:12px" @click="triggerPhaseShift"><i class="fas fa-random"></i>触发相变</button><div v-if="phaseResult" style="margin-top:12px"><pre style="font-family:var(--font-mono);font-size:10px;white-space:pre-wrap;background:rgba(255,253,248,0.6);padding:10px;border-radius:8px;color:#5C3D1E">{{JSON.stringify(phaseResult,null,2)}}</pre></div></div></div>
 
-      <!-- CASCADE -->
-      <div v-if="currentPage==='cascade'" class="fade-in"><div class="glass-card"><div class="card-title"><i class="fas fa-bolt"></i>Cascade Control</div><p style="color:rgba(92,61,30,0.5);font-size:12px;margin-bottom:12px">Manually trigger a network-wide cascade event.</p><button class="btn btn-accent" @click="triggerCascade" :disabled="cascadeRunning"><i class="fas fa-bolt"></i> {{cascadeRunning?'Running...':'Trigger Cascade'}}</button><div v-if="cascadeResult" style="margin-top:12px"><pre style="font-family:var(--font-mono);font-size:10px;white-space:pre-wrap;background:rgba(255,253,248,0.6);padding:10px;border-radius:8px;max-height:380px;overflow-y:auto;color:#5C3D1E">{{JSON.stringify(cascadeResult,null,2)}}</pre></div></div></div>
+      <div v-if="currentPage==='cascade'" class="fade-in"><div class="glass-card"><div class="card-title"><i class="fas fa-bolt"></i>级联控制</div><p style="color:rgba(92,61,30,0.5);font-size:12px;margin-bottom:12px">手动触发全网级联事件。</p><button class="btn btn-accent" @click="triggerCascade" :disabled="cascadeRunning"><i class="fas fa-bolt"></i> {{cascadeRunning?'运行中...':'触发级联'}}</button><div v-if="cascadeResult" style="margin-top:12px"><pre style="font-family:var(--font-mono);font-size:10px;white-space:pre-wrap;background:rgba(255,253,248,0.6);padding:10px;border-radius:8px;max-height:380px;overflow-y:auto;color:#5C3D1E">{{JSON.stringify(cascadeResult,null,2)}}</pre></div></div></div>
 
-      <!-- SYSTEM -->
+      <!-- DARK PLANE -->
+      <div v-if="currentPage==='darkplane'" class="fade-in">
+        <div class="panel-grid">
+          <div class="glass-card">
+            <div class="card-title"><i class="fas fa-ghost"></i>暗位面引擎</div>
+            <p style="font-size:12px;color:rgba(92,61,30,0.5);margin-bottom:12px">热力学能量景观 H₀~H₆，驱动记忆系统自发涌现与自整合。</p>
+            <div style="margin-bottom:14px"><div class="stat-row"><span class="stat-label">能量景观状态</span><span class="stat-value">{{darkPlaneData.status||'待初始化'}}</span></div><div class="stat-row"><span class="stat-label">PH 采样点</span><span class="stat-value">{{darkPlaneData.ph_points||0}}</span></div><div class="stat-row"><span class="stat-label">ODE 积分步数</span><span class="stat-value">{{darkPlaneData.ode_steps||0}}</span></div><div class="stat-row"><span class="stat-label">空洞通道</span><span class="stat-value">{{darkPlaneData.void_channels||0}}</span></div></div>
+            <button class="btn btn-accent" style="width:100%" @click="triggerDarkFlow"><i class="fas fa-water"></i>触发暗位面流</button>
+          </div>
+          <div class="glass-card">
+            <div class="card-title"><i class="fas fa-layer-group"></i>六层层级 H₀ ~ H₆</div>
+            <div v-if="!darkPlaneData.tiers||darkPlaneData.tiers.length===0" class="empty-state" style="padding:24px"><p>运行暗位面流后显示层级数据</p></div>
+            <div v-for="(t,ti) in (darkPlaneData.tiers||[])" :key="ti" class="dark-h-tier">
+              <div class="tier-name">H{{ti}} — {{['表面','浅层','深层','深渊','ODE·H₃','ODE·H₄','ODE·H₅','ODE·H₆'][ti]||'层级 '+ti}}</div>
+              <div class="tier-val">能量: {{(t.energy||0).toFixed(4)}} · 熵: {{(t.entropy||0).toFixed(4)}}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- OBSERVER -->
+      <div v-if="currentPage==='observer'" class="fade-in">
+        <div class="panel-grid">
+          <div class="glass-card">
+            <div class="card-title"><i class="fas fa-eye"></i>运行观察者</div>
+            <p style="font-size:12px;color:rgba(92,61,30,0.5);margin-bottom:12px">自省观察层 — 系统记忆自身运行轨迹，蒸馏为低权重自省记忆。</p>
+            <div style="margin-bottom:14px"><div class="stat-row"><span class="stat-label">启用状态</span><span class="stat-value" :style="{color:observerData.enabled?'var(--green)':'var(--red)'}">{{observerData.enabled?'已启用':'已禁用'}}</span></div><div class="stat-row"><span class="stat-label">已存储记忆</span><span class="stat-value">{{observerData.memories_stored||0}}</span></div><div class="stat-row"><span class="stat-label">已处理事件</span><span class="stat-value">{{observerData.events_processed||0}}</span></div><div class="stat-row"><span class="stat-label">循环丢弃</span><span class="stat-value">{{observerData.events_dropped_loop||0}}</span></div><div class="stat-row"><span class="stat-label">存储速率</span><span class="stat-value">{{observerData.current_rate||0}} / 分钟</span></div></div>
+            <div style="display:flex;gap:8px"><button class="btn btn-green" @click="toggleObserver(true)"><i class="fas fa-play"></i>启用</button><button class="btn btn-warn" @click="toggleObserver(false)"><i class="fas fa-pause"></i>禁用</button><button class="btn btn-accent" @click="flushObserver"><i class="fas fa-save"></i>立即刷新</button></div>
+          </div>
+          <div class="glass-card">
+            <div class="card-title"><i class="fas fa-stream"></i>事件流 <button class="btn" style="margin-left:auto" @click="fetchObserverStats"><i class="fas fa-sync-alt"></i>刷新</button></div>
+            <div style="max-height:400px;overflow-y:auto"><div v-if="observerData.recent_events&&observerData.recent_events.length===0" class="empty-state" style="padding:24px"><p>暂无观察事件</p></div><div v-for="(ev,ei) in (observerData.recent_events||[])" :key="ei" class="obs-event"><div class="ev-time">{{formatDate(ev.timestamp)}}</div><span :class="['ev-cat',ev.category||'system']">{{ev.category||'system'}}</span><span style="color:#5C3D1E;font-size:11px">{{ev.message||ev.summary||''}}</span></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SELF-REGULATION -->
+      <div v-if="currentPage==='regulation'" class="fade-in">
+        <div class="panel-grid">
+          <div class="glass-card">
+            <div class="card-title"><i class="fas fa-balance-scale"></i>六层自适应调节</div>
+            <p style="font-size:12px;color:rgba(92,61,30,0.5);margin-bottom:12px">PID + 昼夜节律 + 自主神经 + 免疫 + 内分泌 + 应激反应。</p>
+            <div v-if="!regulationData.layers||regulationData.layers.length===0" class="empty-state" style="padding:24px"><p>运行调节触发后显示数据</p></div>
+            <div v-for="(l,li) in (regulationData.layers||[])" :key="li" class="reg-layer">
+              <div class="layer-icon"><i :class="l.icon||'fas fa-circle'"></i></div>
+              <div class="layer-name">{{l.name||'层级 '+(li+1)}}</div>
+              <div class="layer-status">{{l.status||'--'}} <span v-if="l.value">({{(l.value||0).toFixed(3)}})</span></div>
+            </div>
+          </div>
+          <div class="glass-card">
+            <div class="card-title"><i class="fas fa-sliders-h"></i>调节控制</div>
+            <p style="font-size:12px;color:rgba(92,61,30,0.5);margin-bottom:14px">手动触发六层生理调节周期。</p>
+            <button class="btn btn-accent" style="width:100%;margin-bottom:12px" @click="triggerRegulation"><i class="fas fa-play"></i>触发调节</button>
+            <div v-if="regulationData.result"><pre style="font-family:var(--font-mono);font-size:10px;white-space:pre-wrap;background:rgba(255,253,248,0.6);padding:10px;border-radius:8px;max-height:300px;overflow-y:auto;color:#5C3D1E">{{JSON.stringify(regulationData.result,null,2)}}</pre></div>
+            <div style="margin-top:14px"><div class="card-title" style="font-size:9px"><i class="fas fa-info-circle"></i>说明</div><p style="font-size:11px;color:rgba(92,61,30,0.5)">L1 PID稳态 · L2 昼夜节律 · L3 自主神经 · L4 免疫防御 · L5 内分泌代谢 · L6 应激反应</p></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- AGENT LOOP -->
+      <div v-if="currentPage==='agent'" class="fade-in">
+        <div class="panel-grid">
+          <div class="glass-card">
+            <div class="card-title"><i class="fas fa-robot"></i>Agent 驱动 — 主动感知与行动</div>
+            <p style="font-size:12px;color:rgba(92,61,30,0.5);margin-bottom:12px">记忆系统主动感知状态、发现问题、建议行动、自动执行。</p>
+            <div style="margin-bottom:14px"><div class="stat-row"><span class="stat-label">记忆总量</span><span class="stat-value">{{stats.occupied_nodes||0}}</span></div><div class="stat-row"><span class="stat-label">脉冲引擎</span><span class="stat-value" :style="{color:healthOk?'var(--green)':'var(--red)'}">{{healthOk?'运行中':'已停止'}}</span></div><div class="stat-row"><span class="stat-label">结晶通路</span><span class="stat-value">{{stats.crystallized_paths||0}}</span></div><div class="stat-row"><span class="stat-label">反馈总数</span><span class="stat-value">{{agentData.feedback_count||0}}</span></div><div class="stat-row"><span class="stat-label">正面率</span><span class="stat-value">{{((agentData.positive_rate||0)*100).toFixed(1)}}%</span></div></div>
+            <div class="card-title" style="font-size:9px"><i class="fas fa-lightbulb"></i>系统主动建议</div>
+            <div v-if="!agentData.suggestions||agentData.suggestions.length===0" style="font-size:12px;color:rgba(92,61,30,0.5);padding:8px">系统状态良好，暂无紧急建议</div>
+            <div v-for="(s,si) in (agentData.suggestions||[])" :key="si" class="agent-suggestion"><div style="font-size:12px;color:#5C3D1E">{{s.action||s}}</div><div style="font-size:10px;color:rgba(92,61,30,0.5)">{{s.reason||''}}</div></div>
+          </div>
+          <div class="glass-card">
+            <div class="card-title"><i class="fas fa-tools"></i>一键认知操作</div>
+            <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px">
+              <button class="btn btn-accent" @click="triggerDream"><i class="fas fa-moon"></i>触发梦境</button>
+              <button class="btn btn-accent" @click="runSelfOrganize"><i class="fas fa-brain"></i>执行自组织</button>
+              <button class="btn btn-accent" @click="triggerCascade"><i class="fas fa-bolt"></i>级联脉冲</button>
+              <button class="btn btn-accent" @click="triggerRegulation"><i class="fas fa-balance-scale"></i>自适应调节</button>
+              <button class="btn btn-accent" @click="triggerDarkFlow"><i class="fas fa-ghost"></i>暗位面流</button>
+              <button class="btn" @click="exportData"><i class="fas fa-file-export"></i>导出备份</button>
+            </div>
+            <div class="card-title" style="font-size:9px"><i class="fas fa-search"></i>上下文探索</div>
+            <div style="display:flex;gap:6px;margin-bottom:12px"><input class="form-input" v-model="agentContext.topic" placeholder="输入话题获取记忆上下文..."><button class="btn btn-accent" @click="fetchAgentContext">获取上下文</button></div>
+            <div v-if="agentContext.result" style="margin-top:8px"><pre style="font-family:var(--font-mono);font-size:10px;white-space:pre-wrap;background:rgba(255,253,248,0.6);padding:10px;border-radius:8px;max-height:200px;overflow-y:auto;color:#5C3D1E">{{JSON.stringify(agentContext.result,null,2)}}</pre></div>
+            <div class="card-title" style="font-size:9px;margin-top:14px"><i class="fas fa-route"></i>推理链导航</div>
+            <div style="display:flex;gap:6px;margin-bottom:8px"><input class="form-input" style="max-width:160px" v-model="agentReason.sourceId" placeholder="源节点 ID"><input class="form-input" style="max-width:160px" v-model="agentReason.targetQuery" placeholder="目标概念"><button class="btn btn-accent" @click="fetchAgentReasoning">推理</button></div>
+            <div v-if="agentReason.result" style="margin-top:8px"><pre style="font-family:var(--font-mono);font-size:10px;white-space:pre-wrap;background:rgba(255,253,248,0.6);padding:10px;border-radius:8px;max-height:200px;overflow-y:auto;color:#5C3D1E">{{JSON.stringify(agentReason.result,null,2)}}</pre></div>
+          </div>
+        </div>
+      </div>
+
       <div v-if="currentPage==='system'" class="fade-in">
         <div class="sys-grid">
-          <div class="glass-card"><div class="card-title"><i class="fas fa-heartbeat"></i>System Health</div><div class="health-status"><div :class="['health-icon',healthOk?'ok':'err']"><i :class="healthOk?'fas fa-check':'fas fa-times'"></i></div><div><div style="font-weight:600;color:#5C3D1E">{{healthData.status||'Unknown'}}</div><div style="font-size:11px;color:rgba(92,61,30,0.5)">v{{healthData.version||'?'}} · {{uptimeStr}}</div></div></div></div>
-          <div class="glass-card"><div class="card-title"><i class="fas fa-chart-bar"></i>Network Statistics</div><div style="font-family:var(--font-mono);font-size:11px"><div v-for="(v,k) in stats" :key="k" style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid rgba(212,175,55,0.03)"><span style="color:rgba(92,61,30,0.5)">{{k}}</span><span style="color:#5C3D1E;font-weight:500">{{typeof v==='number'?(Number.isInteger(v)?v:v.toFixed(4)):v}}</span></div></div></div>
-          <div class="glass-card"><div class="card-title"><i class="fas fa-shield-alt"></i>Data Integrity</div><button class="btn btn-accent" style="width:100%" @click="verifyIntegrity"><i class="fas fa-search"></i>Verify Integrity</button><div v-if="integrityResult" style="margin-top:10px;font-family:var(--font-mono);font-size:11px"><pre style="white-space:pre-wrap;color:#5C3D1E">{{JSON.stringify(integrityResult,null,2)}}</pre></div></div>
-          <div class="glass-card"><div class="card-title"><i class="fas fa-download"></i>Export Data</div><p style="font-size:12px;color:rgba(92,61,30,0.5);margin-bottom:12px">Export all memory data as JSON.</p><button class="btn btn-accent" style="width:100%" @click="exportData"><i class="fas fa-file-export"></i>Export All</button></div>
+          <div class="glass-card"><div class="card-title"><i class="fas fa-heartbeat"></i>系统健康</div><div class="health-status"><div :class="['health-icon',healthOk?'ok':'err']"><i :class="healthOk?'fas fa-check':'fas fa-times'"></i></div><div><div style="font-weight:600;color:#5C3D1E">{{healthData.status||'未知'}}</div><div style="font-size:11px;color:rgba(92,61,30,0.5)">v{{healthData.version||'?'}} · {{uptimeStr}}</div></div></div></div>
+          <div class="glass-card"><div class="card-title"><i class="fas fa-chart-bar"></i>网络统计</div><div style="font-family:var(--font-mono);font-size:11px"><div v-for="(v,k) in stats" :key="k" style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid rgba(212,175,55,0.03)"><span style="color:rgba(92,61,30,0.5)">{{k}}</span><span style="color:#5C3D1E;font-weight:500">{{typeof v==='number'?(Number.isInteger(v)?v:v.toFixed(4)):v}}</span></div></div></div>
+          <div class="glass-card"><div class="card-title"><i class="fas fa-shield-alt"></i>数据完整性</div><button class="btn btn-accent" style="width:100%" @click="verifyIntegrity"><i class="fas fa-search"></i>验证完整性</button><div v-if="integrityResult" style="margin-top:10px;font-family:var(--font-mono);font-size:11px"><pre style="white-space:pre-wrap;color:#5C3D1E">{{JSON.stringify(integrityResult,null,2)}}</pre></div></div>
+          <div class="glass-card"><div class="card-title"><i class="fas fa-download"></i>数据导出</div><p style="font-size:12px;color:rgba(92,61,30,0.5);margin-bottom:12px">导出全部记忆数据为 JSON。</p><button class="btn btn-accent" style="width:100%" @click="exportData"><i class="fas fa-file-export"></i>导出全部</button></div>
         </div>
       </div>
 
-      <!-- BACKUPS -->
       <div v-if="currentPage==='backups'" class="fade-in">
-        <div class="glass-card"><div class="card-title"><i class="fas fa-archive"></i>Backup Management <button class="btn btn-accent" style="margin-left:auto" @click="createBackup('full')"><i class="fas fa-plus"></i>Create Backup</button></div>
-          <div style="margin:12px 0"><div class="form-group" style="display:flex;align-items:center;gap:8px"><label class="form-label" style="margin:0">Level:</label><select class="form-select" style="max-width:140px" v-model="backupLevel"><option value="daily">Daily</option><option value="hourly">Hourly</option><option value="weekly">Weekly</option></select></div></div>
-          <div v-if="backups.length===0" class="empty-state" style="padding:24px"><p>No backups available</p></div>
+        <div class="glass-card"><div class="card-title"><i class="fas fa-archive"></i>备份管理 <button class="btn btn-accent" style="margin-left:auto" @click="createBackup(backupLevel)"><i class="fas fa-plus"></i>创建备份</button></div>
+          <div style="margin:12px 0"><div class="form-group" style="display:flex;align-items:center;gap:8px"><label class="form-label" style="margin:0">级别:</label><select class="form-select" style="max-width:140px" v-model="backupLevel"><option value="daily">每日</option><option value="hourly">每小时</option><option value="weekly">每周</option></select></div></div>
+          <div v-if="backups.length===0" class="empty-state" style="padding:24px"><p>暂无备份</p></div>
           <div v-for="(b,bi) in backups" :key="bi" class="backup-item"><div><div style="font-family:var(--font-mono);font-size:11px;font-weight:600;color:#5C3D1E">{{b.backup_id||b.id}}</div><div style="font-size:10px;color:rgba(92,61,30,0.5)">{{b.level||'full'}} · {{formatDate(b.created_at)}}</div></div><div style="display:flex;gap:4px"><button class="btn" style="padding:3px 8px;font-size:10px" @click="downloadBackup(b)"><i class="fas fa-download"></i></button><button class="btn btn-danger" style="padding:3px 8px;font-size:10px" @click="deleteBackup(b)"><i class="fas fa-trash"></i></button></div></div>
         </div>
       </div>
 
-      <!-- AUDIT -->
       <div v-if="currentPage==='audit'" class="fade-in">
-        <div class="glass-card"><div class="card-title"><i class="fas fa-scroll"></i>Audit Log <button class="btn" style="margin-left:auto" @click="fetchAuditLog"><i class="fas fa-sync-alt"></i>Refresh</button></div>
-          <div class="audit-log"><div v-if="auditLog.length===0" class="empty-state" style="padding:24px"><p>No audit entries</p></div><div v-for="(a,ai) in auditLog" :key="ai" class="audit-entry"><div class="audit-time">{{formatDate(a.timestamp||a.created_at)}}</div><div style="color:#5C3D1E">{{a.action||a.event||JSON.stringify(a)}}</div></div></div>
+        <div class="glass-card"><div class="card-title"><i class="fas fa-scroll"></i>审计日志 <button class="btn" style="margin-left:auto" @click="fetchAuditLog"><i class="fas fa-sync-alt"></i>刷新</button></div>
+          <div class="audit-log"><div v-if="auditLog.length===0" class="empty-state" style="padding:24px"><p>暂无审计记录</p></div><div v-for="(a,ai) in auditLog" :key="ai" class="audit-entry"><div class="audit-time">{{formatDate(a.timestamp||a.created_at)}}</div><div style="color:#5C3D1E">{{a.action||a.event||JSON.stringify(a)}}</div></div></div>
         </div>
       </div>
     </main>
   </div>
 
-  <!-- BOTTOM TOOLBAR -->
   <div v-if="currentPage==='dashboard'" class="bottom-toolbar">
-    <div class="toolbar-search"><i class="fas fa-search"></i><input v-model="searchQuery" placeholder="Query memories..." @keyup.enter="doSearch"></div>
+    <div class="toolbar-search"><i class="fas fa-search"></i><input v-model="searchQuery" placeholder="搜索记忆..." @keyup.enter="doSearch"></div>
     <div class="toolbar-actions">
-      <button class="btn btn-accent" @click="doSearch"><i class="fas fa-search"></i>Query</button>
-      <button class="btn" @click="navigateTo('dream')"><i class="fas fa-moon"></i>Dream</button>
-      <button class="btn" @click="runSelfOrganize"><i class="fas fa-brain"></i>Self-Organize</button>
-      <button class="btn" @click="triggerPhaseShift"><i class="fas fa-random"></i>Phase Shift</button>
-      <button class="btn" @click="exportData"><i class="fas fa-file-export"></i>Export</button>
-      <button class="btn" @click="refreshAll"><i class="fas fa-sync-alt"></i>Refresh</button>
+      <button class="btn btn-accent" @click="doSearch"><i class="fas fa-search"></i>查询</button>
+      <button class="btn" @click="navigateTo('dream')"><i class="fas fa-moon"></i>梦境</button>
+      <button class="btn" @click="runSelfOrganize"><i class="fas fa-brain"></i>自组织</button>
+      <button class="btn" @click="triggerPhaseShift"><i class="fas fa-random"></i>相变</button>
+      <button class="btn" @click="exportData"><i class="fas fa-file-export"></i>导出</button>
+      <button class="btn" @click="refreshAll"><i class="fas fa-sync-alt"></i>刷新</button>
     </div>
   </div>
 </div>
 
-<!-- STORE DIALOG -->
 <div v-if="showStoreDialog" class="dialog-overlay" @click.self="showStoreDialog=false">
   <div class="dialog-box">
-    <div class="dialog-header"><div class="dialog-title">Store New Memory</div><button class="dialog-close" @click="showStoreDialog=false"><i class="fas fa-times"></i></button></div>
-    <div class="form-group"><label class="form-label">Content</label><textarea class="form-textarea" v-model="storeForm.content" placeholder="Enter memory content..."></textarea></div>
-    <div class="form-group"><label class="form-label">Labels (comma-separated)</label><input class="form-input" v-model="storeForm.labelsStr" placeholder="e.g. concept, important"></div>
-    <div class="form-group"><label class="form-label">Weight (0.0 - 1.0)</label><input class="form-input" type="number" min="0" max="1" step="0.01" v-model="storeForm.weight"></div>
-    <div class="form-group"><label class="form-label">Metadata (JSON, optional)</label><textarea class="form-textarea" v-model="storeForm.metadataStr" placeholder='{"source": "manual"}'></textarea></div>
-    <div class="form-actions"><button class="btn" @click="showStoreDialog=false">Cancel</button><button class="btn btn-accent" @click="storeMemory" :disabled="storeLoading">{{storeLoading?'Storing...':'Store Memory'}}</button></div>
+    <div class="dialog-header"><div class="dialog-title">存储新记忆</div><button class="dialog-close" @click="showStoreDialog=false"><i class="fas fa-times"></i></button></div>
+    <div class="form-group"><label class="form-label">内容</label><textarea class="form-textarea" v-model="storeForm.content" placeholder="输入记忆内容..."></textarea></div>
+    <div class="form-group"><label class="form-label">标签（逗号分隔）</label><input class="form-input" v-model="storeForm.labelsStr" placeholder="例如: 概念, 重要"></div>
+    <div class="form-group"><label class="form-label">权重 (0.0 - 1.0)</label><input class="form-input" type="number" min="0" max="1" step="0.01" v-model="storeForm.weight"></div>
+    <div class="form-group"><label class="form-label">元数据（JSON，可选）</label><textarea class="form-textarea" v-model="storeForm.metadataStr" placeholder='{"source": "manual"}'></textarea></div>
+    <div class="form-actions"><button class="btn" @click="showStoreDialog=false">取消</button><button class="btn btn-accent" @click="storeMemory" :disabled="storeLoading">{{storeLoading?'存储中...':'存储记忆'}}</button></div>
   </div>
 </div>
 
-<!-- QUERY RESULTS DIALOG -->
 <div v-if="showQueryDialog" class="dialog-overlay" @click.self="showQueryDialog=false">
   <div class="dialog-box" style="width:620px">
-    <div class="dialog-header"><div class="dialog-title">Query Results</div><button class="dialog-close" @click="showQueryDialog=false"><i class="fas fa-times"></i></button></div>
-    <div v-if="queryResults.length===0" class="empty-state"><p>No results found</p></div>
+    <div class="dialog-header"><div class="dialog-title">查询结果</div><button class="dialog-close" @click="showQueryDialog=false"><i class="fas fa-times"></i></button></div>
+    <div v-if="queryResults.length===0" class="empty-state"><p>未找到结果</p></div>
     <div v-for="(r,ri) in queryResults" :key="ri" style="padding:10px 12px;border-bottom:1px solid rgba(212,175,55,0.04)">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><span style="font-family:var(--font-mono);font-size:10px;color:rgba(92,61,30,0.5)">{{r.id}}</span><span style="font-family:var(--font-mono);font-size:10px;color:var(--purple)">dist: {{(r.distance||0).toFixed(4)}}</span></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><span style="font-family:var(--font-mono);font-size:10px;color:rgba(92,61,30,0.5)">{{r.id}}</span><span style="font-family:var(--font-mono);font-size:10px;color:var(--purple)">距离: {{(r.distance||0).toFixed(4)}}</span></div>
       <div style="font-size:12px;margin-bottom:3px;color:#5C3D1E">{{r.content}}</div>
-      <div><span v-for="l in (r.labels||[])" :key="l" class="mem-label">{{l}}</span><span style="font-family:var(--font-mono);font-size:10px;color:rgba(92,61,30,0.5);margin-left:6px">w: {{(r.weight||0).toFixed(3)}} · act: {{(r.activation||0).toFixed(3)}}</span></div>
+      <div><span v-for="l in (r.labels||[])" :key="l" class="mem-label">{{l}}</span><span style="font-family:var(--font-mono);font-size:10px;color:rgba(92,61,30,0.5);margin-left:6px">权重: {{(r.weight||0).toFixed(3)}} · 激活: {{(r.activation||0).toFixed(3)}}</span></div>
     </div>
   </div>
 </div>
 
-<!-- MEMORY DETAIL DIALOG -->
 <div v-if="showDetailDialog" class="dialog-overlay" @click.self="showDetailDialog=false">
   <div class="dialog-box" style="width:560px">
-    <div class="dialog-header"><div class="dialog-title">Memory Detail</div><button class="dialog-close" @click="showDetailDialog=false"><i class="fas fa-times"></i></button></div>
+    <div class="dialog-header"><div class="dialog-title">记忆详情</div><button class="dialog-close" @click="showDetailDialog=false"><i class="fas fa-times"></i></button></div>
     <div v-if="selectedMemory">
-      <div class="form-group"><label class="form-label">ID</label><div style="font-family:var(--font-mono);font-size:11px;color:#5C3D1E">{{selectedMemory.id}}</div></div>
-      <div class="form-group"><label class="form-label">Content</label><div style="font-size:12px;line-height:1.5;background:rgba(255,253,248,0.6);padding:10px;border-radius:8px;color:#5C3D1E">{{selectedMemory.content}}</div></div>
-      <div class="form-group"><label class="form-label">Labels</label><div><span v-for="l in (selectedMemory.labels||[])" :key="l" class="mem-label" style="font-size:11px">{{l}}</span></div></div>
+      <div class="form-group"><label class="form-label">标识</label><div style="font-family:var(--font-mono);font-size:11px;color:#5C3D1E">{{selectedMemory.id}}</div></div>
+      <div class="form-group"><label class="form-label">内容</label><div style="font-size:12px;line-height:1.5;background:rgba(255,253,248,0.6);padding:10px;border-radius:8px;color:#5C3D1E">{{selectedMemory.content}}</div></div>
+      <div class="form-group"><label class="form-label">标签</label><div><span v-for="l in (selectedMemory.labels||[])" :key="l" class="mem-label" style="font-size:11px">{{l}}</span></div></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-        <div class="form-group"><label class="form-label">Weight</label><div style="font-family:var(--font-mono);font-size:13px;font-weight:600;color:var(--purple)">{{(selectedMemory.weight||0).toFixed(4)}}</div></div>
-        <div class="form-group"><label class="form-label">Activation</label><div style="font-family:var(--font-mono);font-size:13px;font-weight:600;color:var(--cyan)">{{(selectedMemory.activation||0).toFixed(4)}}</div></div>
+        <div class="form-group"><label class="form-label">权重</label><div style="font-family:var(--font-mono);font-size:13px;font-weight:600;color:var(--purple)">{{(selectedMemory.weight||0).toFixed(4)}}</div></div>
+        <div class="form-group"><label class="form-label">激活值</label><div style="font-family:var(--font-mono);font-size:13px;font-weight:600;color:var(--cyan)">{{(selectedMemory.activation||0).toFixed(4)}}</div></div>
       </div>
-      <div class="form-group" v-if="selectedMemory.metadata"><label class="form-label">Metadata</label><pre style="font-family:var(--font-mono);font-size:10px;background:rgba(255,253,248,0.6);padding:8px;border-radius:8px;white-space:pre-wrap;color:#5C3D1E">{{JSON.stringify(selectedMemory.metadata,null,2)}}</pre></div>
+      <div class="form-group" v-if="selectedMemory.metadata"><label class="form-label">元数据</label><pre style="font-family:var(--font-mono);font-size:10px;background:rgba(255,253,248,0.6);padding:8px;border-radius:8px;white-space:pre-wrap;color:#5C3D1E">{{JSON.stringify(selectedMemory.metadata,null,2)}}</pre></div>
       <div style="border-top:1px solid var(--border);padding-top:12px;margin-top:12px">
-        <div class="card-title" style="font-size:9px"><i class="fas fa-comment"></i>Feedback</div>
-        <div class="form-group"><label class="form-label">Action</label><input class="form-input" v-model="feedbackForm.action" placeholder="e.g. reinforced, corrected"></div>
-        <div class="form-group"><label class="form-label">Outcome</label><input class="form-input" v-model="feedbackForm.outcome" placeholder="positive / negative"></div>
-        <div class="form-group"><label class="form-label">Confidence</label><div class="feedback-stars"><span v-for="s in 5" :key="s" class="feedback-star" :class="{active:feedbackForm.confidence>=s}" @click="feedbackForm.confidence=s">★</span></div></div>
-        <div class="form-group"><label class="form-label">Reasoning</label><textarea class="form-textarea" v-model="feedbackForm.reasoning" placeholder="Why this feedback?"></textarea></div>
-        <button class="btn btn-accent" @click="submitFeedback">Submit Feedback</button>
+        <div class="card-title" style="font-size:9px"><i class="fas fa-comment"></i>反馈</div>
+        <div class="form-group"><label class="form-label">操作</label><input class="form-input" v-model="feedbackForm.action" placeholder="例如: 强化, 纠正"></div>
+        <div class="form-group"><label class="form-label">结果</label><input class="form-input" v-model="feedbackForm.outcome" placeholder="正面 / 负面"></div>
+        <div class="form-group"><label class="form-label">置信度</label><div class="feedback-stars"><span v-for="s in 5" :key="s" class="feedback-star" :class="{active:feedbackForm.confidence>=s}" @click="feedbackForm.confidence=s">★</span></div></div>
+        <div class="form-group"><label class="form-label">推理说明</label><textarea class="form-textarea" v-model="feedbackForm.reasoning" placeholder="为什么给出这个反馈？"></textarea></div>
+        <button class="btn btn-accent" @click="submitFeedback">提交反馈</button>
       </div>
     </div>
   </div>
 </div>
 
-<!-- DELETE CONFIRM -->
 <div v-if="showDeleteConfirm" class="dialog-overlay" @click.self="showDeleteConfirm=false">
   <div class="dialog-box" style="width:380px">
-    <div class="dialog-header"><div class="dialog-title">Confirm Deletion</div><button class="dialog-close" @click="showDeleteConfirm=false"><i class="fas fa-times"></i></button></div>
-    <p style="margin-bottom:16px;color:rgba(92,61,30,0.5);font-size:13px">Delete memory <strong style="font-family:var(--font-mono);color:#5C3D1E">{{deleteTarget?.id?.substring(0,8)}}</strong>? This cannot be undone.</p>
-    <div class="form-actions"><button class="btn" @click="showDeleteConfirm=false">Cancel</button><button class="btn btn-danger" @click="doDeleteMemory" :disabled="deleteLoading">{{deleteLoading?'Deleting...':'Delete'}}</button></div>
+    <div class="dialog-header"><div class="dialog-title">确认删除</div><button class="dialog-close" @click="showDeleteConfirm=false"><i class="fas fa-times"></i></button></div>
+    <p style="margin-bottom:16px;color:rgba(92,61,30,0.5);font-size:13px">删除记忆 <strong style="font-family:var(--font-mono);color:#5C3D1E">{{deleteTarget?.id?.substring(0,8)}}</strong>？此操作不可恢复。</p>
+    <div class="form-actions"><button class="btn" @click="showDeleteConfirm=false">取消</button><button class="btn btn-danger" @click="doDeleteMemory" :disabled="deleteLoading">{{deleteLoading?'删除中...':'删除'}}</button></div>
   </div>
 </div>
 
 </div>
 
-<!-- SCRIPTS -->
 <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
 <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
 <script src="https://unpkg.com/three@0.160.0/examples/js/controls/OrbitControls.js"></script>
@@ -524,7 +605,7 @@ body{font-family:var(--font-body);background:var(--void);color:#5C3D1E;-webkit-f
     const token=sessionStorage.getItem('tetramem_token');
     if(token)headers['Authorization']='Bearer '+token;
     return fetch(url,{...opts,headers}).then(r=>{
-      if(r.status===401){sessionStorage.removeItem('tetramem_token');authenticated.value=false;throw new Error('Session expired');}
+      if(r.status===401){sessionStorage.removeItem('tetramem_token');authenticated.value=false;throw new Error('会话已过期');}
       if(!r.ok)throw new Error('API '+r.status+': '+r.statusText);
       return r.json();
     }).catch(e=>{throw e;});
@@ -535,7 +616,7 @@ body{font-family:var(--font-body);background:var(--void);color:#5C3D1E;-webkit-f
     const loginForm=reactive({username:'',password:''});
     const currentPage=ref('dashboard');
     const stats=ref({}),healthData=ref({}),healthOk=ref(true),uptimeSeconds=ref(0);
-    const uptimeStr=computed(()=>{const s=uptimeSeconds.value;return Math.floor(s/86400)+'d '+Math.floor((s%86400)/3600)+'h '+Math.floor((s%3600)/60)+'m';});
+    const uptimeStr=computed(()=>{const s=uptimeSeconds.value;return Math.floor(s/86400)+'天 '+Math.floor((s%86400)/3600)+'时 '+Math.floor((s%3600)/60)+'分';});
     const clusters=ref([]),sceneNodes=ref([]),sceneNodesCount=computed(()=>sceneNodes.value.length),selectedNode=ref(null);
     const browseItems=ref([]),browseTotal=ref(0),browseOffset=ref(0),browseLimit=20,browseLoading=ref(false);
     const memFilter=reactive({label:'',sort:'newest'});
@@ -546,14 +627,15 @@ body{font-family:var(--font-body);background:var(--void);color:#5C3D1E;-webkit-f
     const dreamRunning=ref(false),dreamResult=ref(null),dreamHistory=ref([]);
     const pcnnConfig=ref({}),pcnnLoading=ref(false),cascadeRunning=ref(false),cascadeResult=ref(null),phaseResult=ref(null);
     const spatialData=ref({}),spatialLoading=ref(false);
-    const backups=ref([]),backupLevel=ref('full'),auditLog=ref([]),integrityResult=ref(null);
+    const backups=ref([]),backupLevel=ref('daily'),auditLog=ref([]),integrityResult=ref(null);
     const toasts=ref([]);
+    const darkPlaneData=ref({}),observerData=ref({}),regulationData=ref({layers:[]});
+    const agentData=ref({}),agentContext=reactive({topic:'',result:null}),agentReason=reactive({sourceId:'',targetQuery:'',result:null});
     function toast(message,type){type=type||'info';const t={message,type};toasts.value.push(t);setTimeout(()=>{const idx=toasts.value.indexOf(t);if(idx>-1)toasts.value.splice(idx,1);},4000);}
     const loginCanvas=ref(null),dashScene=ref(null),topoScene=ref(null),topoInfo=ref(null),dreamChart=ref(null),pcnnChart=ref(null);
 
-    // === THREE.JS ===
     let threeRenderers=[],threeAnimating=false;
-    function initThreeScene(container,fullPage){
+    function initThreeScene(container){
       if(!container)return null;const w=container.clientWidth,h=container.clientHeight;if(w===0||h===0)return null;
       const scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera(60,w/h,0.1,1000);camera.position.set(0,3,8);
       const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});renderer.setSize(w,h);renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));renderer.setClearColor(0x000000,0);container.appendChild(renderer.domElement);
@@ -568,15 +650,15 @@ body{font-family:var(--font-body);background:var(--void);color:#5C3D1E;-webkit-f
       if(!ctx)return;const{scene}=ctx;
       const toRemove=[];scene.traverse(c=>{if(c.userData&&c.userData.networkNode)toRemove.push(c);});toRemove.forEach(c=>scene.remove(c));
       if(!nodes||nodes.length===0){nodes=[];for(let i=0;i<40;i++){const t=Math.random()*Math.PI*2,p=Math.acos(2*Math.random()-1),r=2+Math.random()*3;nodes.push({id:'demo_'+i,pos:[r*Math.sin(p)*Math.cos(t),r*Math.cos(p)-1,r*Math.sin(p)*Math.sin(t)],w:Math.random(),d:Math.floor(Math.random()*5)});}}
-      const geo=new THREE.SphereGeometry(0.07,12,12),mat=new THREE.MeshStandardMaterial({metalness:0.4,roughness:0.3});
+      const geo=new THREE.TetrahedronGeometry(0.12,0),mat=new THREE.MeshStandardMaterial({metalness:0.4,roughness:0.3});
       const im=new THREE.InstancedMesh(geo,mat,nodes.length);im.userData.networkNode=true;
       const dummy=new THREE.Object3D(),color=new THREE.Color(),positions=[];
-      nodes.forEach((n,i)=>{const p=n.pos||[0,0,0];positions.push(p);dummy.position.set(p[0],p[1],p[2]);dummy.scale.setScalar(0.5+(n.w||0)*0.8);dummy.updateMatrix();im.setMatrixAt(i,dummy.matrix);const w=n.w||0;if(w>0.7)color.setHex(0xef4444);else if(w>0.3)color.setHex(0xfbbf24);else color.setHex(0xD4AF37);im.setColorAt(i,color);});
+      nodes.forEach((n,i)=>{const p=n.pos||[0,0,0];positions.push(p);dummy.position.set(p[0],p[1],p[2]);dummy.rotation.set(Math.random()*Math.PI,Math.random()*Math.PI,0);dummy.scale.setScalar(1);dummy.updateMatrix();im.setMatrixAt(i,dummy.matrix);const w=n.w||0;if(w>0.7)color.setHex(0xef4444);else if(w>0.3)color.setHex(0xfbbf24);else color.setHex(0xD4AF37);im.setColorAt(i,color);});
       im.instanceMatrix.needsUpdate=true;if(im.instanceColor)im.instanceColor.needsUpdate=true;scene.add(im);
       const eMat=new THREE.LineBasicMaterial({color:0xD4AF37,transparent:true,opacity:0.08}),eGeo=new THREE.BufferGeometry(),ePts=[];const maxD=2.5;
       for(let i=0;i<positions.length;i++)for(let j=i+1;j<positions.length;j++){const dx=positions[i][0]-positions[j][0],dy=positions[i][1]-positions[j][1],dz=positions[i][2]-positions[j][2];if(Math.sqrt(dx*dx+dy*dy+dz*dz)<maxD){ePts.push(positions[i][0],positions[i][1],positions[i][2],positions[j][0],positions[j][1],positions[j][2]);}}
       eGeo.setAttribute('position',new THREE.Float32BufferAttribute(ePts,3));const edges=new THREE.LineSegments(eGeo,eMat);edges.userData.networkNode=true;scene.add(edges);
-      const oGeo=new THREE.SphereGeometry(0.03,8,8),oMat=new THREE.MeshBasicMaterial({color:0xCD853F,transparent:true,opacity:0.5});
+      const oGeo=new THREE.TetrahedronGeometry(0.05,0),oMat=new THREE.MeshBasicMaterial({color:0xCD853F,transparent:true,opacity:0.5});
       for(let i=0;i<5;i++){const orb=new THREE.Mesh(oGeo,oMat.clone());orb.userData.networkNode=true;orb.userData.pulseOrb=true;orb.userData.startPos=positions[Math.floor(Math.random()*positions.length)]||[0,0,0];orb.userData.endPos=positions[Math.floor(Math.random()*positions.length)]||[1,0,0];orb.userData.t=Math.random();orb.userData.speed=0.2+Math.random()*0.4;scene.add(orb);}
       return im;
     }
@@ -584,53 +666,61 @@ body{font-family:var(--font-body);background:var(--void);color:#5C3D1E;-webkit-f
     function startAnimation(){if(threeAnimating)return;threeAnimating=true;function animate(){animFrameId=requestAnimationFrame(animate);threeRenderers.forEach(ctx=>{if(!ctx||!ctx.renderer)return;ctx.controls.update();ctx.scene.traverse(c=>{if(c.userData&&c.userData.pulseOrb){c.userData.t+=0.003*c.userData.speed;if(c.userData.t>1)c.userData.t=0;const sp=c.userData.startPos,ep=c.userData.endPos;c.position.set(sp[0]+(ep[0]-sp[0])*c.userData.t,sp[1]+(ep[1]-sp[1])*c.userData.t,sp[2]+(ep[2]-sp[2])*c.userData.t);c.material.opacity=0.2+Math.sin(c.userData.t*Math.PI)*0.5;}});ctx.renderer.render(ctx.scene,ctx.camera);});}animate();}
     function stopAnimation(){threeAnimating=false;if(animFrameId)cancelAnimationFrame(animFrameId);}
 
-    // === CHARTS ===
     let dreamChartInstance=null,pcnnChartInstance=null;
-    function initDreamChart(){const el=dreamChart.value;if(!el)return;if(dreamChartInstance)dreamChartInstance.destroy();dreamChartInstance=new Chart(el,{type:'line',data:{labels:dreamHistory.value.map((_,i)=>'#'+(i+1)).slice(-10),datasets:[{label:'Quality',data:dreamHistory.value.map(d=>d.quality||Math.random()*0.5+0.5).slice(-10),borderColor:'#D4AF37',backgroundColor:'rgba(212,175,55,0.08)',tension:0.4,fill:true,pointRadius:3,pointBackgroundColor:'#D4AF37'}]},options:{responsive:true,maintainAspectRatio:false,scales:{y:{beginAtZero:true,max:1,grid:{color:'rgba(184,134,11,0.06)'}},x:{grid:{display:false}}},plugins:{legend:{labels:{font:{family:'Rajdhani',size:10},color:'#D4AF3766'}}}}});}
+    function initDreamChart(){const el=dreamChart.value;if(!el)return;if(dreamChartInstance)dreamChartInstance.destroy();dreamChartInstance=new Chart(el,{type:'line',data:{labels:dreamHistory.value.map((_,i)=>'#'+(i+1)).slice(-10),datasets:[{label:'质量',data:dreamHistory.value.map(d=>d.quality||Math.random()*0.5+0.5).slice(-10),borderColor:'#D4AF37',backgroundColor:'rgba(212,175,55,0.08)',tension:0.4,fill:true,pointRadius:3,pointBackgroundColor:'#D4AF37'}]},options:{responsive:true,maintainAspectRatio:false,scales:{y:{beginAtZero:true,max:1,grid:{color:'rgba(184,134,11,0.06)'}},x:{grid:{display:false}}},plugins:{legend:{labels:{font:{family:'Rajdhani',size:10},color:'#D4AF3766'}}}}});}
     function initPcnnChart(){const el=pcnnChart.value;if(!el)return;if(pcnnChartInstance)pcnnChartInstance.destroy();const pt=pcnnConfig.value.pulse_types||['alpha','beta','gamma','theta'];const data=pt.map(()=>Math.random()*30+5);const colors=['#D4AF37','#CD853F','#B8860B','#DAA520','#E5A443'];pcnnChartInstance=new Chart(el,{type:'doughnut',data:{labels:pt,datasets:[{data,backgroundColor:colors.slice(0,pt.length),borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{family:'Rajdhani',size:10},color:'#D4AF3766',padding:10}}}}});}
 
-    // === API CALLS ===
     function fetchStats(){api('/stats').then(d=>{stats.value=d;}).catch(()=>{});}
     function fetchHealth(){api('/health').then(d=>{healthData.value=d;healthOk.value=d.status==='healthy'||d.status==='ok';uptimeSeconds.value=d.uptime_seconds||0;}).catch(()=>{healthOk.value=false;});}
     function fetchClusters(){api('/clusters').then(d=>{clusters.value=Array.isArray(d.clusters)?d.clusters:Array.isArray(d)?d:[];}).catch(()=>{clusters.value=[];});}
     function fetchSceneNodes(){api('/scene-nodes').then(d=>{sceneNodes.value=d.nodes||[];}).catch(()=>{sceneNodes.value=[];});}
-    function fetchBrowse(){browseLoading.value=true;const params=new URLSearchParams({direction:memFilter.sort==='oldest'?'oldest':memFilter.sort==='weight_desc'?'weight_desc':memFilter.sort==='weight_asc'?'weight_asc':memFilter.sort==='activation_desc'?'activation_desc':'newest',limit:String(browseLimit),offset:String(browseOffset.value)});if(memFilter.label)params.set('label',memFilter.label);api('/browse?'+params.toString()).then(d=>{browseItems.value=d.tetrahedra||[];browseTotal.value=d.total||d.count||0;}).catch(e=>{toast('Failed: '+e.message,'error');}).finally(()=>{browseLoading.value=false;});}
+    function fetchBrowse(){browseLoading.value=true;const params=new URLSearchParams({direction:memFilter.sort==='oldest'?'oldest':memFilter.sort==='weight_desc'?'weight_desc':memFilter.sort==='weight_asc'?'weight_asc':memFilter.sort==='activation_desc'?'activation_desc':'newest',limit:String(browseLimit),offset:String(browseOffset.value)});if(memFilter.label)params.set('label',memFilter.label);api('/browse?'+params.toString()).then(d=>{browseItems.value=d.tetrahedra||[];browseTotal.value=d.total||d.count||0;}).catch(e=>{toast('失败: '+e.message,'error');}).finally(()=>{browseLoading.value=false;});}
     let debounceTimer=null;function debouncedBrowse(){clearTimeout(debounceTimer);debounceTimer=setTimeout(()=>{browseOffset.value=0;fetchBrowse();},400);}
     function fetchPcnnConfig(){pcnnLoading.value=true;api('/pcnn/config').then(d=>{pcnnConfig.value=d;}).catch(()=>{}).finally(()=>{pcnnLoading.value=false;});}
     function fetchSpatial(){spatialLoading.value=true;api('/spatial/autocorrelation').then(d=>{spatialData.value=d;}).catch(()=>{}).finally(()=>{spatialLoading.value=false;});}
     function fetchBackups(){api('/backups').then(d=>{backups.value=Array.isArray(d.backups)?d.backups:Array.isArray(d)?d:[];}).catch(()=>{});}
     function fetchAuditLog(){api('/audit').then(d=>{auditLog.value=Array.isArray(d.entries)?d.entries:Array.isArray(d)?d:[];}).catch(()=>{auditLog.value=[];});}
+    function fetchDarkPlane(){api('/dark-plane/status').then(d=>{darkPlaneData.value=d;}).catch(()=>{});}
+    function fetchObserverStats(){api('/observer/stats').then(d=>{observerData.value=d;}).catch(()=>{});}
+    function fetchRegulation(){api('/regulation/status').then(d=>{regulationData.value=d;}).catch(()=>{});}
+    function fetchAgentData(){api('/feedback/stats').then(d=>{agentData.value={...agentData.value,...d};}).catch(()=>{});api('/dream/status').then(d=>{agentData.value={...agentData.value,dream_status:d};}).catch(()=>{});}
 
-    // === ACTIONS ===
-    function doLogin(){if(!loginForm.username){loginError.value='Enter username';return;}if(!loginForm.password){loginError.value='Enter password';return;}loggingIn.value=true;loginError.value='';currentUser.value=loginForm.username;api('/login',{method:'POST',body:JSON.stringify({password:loginForm.password})}).then(d=>{if(d.token)sessionStorage.setItem('tetramem_token',d.token);loginTransitioning.value=true;setTimeout(()=>{authenticated.value=true;loggingIn.value=false;nextTick(()=>{initDashboard();});},600);}).catch(err=>{loggingIn.value=false;loginError.value=err.message||'Invalid password';});}
+    function doLogin(){if(!loginForm.username){loginError.value='请输入用户名';return;}if(!loginForm.password){loginError.value='请输入密码';return;}loggingIn.value=true;loginError.value='';currentUser.value=loginForm.username;api('/login',{method:'POST',body:JSON.stringify({password:loginForm.password})}).then(d=>{if(d.token)sessionStorage.setItem('tetramem_token',d.token);loginTransitioning.value=true;setTimeout(()=>{authenticated.value=true;loggingIn.value=false;nextTick(()=>{initDashboard();});},600);}).catch(err=>{loggingIn.value=false;loginError.value=err.message||'密码无效';});}
     function doLogout(){sessionStorage.removeItem('tetramem_token');stopAnimation();threeRenderers=[];authenticated.value=false;loginTransitioning.value=false;}
-    function navigateTo(page){currentPage.value=page;nextTick(()=>{if(page==='dashboard')initDashScene();if(page==='topology')initTopoScene();if(page==='dream')initDreamChart();if(page==='pcnn'){initPcnnChart();fetchPcnnConfig();}if(page==='memories')fetchBrowse();if(page==='tension')fetchSpatial();if(page==='backups')fetchBackups();if(page==='audit')fetchAuditLog();});}
+    function navigateTo(page){currentPage.value=page;nextTick(()=>{if(page==='dashboard')initDashScene();if(page==='topology')initTopoScene();if(page==='dream')initDreamChart();if(page==='pcnn'){initPcnnChart();fetchPcnnConfig();}if(page==='memories')fetchBrowse();if(page==='tension')fetchSpatial();if(page==='backups')fetchBackups();if(page==='audit')fetchAuditLog();if(page==='darkplane')fetchDarkPlane();if(page==='observer')fetchObserverStats();if(page==='regulation')fetchRegulation();if(page==='agent'){fetchAgentData();}});}
     function initDashboard(){fetchStats();fetchHealth();fetchClusters();fetchSceneNodes();nextTick(()=>{initDashScene();startAnimation();});setInterval(()=>{fetchHealth();},30000);setInterval(()=>{fetchStats();},15000);}
     let dashCtx=null,topoCtx=null;
-    function initDashScene(){const el=dashScene.value;if(!el)return;dashCtx=initThreeScene(el,false);if(dashCtx){threeRenderers=threeRenderers.filter(c=>c!==dashCtx);threeRenderers.push(dashCtx);buildNetwork(dashCtx,sceneNodes.value);startAnimation();}}
-    function initTopoScene(){const el=topoScene.value;if(!el)return;topoCtx=initThreeScene(el,true);if(topoCtx){threeRenderers=threeRenderers.filter(c=>c!==topoCtx);threeRenderers.push(topoCtx);buildNetwork(topoCtx,sceneNodes.value);const raycaster=new THREE.Raycaster(),mouse=new THREE.Vector2(),infoEl=topoInfo.value;el.addEventListener('click',e=>{const rect=el.getBoundingClientRect();mouse.x=((e.clientX-rect.left)/rect.width)*2-1;mouse.y=-((e.clientY-rect.top)/rect.height)*2+1;raycaster.setFromCamera(mouse,topoCtx.camera);const hits=raycaster.intersectObjects(topoCtx.scene.children,true);let minDist=Infinity,closest=null;const nodes=sceneNodes.value.length>0?sceneNodes.value:null;if(nodes){const point=hits.length>0?hits[0].point:null;if(point)nodes.forEach(n=>{const p=n.pos||[0,0,0];const d=Math.sqrt(Math.pow(point.x-p[0],2)+Math.pow(point.y-p[1],2)+Math.pow(point.z-p[2],2));if(d<minDist){minDist=d;closest=n;}});}selectedNode.value=closest;if(infoEl)infoEl.classList.toggle('visible',!!closest);});startAnimation();}}
-    function storeMemory(){if(!storeForm.content.trim()){toast('Content required','error');return;}storeLoading.value=true;const labels=storeForm.labelsStr.split(',').map(l=>l.trim()).filter(Boolean);let metadata={};try{metadata=storeForm.metadataStr?JSON.parse(storeForm.metadataStr):{};}catch{metadata={raw:storeForm.metadataStr};}api('/store',{method:'POST',body:JSON.stringify({content:storeForm.content,labels,weight:parseFloat(storeForm.weight)||0.5,metadata})}).then(d=>{toast('Memory stored: '+(d.id||'ok'),'success');showStoreDialog.value=false;storeForm.content='';storeForm.labelsStr='';storeForm.weight=0.5;storeForm.metadataStr='';fetchBrowse();fetchStats();fetchSceneNodes();}).catch(e=>{toast('Store failed: '+e.message,'error');}).finally(()=>{storeLoading.value=false;});}
-    function doSearch(){if(!searchQuery.value.trim()){toast('Enter a query','info');return;}api('/query',{method:'POST',body:JSON.stringify({query:searchQuery.value,k:10})}).then(d=>{queryResults.value=d.results||[];showQueryDialog.value=true;}).catch(e=>{toast('Query failed: '+e.message,'error');});}
+    function initDashScene(){const el=dashScene.value;if(!el)return;dashCtx=initThreeScene(el);if(dashCtx){threeRenderers=threeRenderers.filter(c=>c!==dashCtx);threeRenderers.push(dashCtx);buildNetwork(dashCtx,sceneNodes.value);startAnimation();}}
+    function initTopoScene(){const el=topoScene.value;if(!el)return;topoCtx=initThreeScene(el);if(topoCtx){threeRenderers=threeRenderers.filter(c=>c!==topoCtx);threeRenderers.push(topoCtx);buildNetwork(topoCtx,sceneNodes.value);const raycaster=new THREE.Raycaster(),mouse=new THREE.Vector2(),infoEl=topoInfo.value;el.addEventListener('click',e=>{const rect=el.getBoundingClientRect();mouse.x=((e.clientX-rect.left)/rect.width)*2-1;mouse.y=-((e.clientY-rect.top)/rect.height)*2+1;raycaster.setFromCamera(mouse,topoCtx.camera);const hits=raycaster.intersectObjects(topoCtx.scene.children,true);let minDist=Infinity,closest=null;const nodes=sceneNodes.value.length>0?sceneNodes.value:null;if(nodes){const point=hits.length>0?hits[0].point:null;if(point)nodes.forEach(n=>{const p=n.pos||[0,0,0];const d=Math.sqrt(Math.pow(point.x-p[0],2)+Math.pow(point.y-p[1],2)+Math.pow(point.z-p[2],2));if(d<minDist){minDist=d;closest=n;}});}selectedNode.value=closest;if(infoEl)infoEl.classList.toggle('visible',!!closest);});startAnimation();}}
+    function storeMemory(){if(!storeForm.content.trim()){toast('内容不能为空','error');return;}storeLoading.value=true;const labels=storeForm.labelsStr.split(',').map(l=>l.trim()).filter(Boolean);let metadata={};try{metadata=storeForm.metadataStr?JSON.parse(storeForm.metadataStr):{};}catch{metadata={raw:storeForm.metadataStr};}api('/store',{method:'POST',body:JSON.stringify({content:storeForm.content,labels,weight:parseFloat(storeForm.weight)||0.5,metadata})}).then(d=>{toast('记忆已存储: '+(d.id||'ok'),'success');showStoreDialog.value=false;storeForm.content='';storeForm.labelsStr='';storeForm.weight=0.5;storeForm.metadataStr='';fetchBrowse();fetchStats();fetchSceneNodes();}).catch(e=>{toast('存储失败: '+e.message,'error');}).finally(()=>{storeLoading.value=false;});}
+    function doSearch(){if(!searchQuery.value.trim()){toast('请输入查询','info');return;}api('/query',{method:'POST',body:JSON.stringify({query:searchQuery.value,k:10})}).then(d=>{queryResults.value=d.results||[];showQueryDialog.value=true;}).catch(e=>{toast('查询失败: '+e.message,'error');});}
     function viewMemoryDetail(m){selectedMemory.value=m;showDetailDialog.value=true;feedbackForm.action='';feedbackForm.outcome='';feedbackForm.confidence=3;feedbackForm.reasoning='';}
     function confirmDeleteMemory(m){deleteTarget.value=m;showDeleteConfirm.value=true;}
-    function doDeleteMemory(){if(!deleteTarget.value)return;deleteLoading.value=true;api('/tetrahedra/'+deleteTarget.value.id,{method:'DELETE'}).then(()=>{toast('Memory deleted','success');showDeleteConfirm.value=false;fetchBrowse();fetchStats();}).catch(e=>{toast('Delete failed: '+e.message,'error');}).finally(()=>{deleteLoading.value=false;});}
-    function triggerDream(){dreamRunning.value=true;api('/dream',{method:'POST'}).then(d=>{dreamResult.value=d.result||d;dreamHistory.value.unshift({time:new Date().toLocaleTimeString(),summary:(d.result&&d.result.insight)||'Dream cycle completed',quality:d.result&&d.result.quality?d.result.quality:0.5+Math.random()*0.5});if(dreamHistory.value.length>20)dreamHistory.value.length=20;toast('Dream completed','success');nextTick(initDreamChart);}).catch(e=>{toast('Dream failed: '+e.message,'error');}).finally(()=>{dreamRunning.value=false;});}
-    function triggerCascade(){cascadeRunning.value=true;api('/cascade/trigger',{method:'POST'}).then(d=>{cascadeResult.value=d;toast('Cascade triggered','success');fetchStats();fetchSceneNodes();}).catch(e=>{toast('Cascade failed: '+e.message,'error');}).finally(()=>{cascadeRunning.value=false;});}
-    function triggerPhaseShift(){api('/self-organize',{method:'POST'}).then(d=>{phaseResult.value=d.stats||d;toast('Phase shift completed','success');fetchStats();fetchSceneNodes();}).catch(e=>{toast('Phase shift failed: '+e.message,'error');});}
-    function runSelfOrganize(){api('/self-organize',{method:'POST'}).then(d=>{toast('Self-organize complete','success');fetchStats();fetchSceneNodes();fetchClusters();}).catch(e=>{toast('Self-organize failed: '+e.message,'error');});}
-    function exportData(){api('/export').then(d=>{const blob=new Blob([JSON.stringify(d,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='tetramem-export-'+Date.now()+'.json';a.click();URL.revokeObjectURL(url);toast('Export downloaded','success');}).catch(e=>{toast('Export failed: '+e.message,'error');});}
-    function createBackup(level){api('/system/backup',{method:'POST',body:JSON.stringify({level:level||backupLevel.value})}).then(d=>{toast('Backup created: '+(d.backup_id||'ok'),'success');fetchBackups();}).catch(e=>{toast('Backup failed: '+e.message,'error');});}
-    function downloadBackup(b){toast('Downloading...','info');}
-    function deleteBackup(b){toast('Backup deleted','info');}
-    function verifyIntegrity(){api('/health').then(d=>{integrityResult.value={status:'verified',timestamp:new Date().toISOString(),health:d};toast('Integrity check passed','success');}).catch(e=>{integrityResult.value={status:'error',error:e.message};toast('Integrity check failed','error');});}
-    function submitFeedback(){api('/feedback/record',{method:'POST',body:JSON.stringify({action:feedbackForm.action,context_id:selectedMemory.value?.id,outcome:feedbackForm.outcome,confidence:feedbackForm.confidence/5,reasoning:feedbackForm.reasoning})}).then(()=>{toast('Feedback submitted','success');showDetailDialog.value=false;}).catch(e=>{toast('Feedback failed: '+e.message,'error');});}
-    function refreshAll(){fetchStats();fetchHealth();fetchClusters();fetchSceneNodes();if(dashCtx)buildNetwork(dashCtx,sceneNodes.value);toast('Data refreshed','info');}
+    function doDeleteMemory(){if(!deleteTarget.value)return;deleteLoading.value=true;api('/tetrahedra/'+deleteTarget.value.id,{method:'DELETE'}).then(()=>{toast('记忆已删除','success');showDeleteConfirm.value=false;fetchBrowse();fetchStats();}).catch(e=>{toast('删除失败: '+e.message,'error');}).finally(()=>{deleteLoading.value=false;});}
+    function triggerDream(){dreamRunning.value=true;api('/dream',{method:'POST'}).then(d=>{dreamResult.value=d.result||d;dreamHistory.value.unshift({time:new Date().toLocaleTimeString(),summary:(d.result&&d.result.insight)||'梦境周期完成',quality:d.result&&d.result.quality?d.result.quality:0.5+Math.random()*0.5});if(dreamHistory.value.length>20)dreamHistory.value.length=20;toast('梦境完成','success');nextTick(initDreamChart);}).catch(e=>{toast('梦境失败: '+e.message,'error');}).finally(()=>{dreamRunning.value=false;});}
+    function triggerCascade(){cascadeRunning.value=true;api('/cascade/trigger',{method:'POST'}).then(d=>{cascadeResult.value=d;toast('级联已触发','success');fetchStats();fetchSceneNodes();}).catch(e=>{toast('级联失败: '+e.message,'error');}).finally(()=>{cascadeRunning.value=false;});}
+    function triggerPhaseShift(){api('/phase-transition/trigger',{method:'POST',body:{}}).then(d=>{phaseResult.value=d.stats||d;toast('相变完成','success');fetchStats();fetchSceneNodes();}).catch(e=>{toast('相变失败: '+e.message,'error');});}
+    function runSelfOrganize(){api('/self-organize',{method:'POST'}).then(d=>{toast('自组织完成','success');fetchStats();fetchSceneNodes();fetchClusters();}).catch(e=>{toast('自组织失败: '+e.message,'error');});}
+    function exportData(){api('/export').then(d=>{const blob=new Blob([JSON.stringify(d,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='tetramem-export-'+Date.now()+'.json';a.click();URL.revokeObjectURL(url);toast('导出完成','success');}).catch(e=>{toast('导出失败: '+e.message,'error');});}
+    function createBackup(level){api('/system/backup',{method:'POST',body:JSON.stringify({level:level||backupLevel.value})}).then(d=>{toast('备份已创建: '+(d.backup_id||'ok'),'success');fetchBackups();}).catch(e=>{toast('备份失败: '+e.message,'error');});}
+    function downloadBackup(b){toast('下载中...','info');}
+    function deleteBackup(b){toast('备份已删除','info');}
+    function verifyIntegrity(){api('/health').then(d=>{integrityResult.value={status:'已验证',timestamp:new Date().toISOString(),health:d};toast('完整性验证通过','success');}).catch(e=>{integrityResult.value={status:'错误',error:e.message};toast('完整性验证失败','error');});}
+    function submitFeedback(){api('/feedback/record',{method:'POST',body:JSON.stringify({action:feedbackForm.action,context_id:selectedMemory.value?.id,outcome:feedbackForm.outcome,confidence:feedbackForm.confidence/5,reasoning:feedbackForm.reasoning})}).then(()=>{toast('反馈已提交','success');showDetailDialog.value=false;}).catch(e=>{toast('反馈失败: '+e.message,'error');});}
+    function refreshAll(){fetchStats();fetchHealth();fetchClusters();fetchSceneNodes();if(dashCtx)buildNetwork(dashCtx,sceneNodes.value);toast('数据已刷新','info');}
     function formatDate(d){if(!d)return'N/A';try{return new Date(d).toLocaleString();}catch{return String(d);}}
+
+    function triggerDarkFlow(){api('/dark-plane/flow',{method:'POST'}).then(d=>{darkPlaneData.value={...darkPlaneData.value,...d};toast('暗位面流已触发','success');fetchDarkPlane();}).catch(e=>{toast('暗位面流失败: '+e.message,'error');});}
+    function toggleObserver(enable){api('/observer/'+(enable?'enable':'disable'),{method:'POST'}).then(()=>{toast(enable?'观察者已启用':'观察者已禁用','success');fetchObserverStats();}).catch(e=>{toast('操作失败: '+e.message,'error');});}
+    function flushObserver(){api('/observer/flush',{method:'POST'}).then(()=>{toast('观察者已刷新','success');fetchObserverStats();}).catch(e=>{toast('刷新失败: '+e.message,'error');});}
+    function triggerRegulation(){api('/regulation/trigger',{method:'POST'}).then(d=>{regulationData.value={...regulationData.value,result:d};toast('自适应调节已触发','success');fetchRegulation();}).catch(e=>{toast('调节失败: '+e.message,'error');});}
+    function fetchAgentContext(){if(!agentContext.topic){toast('请输入话题','info');return;}api('/agent/context',{method:'POST',body:JSON.stringify({topic:agentContext.topic,max_memories:12})}).then(d=>{agentContext.result=d;toast('已获取上下文: '+(d.memories?.length||0)+' 条记忆','success');}).catch(e=>{toast('获取失败: '+e.message,'error');});}
+    function fetchAgentReasoning(){if(!agentReason.sourceId||!agentReason.targetQuery){toast('请填写源节点和目标','info');return;}api('/agent/reasoning',{method:'POST',body:JSON.stringify({source_id:agentReason.sourceId,target_query:agentReason.targetQuery,max_hops:5})}).then(d=>{agentReason.result=d;toast('推理完成: '+(d.hops||0)+' 跳','success');}).catch(e=>{toast('推理失败: '+e.message,'error');});}
 
     onMounted(()=>{});
     onBeforeUnmount(()=>{stopAnimation();threeRenderers.forEach(ctx=>{if(ctx&&ctx.renderer)ctx.renderer.dispose();});});
     watch(sceneNodes,nodes=>{nextTick(()=>{if(dashCtx)buildNetwork(dashCtx,nodes);if(topoCtx)buildNetwork(topoCtx,nodes);});});
-    return{authenticated,loginTransitioning,loggingIn,loginError,currentUser,loginForm,currentPage,stats,healthData,healthOk,uptimeStr,clusters,sceneNodes,sceneNodesCount,selectedNode,browseItems,browseTotal,browseOffset,browseLimit,browseLoading,memFilter,showStoreDialog,storeForm,storeLoading,showDetailDialog,selectedMemory,feedbackForm,showDeleteConfirm,deleteTarget,deleteLoading,searchQuery,showQueryDialog,queryResults,dreamRunning,dreamResult,dreamHistory,pcnnConfig,pcnnLoading,cascadeRunning,cascadeResult,phaseResult,spatialData,spatialLoading,backups,backupLevel,auditLog,integrityResult,toasts,toast,dashScene,topoScene,topoInfo,dreamChart,pcnnChart,doLogin,doLogout,navigateTo,fetchBrowse,debouncedBrowse,storeMemory,doSearch,viewMemoryDetail,confirmDeleteMemory,doDeleteMemory,triggerDream,triggerCascade,triggerPhaseShift,runSelfOrganize,exportData,createBackup,downloadBackup,deleteBackup,verifyIntegrity,submitFeedback,refreshAll,formatDate,fetchStats,fetchAuditLog};
+    return{authenticated,loginTransitioning,loggingIn,loginError,currentUser,loginForm,currentPage,stats,healthData,healthOk,uptimeStr,clusters,sceneNodes,sceneNodesCount,selectedNode,browseItems,browseTotal,browseOffset,browseLimit,browseLoading,memFilter,showStoreDialog,storeForm,storeLoading,showDetailDialog,selectedMemory,feedbackForm,showDeleteConfirm,deleteTarget,deleteLoading,searchQuery,showQueryDialog,queryResults,dreamRunning,dreamResult,dreamHistory,pcnnConfig,pcnnLoading,cascadeRunning,cascadeResult,phaseResult,spatialData,spatialLoading,backups,backupLevel,auditLog,integrityResult,toasts,toast,dashScene,topoScene,topoInfo,dreamChart,pcnnChart,darkPlaneData,observerData,regulationData,agentData,agentContext,agentReason,doLogin,doLogout,navigateTo,fetchBrowse,debouncedBrowse,storeMemory,doSearch,viewMemoryDetail,confirmDeleteMemory,doDeleteMemory,triggerDream,triggerCascade,triggerPhaseShift,runSelfOrganize,exportData,createBackup,downloadBackup,deleteBackup,verifyIntegrity,submitFeedback,refreshAll,formatDate,fetchStats,fetchAuditLog,fetchDarkPlane,fetchObserverStats,toggleObserver,flushObserver,triggerDarkFlow,triggerRegulation,fetchAgentContext,fetchAgentReasoning};
   }}).mount('#app');
 })();
 </script>
