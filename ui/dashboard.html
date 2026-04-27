@@ -249,7 +249,6 @@ tr:hover td{background:rgba(100,80,255,.02)}
 </div>
 </div>
 
-<link rel="stylesheet" href="/libs/element-plus.css">
 <script src="/libs/vue.global.prod.js"></script>
 <script src="/libs/element-plus.js"></script>
 <script src="/libs/three.min.js"></script>
@@ -325,7 +324,6 @@ function doLogin(){
     if(d.token)sessionStorage.setItem('tetramem_token',d.token);
     document.getElementById('loginPage').classList.add('hidden');
     document.getElementById('appPage').classList.remove('hidden');
-    sessionStorage.setItem('auth',btoa(u+':'+p));
     sessionStorage.setItem('apiBase',API);
     initApp();
   }).catch(()=>{errEl.textContent='Cannot connect to API';});
@@ -389,7 +387,7 @@ async function refreshTopbar(){
 
 async function refreshAll(){
   try{
-    const[s,d]=await Promise.all([api('/stats'),api('/tetrahedra')]);
+    const[s,d]=await Promise.all([api('/stats'),api('/browse')]);
     G.stats=s;G.memories=d.tetrahedra||[];
     if(!_sceneBuilt&&renderer){
       _sceneBuilt=true;
@@ -561,7 +559,7 @@ function memTable(title,items){
 }
 
 async function renderTension(el){
-  const[t,tm]=await Promise.all([api('/tension'),api('pcnn/tension-map')]);
+  const[t,tm]=await Promise.all([api('/spatial/autocorrelation'),api('pcnn/tension-map')]);
   const detailed=tm?.tension_map||[];
   const maxT=detailed.length?Math.max(...detailed.map(d=>d.tension)):1;
   el.innerHTML=`

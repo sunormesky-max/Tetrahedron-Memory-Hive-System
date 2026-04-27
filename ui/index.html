@@ -6,7 +6,6 @@
 <title>TetraMem-XL v8.0 · Meleo天庭</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Raleway:wght@300;400;500;600;700&family=Fira+Code:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://unpkg.com/element-plus/dist/index.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <style>
 :root {
@@ -595,14 +594,6 @@ body {
   .pcnn-grid, .sys-grid, .dream-grid { grid-template-columns: 1fr; }
 }
 
-/* ===== ELEMENT PLUS OVERRIDES ===== */
-.el-button--primary { --el-button-bg-color: var(--gold-dark); --el-button-border-color: var(--gold-dark); }
-.el-button--primary:hover { --el-button-hover-bg-color: var(--gold); --el-button-hover-border-color: var(--gold); }
-.el-pagination .el-pager li.is-active { color: var(--gold-dark); }
-.el-tag { --el-tag-bg-color: rgba(212,168,67,0.1); --el-tag-border-color: rgba(212,168,67,0.3); --el-tag-text-color: var(--gold-dark); }
-.el-input__wrapper:focus-within { box-shadow: 0 0 0 1px var(--gold) inset; }
-.el-loading-spinner .circular .path { stroke: var(--gold); }
-
 /* ===== LOADING ===== */
 .loading-overlay {
   display: flex; align-items: center; justify-content: center;
@@ -1053,9 +1044,9 @@ body {
             <div class="form-group" style="display:flex;align-items:center;gap:10px">
               <label class="form-label" style="margin:0">Level:</label>
               <select class="form-select" style="max-width:160px" v-model="backupLevel">
-                <option value="full">Full</option>
-                <option value="incremental">Incremental</option>
-                <option value="snapshot">Snapshot</option>
+                <option value="daily">Daily</option>
+                <option value="hourly">Hourly</option>
+                <option value="weekly">Weekly</option>
               </select>
             </div>
           </div>
@@ -1701,8 +1692,8 @@ body {
         });
         if (memFilter.label) params.set('label', memFilter.label);
         api('/browse?' + params.toString()).then(d => {
-          browseItems.value = d.items || [];
-          browseTotal.value = d.total || 0;
+          browseItems.value = d.tetrahedra || [];
+          browseTotal.value = d.total || d.count || 0;
         }).catch(e => { toast('Failed to fetch memories: ' + e.message, 'error'); })
         .finally(() => { browseLoading.value = false; });
       }
@@ -1720,12 +1711,12 @@ body {
         api('/spatial/autocorrelation').then(d => { spatialData.value = d; }).catch(() => {}).finally(() => { spatialLoading.value = false; });
       }
       function fetchBackups() {
-        api('/system/backups').then(d => {
+        api('/backups').then(d => {
           backups.value = Array.isArray(d.backups) ? d.backups : (Array.isArray(d) ? d : []);
         }).catch(() => {});
       }
       function fetchAuditLog() {
-        api('/system/audit').then(d => {
+        api('/audit').then(d => {
           auditLog.value = Array.isArray(d.entries) ? d.entries : (Array.isArray(d) ? d : []);
         }).catch(() => { auditLog.value = []; });
       }
@@ -1901,7 +1892,7 @@ body {
 
       function triggerDream() {
         dreamRunning.value = true;
-        api('/dream/run', { method: 'POST' })
+        api('/dream', { method: 'POST' })
           .then(d => {
             dreamResult.value = d.result || d;
             dreamHistory.value.unshift({
@@ -1979,7 +1970,7 @@ body {
       }
 
       function submitFeedback() {
-        api('/feedback', {
+        api('/feedback/record', {
           method: 'POST',
           body: JSON.stringify({
             action: feedbackForm.action,

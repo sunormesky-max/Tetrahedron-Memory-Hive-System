@@ -103,10 +103,12 @@ export TETRAMEM_UI_PASSWORD="$TETRAMEM_PASSWORD"
 mkdir -p "$TETRAMEM_DIR/static"
 if [[ -f "$TETRAMEM_DIR/ui/index.html" ]]; then
   cp "$TETRAMEM_DIR/ui/index.html" "$TETRAMEM_DIR/static/index.html"
-  sed -i "s/CHANGE_ME/$TETRAMEM_PASSWORD/g" "$TETRAMEM_DIR/static/index.html"
 fi
 if [[ -f "$TETRAMEM_DIR/ui/dashboard.html" ]]; then
   cp "$TETRAMEM_DIR/ui/dashboard.html" "$TETRAMEM_DIR/static/dashboard.html"
+fi
+if [[ -d "$TETRAMEM_DIR/libs" ]]; then
+  cp -r "$TETRAMEM_DIR/libs/"* "$TETRAMEM_DIR/static/" 2>/dev/null || true
 fi
 ok "Configuration complete"
 
@@ -128,6 +130,7 @@ Type=simple
 WorkingDirectory=$TETRAMEM_DIR
 Environment=TETRAMEM_STORAGE=$TETRAMEM_DIR/tetramem_data_v2
 Environment=TETRAMEM_UI_PASSWORD=$TETRAMEM_PASSWORD
+Environment=TETRAMEM_CORS_ORIGINS=http://localhost:3000,http://localhost:8082,http://127.0.0.1:$TETRAMEM_UI_PORT,http://127.0.0.1:$TETRAMEM_PORT
 ExecStart=$(which python3) -m uvicorn start_api_v2:app --host 127.0.0.1 --port $TETRAMEM_PORT
 Restart=always
 RestartSec=10
@@ -181,7 +184,7 @@ server {
     }
 
     location /libs/ {
-        alias $TETRAMEM_DIR/static/;
+        alias $TETRAMEM_DIR/libs/;
     }
 
     location = / {
