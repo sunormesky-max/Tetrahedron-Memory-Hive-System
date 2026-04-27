@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TetraMem-XL v6.5</title>
+<title>TetraMem-XL v8.0</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔷</text></svg>">
-<link rel="stylesheet" href="https://unpkg.com/element-plus/dist/index.css">
+<link rel="stylesheet" href="/libs/element-plus.css">
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800&family=Rajdhani:wght@300;400;500;600&display=swap');
 *{margin:0;padding:0;box-sizing:border-box}
@@ -159,8 +159,8 @@ tr:hover td{background:rgba(100,80,255,.02)}
 <div id="loginPage" class="login-wrap">
 <div class="login-box">
   <h1>TetraMem-XL</h1>
-  <div class="sub">BCC Lattice Honeycomb + PCNN Neural Pulse v6.5</div>
-  <div style="font-size:10px;color:rgba(100,120,255,.25);margin-bottom:18px;line-height:1.6">TetraMem-XL 独立可视化面板<br>默认用户: tetramem / tetramem123<br>请输入运行 TetraMem-XL 的服务器地址</div>
+  <div class="sub">BCC Lattice Honeycomb + PCNN Neural Pulse v8.0</div>
+  <div style="font-size:10px;color:rgba(100,120,255,.25);margin-bottom:18px;line-height:1.6">TetraMem-XL 独立可视化面板<br>请输入运行 TetraMem-XL 的服务器地址和密码</div>
   <input id="apiBase" placeholder="API 地址 (如 http://192.168.1.100:8082)" value="" autocomplete="off">
   <div id="apiStatus" style="font-size:10px;min-height:14px;margin-bottom:6px"></div>
   <input id="user" placeholder="用户名" autocomplete="off">
@@ -173,7 +173,7 @@ tr:hover td{background:rgba(100,80,255,.02)}
 <div id="appPage" class="app-layout hidden">
 <div class="top-bar">
   <h1>Tetra<span>Mem</span>-XL</h1>
-  <span class="version">v6.5 脉冲共振</span>
+  <span class="version">v8.0 脉冲共振</span>
   <div class="stats-bar">
     <span>节点<b id="sNodes">-</b></span>
     <span>记忆<b id="sMem">-</b></span>
@@ -225,7 +225,7 @@ tr:hover td{background:rgba(100,80,255,.02)}
       <div class="legend-item"><div class="legend-dot" style="background:#5eb88a"></div>梦境 / 桥接</div>
       <div class="legend-item"><div class="legend-dot" style="background:rgba(123,140,255,.4)"></div>神经脉冲</div>
       <div class="legend-item"><div class="legend-dot" style="background:rgba(176,140,255,.4)"></div>vertex 邻居</div>
-      <div style="margin-top:4px;color:#2a2a4a;font-size:9px">BCC 晶格 · PCNN v6.5 · Moran's I</div>
+      <div style="margin-top:4px;color:#2a2a4a;font-size:9px">BCC 晶格 · PCNN v8.0 · Moran's I</div>
     </div>
   </div>
   <div class="right-panel">
@@ -249,11 +249,11 @@ tr:hover td{background:rgba(100,80,255,.02)}
 </div>
 </div>
 
-<link rel="stylesheet" href="https://unpkg.com/element-plus/dist/index.css">
-<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
-<script src="https://unpkg.com/element-plus"></script>
-<script src="https://unpkg.com/three@0.157.0/build/three.min.js"></script>
-<script src="https://unpkg.com/three@0.157.0/examples/js/controls/OrbitControls.js"></script>
+<link rel="stylesheet" href="/libs/element-plus.css">
+<script src="/libs/vue.global.prod.js"></script>
+<script src="/libs/element-plus.js"></script>
+<script src="/libs/three.min.js"></script>
+<script src="/libs/OrbitControls.js"></script>
 <script>
 window.onerror=function(m,u,l){document.title='ERROR:'+m+' L'+l};
 if(!window.Vue){document.body.innerHTML='<h2 style="color:red;padding:40px">Vue.js failed</h2>';}
@@ -262,7 +262,7 @@ if(!window.THREE){document.body.innerHTML='<h2 style="color:red;padding:40px">Th
 <script>
 window._ocReady=true;
 
-const CREDS={tetramem:'tetramem123',admin:'admin123'};
+const CREDS={};
 let API='/api/v1/';
 if(sessionStorage.getItem('apiBase'))API=sessionStorage.getItem('apiBase');
 let refreshTimer=null;
@@ -315,17 +315,25 @@ function doLogin(){
   const u=document.getElementById('user').value,p=document.getElementById('pass').value;
   const ab=document.getElementById('apiBase').value.trim();
   if(ab){API=ab.replace(/\/+$/,'')+'/api/v1/';localStorage.setItem('tetramem_api_base',ab);}
-  if(CREDS[u]&&CREDS[u]===p){
+  const errEl=document.getElementById('loginErr');
+  errEl.textContent='';
+  fetch(API+'login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:p}),signal:AbortSignal.timeout(5000)}).then(r=>{
+    if(!r.ok){errEl.textContent='Invalid password';return null;}
+    return r.json();
+  }).then(d=>{
+    if(!d)return;
+    if(d.token)sessionStorage.setItem('tetramem_token',d.token);
     document.getElementById('loginPage').classList.add('hidden');
     document.getElementById('appPage').classList.remove('hidden');
     sessionStorage.setItem('auth',btoa(u+':'+p));
     sessionStorage.setItem('apiBase',API);
     initApp();
-  }else{document.getElementById('loginErr').textContent='用户名或密码错误';}
+  }).catch(()=>{errEl.textContent='Cannot connect to API';});
 }
 document.getElementById('pass').onkeydown=function(e){if(e.key==='Enter')doLogin()};
 function doLogout(){
   sessionStorage.removeItem('auth');
+  sessionStorage.removeItem('tetramem_token');
   document.getElementById('appPage').classList.add('hidden');
   document.getElementById('loginPage').classList.remove('hidden');
   if(refreshTimer)clearInterval(refreshTimer);
@@ -334,7 +342,10 @@ function doLogout(){
 async function api(path,opts={}){
   const url=API+path.replace(/^\/+/,'');const method=opts.method||(opts.body?'POST':'GET');
   const headers=opts.body?{'Content-Type':'application/json'}:{};
+  const token=sessionStorage.getItem('tetramem_token');
+  if(token)headers['Authorization']='Bearer '+token;
   const r=await fetch(url,{method,headers,body:opts.body?JSON.stringify(opts.body):undefined});
+  if(r.status===401){sessionStorage.removeItem('tetramem_token');doLogout();throw new Error('Session expired');}
   if(!r.ok)throw new Error(r.status+' '+await r.text());
   return r.json();
 }
@@ -1149,7 +1160,7 @@ async function renderOrganize(el){
 async function runOrganize(){
   const res=document.getElementById('organizeResult');
   if(res) res.innerHTML='<div class="card" style="border-color:#ff8a65"><h2 style="color:#ff8a65">自组织执行中...</h2></div>';
-  await api('/self-organize/run',{method:'POST'});
+  await api('/self-organize',{method:'POST'});
   await renderOrganize(document.getElementById('modePanel'));
 }
 
@@ -1329,14 +1340,14 @@ async function agentAutoAction(action){
   let r;
   try{
     if(action==='dream'){r=await api('/dream',{method:'POST'});agentLog('ACTION','梦境完成: '+(r.result?.dreams_created||0)+' 梦境创建');}
-    else if(action==='selforg'){r=await api('/self-organize/run',{method:'POST'});agentLog('ACTION','自组织完成');}
+    else if(action==='selforg'){r=await api('/self-organize',{method:'POST'});agentLog('ACTION','自组织完成');}
     else if(action==='cascade'){r=await api('/cascade/trigger',{method:'POST'});agentLog('ACTION','级联脉冲已触发');}
     else if(action==='crystal'){r=await api('/crystallized/force',{method:'POST'});agentLog('ACTION','结晶化扫描: '+(r.crystallized?.total_crystals||0)+' 通路');}
     else if(action==='selfcheck'){r=await api('/self-check/run',{method:'POST'});agentLog('ACTION','自检完成: '+(r.anomalies_found||0)+' 异常');}
     else if(action==='export'){r=await api('/export');agentLog('ACTION','导出: '+((r.size||0)/1024).toFixed(1)+'KB');}
     else if(action==='deepen_context'){r=await api('/agent/suggest',{method:'POST',body:{context:'auto-deepen'}});agentLog('ACTION','深度上下文分析完成');}
     else if(action==='connect_isolated_memories'){r=await api('/cascade/trigger',{method:'POST',body:{strength:0.8}});agentLog('ACTION','级联脉冲连接孤立记忆');}
-    else if(action==='leverage_clusters'){r=await api('/self-organize/run',{method:'POST'});agentLog('ACTION','自组织利用聚类');}
+    else if(action==='leverage_clusters'){r=await api('/self-organize',{method:'POST'});agentLog('ACTION','自组织利用聚类');}
     else{r={info:'unknown'};}
   }catch(e){r={error:e.message};agentLog('WARN','失败: '+e.message);}
   el.innerHTML='<pre style="color:#a0a0c0;font-size:11px;max-height:120px;overflow-y:auto;background:#0a0a1a;padding:8px;border-radius:4px">'+esc(JSON.stringify(r,null,2))+'</pre>';

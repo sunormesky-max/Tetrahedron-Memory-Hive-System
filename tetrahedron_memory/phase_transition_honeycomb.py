@@ -318,3 +318,7 @@ class HoneycombPhaseTransition:
         elif recent[-1] < recent[0] * 0.8:
             return "falling"
         return "stable"
+
+    @property
+    def transition_count(self) -> int:
+        return self._transition_count

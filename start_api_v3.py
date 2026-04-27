@@ -21,7 +21,7 @@ _start_time = time.time()
 
 def init_state():
     global _field
-    _field = HoneycombNeuralField(resolution=5, spacing=1.0)
+    _field = HoneycombNeuralField(resolution=10, spacing=1.0)
     _field.initialize()
 
     json_file = Path(STORAGE_DIR) / "mesh_index.json"
@@ -48,10 +48,13 @@ def init_state():
 
 @asynccontextmanager
 async def lifespan(application):
-    init_state()
+    global _field
+    if _field is None:
+        init_state()
     yield
-    _field.stop_pulse_engine()
-    print("[TetraMem v3.0] Shutdown complete, pulse engine stopped")
+    if _field is not None:
+        _field.stop_pulse_engine()
+        print("[TetraMem v3.0] Shutdown complete, pulse engine stopped")
 
 
 app = FastAPI(title="TetraMem-XL v3", version="3.0.0", lifespan=lifespan)

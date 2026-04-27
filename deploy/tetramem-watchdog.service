@@ -1,0 +1,26 @@
+[Unit]
+Description=TetraMem-XL v8.0 Watchdog
+After=tetramem-api.service
+Requires=tetramem-api.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/tetramem
+ExecStart=/usr/bin/python3 watchdog.py
+Restart=always
+RestartSec=10
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+Environment=TETRAMEM_HEALTH_URL=http://127.0.0.1:8000/api/v1/health
+Environment=TETRAMEM_WATCHDOG_INTERVAL=15
+Environment=TETRAMEM_WATCHDOG_FAIL_COUNT=3
+Environment=TETRAMEM_WATCHDOG_COOLDOWN=30
+Environment=TETRAMEM_SERVICE=tetramem-api
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=tetramem-watchdog
+
+[Install]
+WantedBy=multi-user.target

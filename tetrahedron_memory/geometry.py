@@ -6,12 +6,15 @@ and 4D spatiotemporal embedding for the tetrahedral memory space.
 """
 
 import hashlib
+import logging
 import math
 import time
 from collections import Counter
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
+
+_log = logging.getLogger("tetramem.geometry")
 
 
 class GeometryPrimitives:
@@ -81,6 +84,7 @@ class GeometryPrimitives:
             c, _, _, _ = np.linalg.lstsq(A, b, rcond=None)
             return c
         except np.linalg.LinAlgError:
+            _log.debug("circumcenter lstsq failed, falling back to centroid")
             return GeometryPrimitives.centroid(vertices)
 
     @staticmethod
@@ -96,6 +100,7 @@ class GeometryPrimitives:
             coords = np.linalg.solve(mat, point - v0)
             return all(0 <= c <= 1 for c in coords) and sum(coords) <= 1 + 1e-6
         except np.linalg.LinAlgError:
+            _log.debug("is_point_in_tetrahedron solve failed, returning False")
             return False
 
     @staticmethod
@@ -210,7 +215,7 @@ class SemanticEmbedder:
             cls._model = SentenceTransformer(model_name)
             cls._model_name = model_name
         except ImportError:
-            pass
+            _log.debug("sentence_transformers not available, embedding model not loaded")
 
     @classmethod
     def is_available(cls) -> bool:
@@ -363,4 +368,5 @@ def weighted_tetra_power_radius(points: np.ndarray, weights: np.ndarray) -> floa
         O = np.linalg.solve(M, b_vec)
         return float(np.dot(O - A, O - A) - wA)
     except np.linalg.LinAlgError:
+        _log.debug("weighted_circumcenter_distance solve failed, returning inf")
         return float("inf")

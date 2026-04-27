@@ -4,15 +4,15 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tetrahedron-memory"
-version = "4.1.0"
-description = "BCC Lattice Honeycomb Neural Field with PCNN — Topology-aware Eternal Memory System"
+version = "8.0.0"
+description = "TetraMem-XL: BCC Honeycomb Lattice + PCNN Neural Pulse Eternal Memory System"
 readme = "README.md"
 requires-python = ">=3.9"
-license = {text = "CC BY-NC 4.0"}
+license = {text = "AGPL-3.0-or-later"}
 authors = [
-    {name = "Liu Qihang", email = "sunormesky@gmail.com"}
+    {name = "TetraMem Contributors"}
 ]
-keywords = ["memory", "ai", "pcnn", "bcc-lattice", "honeycomb", "neural-network", "hebbian", "topology"]
+keywords = ["memory", "ai", "tetrahedron", "geometry", "topology", "pcnn", "honeycomb"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -21,24 +21,31 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Mathematics",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 
 dependencies = [
     "numpy>=1.20.0",
+    "fastapi>=0.100.0",
+    "uvicorn>=0.20.0",
+    "pydantic>=1.10.0",
+    "starlette>=0.26.0",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
     "ruff>=0.1.0",
+    "httpx>=0.24.0",
 ]
-api = [
-    "fastapi>=0.100.0",
-    "uvicorn>=0.20.0",
+visualization = [
+    "pyvista>=0.38.0",
+    "matplotlib>=3.5.0",
 ]
 all = [
-    "tetrahedron-memory[dev,api]",
+    "tetrahedron-memory[dev,visualization]",
 ]
 
 [tool.setuptools]
@@ -47,16 +54,14 @@ packages = ["tetrahedron_memory"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
 addopts = "-v --tb=short"
+markers = [
+    "slow: marks tests as slow",
+    "benchmark: performance benchmark tests",
+]
 
 [tool.ruff]
-line-length = 120
+line-length = 100
 target-version = "py39"
-
-[tool.ruff.lint]
-select = ["E", "F", "W", "I"]
-ignore = ["E501", "E741", "E401", "E402", "F401", "F821", "F841", "I001", "W605"]
-
-[tool.ruff.lint.per-file-ignores]
-"__init__.py" = ["F401", "F403"]
-"tests/*" = ["F401", "F811"]

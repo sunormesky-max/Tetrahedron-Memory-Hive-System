@@ -1,162 +1,184 @@
-# Tetrahedron-Memory-Hive-System
+# TetraMem-XL
 
-**四面体记忆蜂巢系统** | Tetrahedral Memory Hive System
+**An Eternal, Self-Aware Memory System for AI Agents**
 
-纯几何驱动 · 永恒记忆 · 自涌现闭环 — 以四面体（3-simplex）为基本单元的下一代 AI 记忆体
+Memory that never forgets. That watches itself. That dreams.
 
-[中文文档](./README.cn.md) | [架构文档](./ARCHITECTURE.md) | [演示脚本](./demo_tetramem.py)
+[中文文档](./README.cn.md) | [Integration Guide](./INTEGRATION_GUIDE.md) | [Agent Guide](./AGENTS.md) | [Changelog](./CHANGELOG.md)
 
-## Core Principles
+---
 
-| 原则 | 含义 |
-|------|------|
-| **Eternity** | 所有记忆永久保留，不删除、不衰减、不覆盖 |
-| **Integration** | 记忆持续抽象重组，形成更高阶概念 |
-| **Self-Emergence** | 无外部输入时也能自发产生新记忆和新关联 |
-| **Closed Loop** | Memory → Think → Execute → Reflect → Integrate → Dream → 循环 |
+## What is this?
+
+TetraMem-XL is a memory system designed for AI agents that need more than a vector database.
+
+- **Eternal** — Memories are never deleted. Only consolidated and recombined.
+- **Self-Organizing** — Memories cluster, migrate, and form pathways autonomously.
+- **Self-Aware** — The system observes its own runtime behavior and stores self-reflection memories.
+- **Alive** — Dream cycles create cross-domain associations. Pulse waves propagate activation. The memory landscape evolves even without input.
+
+Under the hood: a novel fusion of crystal geometry, neural pulse propagation, and topological analysis — all in pure Python.
+
+---
 
 ## Quick Start
 
+### One-Click Install (Linux)
+
 ```bash
-pip install -e ".[all]"
+curl -sSL https://raw.githubusercontent.com/sunormesky-max/Tetrahedron-Memory-Hive-System/main/install.sh | bash
+```
+
+### Docker
+
+```bash
+git clone https://github.com/sunormesky-max/Tetrahedron-Memory-Hive-System.git
+cd Tetrahedron-Memory-Hive-System
+TETRAMEM_UI_PASSWORD=mypass docker compose up -d
+```
+
+### Python
+
+```bash
+pip install -e ".[dev]"
 ```
 
 ```python
-import numpy as np
-from tetrahedron_memory.tetra_distributed import TetraDistributedController
+import requests
 
-ctrl = TetraDistributedController(num_buckets=4, use_ray=False)
-ctrl.initialize()
+BASE = "http://localhost:8000/api/v1"
+H = {"X-API-Key": "your-key", "Content-Type": "application/json"}
 
-# Store memories on tetrahedra
-bid, tid = ctrl.store(
-    "AI memory should be eternal",
-    seed_point=np.array([0.5, 0.0, 0.0]),
-    labels=["principle", "ai"],
-    weight=1.5,
-)
+# Store a memory
+r = requests.post(f"{BASE}/store", json={
+    "content": "AI memory should be eternal",
+    "labels": ["principle", "ai"],
+    "weight": 1.5,
+}, headers=H)
+print(r.json())  # {"id": "abc123..."}
 
-# Pure topological query (no vector embeddings)
-results = ctrl.query(np.array([0.5, 0.0, 0.0]), k=5)
+# Query memories
+r = requests.post(f"{BASE}/query", json={"query": "eternal memory", "k": 5}, headers=H)
+for m in r.json()["results"]:
+    print(f"  {m['content'][:50]}... score={m['distance']:.3f}")
 
-# Run dream cycle (self-emergent synthesis)
-dream_stats = ctrl.run_dream_cycle(walk_steps=12)
+# Let it dream
+r = requests.post(f"{BASE}/dream", headers=H)
 
-# Run self-organization
-org_stats = ctrl.run_self_organization(max_iterations=5)
-
-# View statistics
-stats = ctrl.get_statistics()
+# Trigger self-organization
+r = requests.post(f"{BASE}/self-organize", headers=H)
 ```
 
-## Architecture
+---
 
-```
-TetraDistributedController (unified API)
-  └── TetraMeshRouter (spatial partitioning + cross-bucket topology)
-        ├── TetraBucket (TetraMesh + Ghost Cells)
-        ├── TetraBucket (TetraMesh + Ghost Cells)
-        └── ... (auto-split when full)
-              └── TetraMesh (dynamic tetrahedral mesh)
-                    ├── MemoryTetrahedron (memory on 3-simplex)
-                    ├── DreamProtocol (THINK → EXECUTE → REFLECT)
-                    └── Self-Organizer (PH-driven geometric surgery)
-```
+## Core Features
 
-## Key Features
+| Feature | Description |
+|---------|-------------|
+| **Eternal Memory** | No deletion, no forgetting. Only consolidation and abstraction. |
+| **Self-Organizing** | Autonomous clustering, pathway formation, and memory migration. |
+| **Dream Engine** | Cross-domain creative recombination — the system generates new associations while "sleeping". |
+| **Self-Reflection** | RuntimeObserver watches system behavior, classifies events, and stores trajectory memories. |
+| **Adaptive Regulation** | Six-layer physiological control system maintains memory health autonomously. |
+| **Topological Analysis** | High-dimensional topological invariants drive the memory energy landscape. |
+| **Attention Mechanism** | Focus, diffuse, decay — controllable attention over the memory space. |
+| **93 REST Endpoints** | Full API for store, query, dream, organize, observe, regulate, and more. |
+| **MCP Server** | 42 tools for Claude Desktop / Cursor integration out of the box. |
+| **3D Visualization** | Real-time Three.js honeycomb crystal browser. |
 
-- **Pure geometric retrieval** — BFS along shared faces/edges/vertices, zero vector embeddings
-- **Eternal memory** — SHA-256 audit, no deletion, only integration
-- **7-dimension fusion quality scoring** — topology connectivity, source depth, centroid dispersion, label diversity, weight balance, content richness, source diversity
-- **DreamProtocol** — structured THINK → EXECUTE → REFLECT with quality gate
-- **DreamStore** — full provenance tracking, source indexing, quality statistics
-- **Distributed** — spatial bucketing + Ghost Cell v2 (versioning + stale detection + batch verification)
-- **Multimodal** — image/audio/video → PixHomology → tetrahedral anchors
-- **125+ tests, 0 regressions**
+---
 
-## Fusion Quality Score v2 (7 Dimensions)
+## Performance
 
-| Dimension | Weight | Meaning |
-|-----------|--------|---------|
-| Topological connectivity | 0.20 | Shared labels as topology proxy |
-| Source diversity | 0.15 | Number of distinct sources |
-| Source depth | 0.15 | integration_count weighting |
-| Centroid dispersion | 0.15 | Spatial bridging value |
-| Content richness | 0.15 | Synthesis output quality |
-| Label diversity | 0.10 | Unique label spread |
-| Weight balance | 0.10 | How balanced source weights are |
+| Scale | Store | Query | Memory |
+|-------|-------|-------|--------|
+| 500 nodes | 408 ops/s | 3.8ms | ~36MB |
+| 1,000 nodes | 286 ops/s | 45ms | ~72MB |
+| 5,000 nodes | ~200 ops/s | 173ms | ~1.2GB |
 
-## DreamProtocol (THINK → EXECUTE → REFLECT)
+Zero external engine dependencies. Pure Python + NumPy.
+
+---
+
+## API at a Glance
+
+### Core Operations
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/store` | POST | Store a memory |
+| `/query` | POST | Semantic query |
+| `/browse` | GET | Browse memories |
+| `/tetrahedra/{id}` | GET/DELETE | Get/delete single memory |
+| `/stats` | GET | System statistics |
+| `/health` | GET | Health check |
+
+### Autonomous Systems
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/dream` | POST | Trigger dream cycle |
+| `/self-organize` | POST | Trigger self-organization |
+| `/dark-plane/flow` | POST | Run energy landscape evolution |
+| `/dark-plane/stats` | GET | Energy landscape statistics |
+| `/regulation/trigger` | POST | Trigger self-regulation |
+| `/cascade/trigger` | POST | Trigger pulse cascade |
+| `/observer/stats` | GET | Self-reflection statistics |
+
+### Full API
+
+See [INTEGRATION_GUIDE.md](./INTEGRATION_GUIDE.md) for complete endpoint documentation.
+
+---
+
+## Integration Options
+
+### For External AI Agents
+
+Point TetraMem at your log file — it auto-classifies events and distills them into trajectory memories:
 
 ```python
-from tetrahedron_memory.tetra_dream import DreamProtocol
-
-protocol = DreamProtocol(
-    think_fn=my_analyzer,      # optional: custom analysis
-    execute_fn=my_llm,         # optional: LLM synthesis
-    reflect_fn=my_evaluator,   # optional: quality evaluation
-    quality_threshold=0.3,     # accept/reject gate
-)
-
-result = protocol.run(source_inputs)
-if result["accepted"]:
-    mesh.store(result["content"], ...)
+from tetrahedron_memory.observer_config import auto_attach
+observer = auto_attach(field, config_path="./observer_config.json")
 ```
 
-## Demo
+### For Embedded Agents
 
-```bash
-python demo_tetramem.py
+Inject events directly from your agent code:
+
+```python
+from tetrahedron_memory.runtime_observer import attach_callback_observer
+observer = attach_callback_observer(field)
+observer.observe("ERROR", "my_agent", "Connection timeout")
 ```
 
-See [demo_tetramem.py](./demo_tetramem.py) for a full 8-section walkthrough.
+### For LLM Tools (MCP)
 
+Built-in Model Context Protocol server with 42 tools — works with Claude Desktop, Cursor, and any MCP-compatible client.
 
-## Performance Benchmarks
+---
 
-Tested on **1-core 2GB cloud server** with `TetraMesh` + `TetraDreamCycle`.
+## Environment Variables
 
-### Write Throughput (50K scale)
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `TETRAMEM_STORAGE` | `./tetramem_data_v2` | Data directory |
+| `TETRAMEM_UI_PASSWORD` | `CHANGE_ME` | UI login password |
+| `TETRAMEM_PORT` | `8000` | API port |
+| `TETRAMEM_CORS_ORIGINS` | `http://localhost:3000` | CORS origins |
 
-| Scale | Throughput | Heap | RSS |
-|-------|-----------|------|-----|
-| 10K | ~1,200 items/s | 48 MB | 157 MB |
-| 20K | ~1,195 items/s | 79 MB | 283 MB |
-| 30K | ~1,204 items/s | 109 MB | 419 MB |
-| 40K | ~1,181 items/s | 135 MB | 539 MB |
-| 50K | ~1,192 items/s | 167 MB | 716 MB |
+---
 
-### Per-Operation Latency (GeoMemoryBody)
+## UI
 
-| Scale | avg | p50 | p99 |
-|-------|-----|-----|-----|
-| 10K | 2.2 ms | 2.1 ms | 2.5 ms |
-| 20K | 2.2 ms | 2.1 ms | 2.3 ms |
+- **Embedded**: `http://<host>:8000/ui/`
+- **Standalone Dashboard**: Open `ui/dashboard.html` in any browser
 
-### Per-Operation Latency (TetraMesh)
-
-| Scale | avg |
-|-------|-----|
-| 10K | 0.8 ms |
-
-### Key Observations
-
-- **Write throughput flat** at ~1,200 items/s from 10K to 50K (zero degradation)
-- **Memory linear**: ~3.3 MB per 1K tetrahedra (heap), RSS manageable at 716 MB for 50K
-- **Latency stable**: GeoMemoryBody ~2.1 ms, TetraMesh ~0.8 ms, no growth with scale
-- **Dream cycle stable**: 10 dream cycles triggered during 50K test, no failures
-- **Bottleneck**: Dream cycle causes brief throughput dip in the following batch (GC pressure)
-
-Reproduce: `python scale_test_50k.py` (see repository root)
-
-## Resources
-
-- [ARCHITECTURE.md](./ARCHITECTURE.md) — detailed architecture, scoring system, eternal audit
-- [paper.md](./paper.md) — academic paper draft
-- [examples/](./examples/) — usage examples
+---
 
 ## License
 
-CC BY-NC 4.0 (Personal & Non-Commercial Use)
+AGPL-3.0-or-later
 
-**Author**: sunorme (Liu Qihang)
+**Author**: sunorme (刘启航)
+**Email**: sunormesky@gmail.com

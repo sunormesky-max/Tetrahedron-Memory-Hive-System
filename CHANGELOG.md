@@ -2,6 +2,127 @@
 
 All notable changes to TetraMem-XL are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [8.0.0] - 2026-04-26
+
+### Added — Dark Plane H₀~H₆ + RuntimeObserver + Persistent Entropy
+
+#### Dark Plane Substrate — 7-Dimensional Homology
+- **H₀~H₂ persistent homology**: actual filtration-based PH computation (Betti numbers, persistence diagrams)
+- **H₃~H₆ ODE dynamics**: continuous homology evolution (34 parameters, coupled ODEs)
+- **Cross-dimensional coupling**: H₀→H₁→H₂→H₃→H₄→H₅→H₆ energy flow
+- **Persistent Entropy**: Shannon entropy over H₀+H₁+H₂ persistence → self_regulation neurochemical feedback
+- **Phase transitions**: H₄ emergence, H₅ complexification, H₆ cascade thresholds
+- **Void channels**: topological handle channels dim 1/2/3 with cascade upgrade and decay
+- **Export/import persistence**: substrate + void_channels survive checkpoint/restore
+
+#### RuntimeObserver — Self-Observation Layer
+- **Semantic classifier**: 6 categories (error/anomaly/system/performance/behavior/noise)
+- **Aggregation window**: 300s with trajectory narration
+- **Rate limiting**: 30 stores/min hard cap
+- **Loop isolation**: auto-drops self-observation logs
+- **Privacy redaction**: api_key/password/token/Bearer → [REDACTED]
+- **LogFileTailer**: file tail + rotation detection for external agent logs
+- **Three attach modes**: file tail, callback injection, auto_attach (zero-touch)
+- **5 API endpoints**: stats/flush/enable/disable/observe
+- **42 unit tests** passing
+
+#### API Changes
+- Removed duplicate endpoints: `/status` → use `/system/status`, `/self-organize/run` → use `/self-organize`
+- Added 5 observer endpoints under `/api/v1/observer/*`
+- Added 7 dark plane substrate endpoints under `/api/v1/dark-plane/*`
+
+#### Code Quality
+- Unified all version strings to 8.0.0
+- Deleted dead code: `rw_lock.py`, `llm_tool.py`, `test_api_v2_integration.py`
+- Fixed `system_ops.py` backup index missing `id` field
+- Fixed `feedback.py` inline import
+- `__init__.py` now exports all 20+ subsystems
+- `monitoring.py` stubs upgraded to actual recording
+- License changed from CC BY-NC 4.0 to **AGPL-3.0-or-later**
+
+#### Performance
+- Store/Query: zero overhead vs v7.1
+- Dark plane flow: +2.3% (within noise margin)
+- Memory overhead: +0.1% (+1 MB for substrate state)
+- PH computation: O(n²), executed every 10 cycles; ODE: O(1) per cycle
+
+## [7.1.0] - 2026-04-24
+
+### Added — Dark Plane Thermodynamics + PID Self-Regulation + Security
+
+#### Dark Plane Engine — Real Physics
+- **Adaptive quantile thresholds**: depth distribution 25th/50th/75th percentile replaces hardcoded cutoffs
+- **Boltzmann redistribution**: 5% thermal transition probability per cycle, P(plane_i | D) = exp(-β|D - center_i|) / Z
+- **WKB tunneling**: direction-corrected barrier penetration, P = exp(-2κ × barrier), κ=0.5
+- **Query energy injection**: hits on deep/abyss nodes receive 0.1 + relevance×0.3 energy boost
+- **Cross-plane depth weights**: surface=1.0, shallow=1.5, deep=2.5, abyss=4.0
+- **Metastable tracking**: 30s cooldown after plane transitions to prevent oscillation
+- **Activity-rate temperature**: T = T_base × (1+0.5×stress) × circadian × (1+0.3×activity_rate)
+- Production result: thresholds at -0.75/-0.04/0.75, ~42%/14%/19%/24% plane distribution
+
+#### Self-Regulation Engine — PID Control
+- **5 PID controllers**: bridge_rate, crystal_ratio, field_entropy, activation, emergence
+  - Anti-windup integral clamping per controller
+  - Example: bridge_rate kp=0.15, ki=0.02, kd=0.03, integral_limit=1.0
+- **Hysteresis bands**: autonomic enters at 0.35/0.65, stress emergency enters at 0.85/exits at 0.50
+- **Dark plane feedback**: heavy transitions → endocrine cortisol response, awakening → dopamine surge
+- **All parameters applied**: dream_frequency, bridge_threshold, cascade_depth_bonus now actually write to system
+- **Immune enhancement**: _occupied_ids consistency check, frontier_empty cleanup, empty node release
+- **Query history**: deque(maxlen=100) replaces unbounded list for query_success_history
+
+#### Attention Mechanism Fix
+- Attention mask only boosts query scores when `_attention_foci` is non-empty
+- Prevents residual noise from degrading query relevance (fixed -10.6% regression)
+
+#### Security Fixes
+- UI login now uses backend `/login` endpoint with `TETRAMEM_UI_PASSWORD` environment variable
+- All hardcoded passwords removed (Hive@2026, tetramem123, admin123)
+- `/login` endpoint accepts both `api_key` and `password` fields
+
+#### Test Suite
+- `tests/test_integration.py`: 20 TestClient integration tests, all passing in 1.7s
+- Covers: health, store, query, browse, stats, dream, self-organize, dark plane, regulation, cascade, crystallize, lattice, honeycomb, attention, export/import
+
+#### Documentation
+- README.md / README.cn.md / AGENTS.md rewritten for v7.1 architecture
+- Removed references to deleted files (ARCHITECTURE.md, demo_tetramem.py, tetra_distributed.py, etc.)
+
+### Fixed
+- InsightAggregator: added `collect()` method (was missing, caused `_insight_loop` crash)
+- 60+ bare except blocks now log errors instead of silently swallowing
+- QUERY_WEIGHTS normalized to sum=1.0
+- WAL replay enhanced with error recovery
+
+### Performance
+- Store: **103 mem/s** (server), **378 mem/s** (local) — 103x improvement over baseline
+- Query: **92ms** avg latency — 3x improvement over baseline
+- API routes: 129 registered, 20/20 integration tests pass
+
+## [7.0.0] - 2026-04-22
+
+### Added — Comprehensive Architecture Hardening (~70 fixes)
+
+#### Route Architecture
+- API split into 6 router modules: memory, agent, system, neural, spatial, darkplane
+- `AppState` dependency injection container replacing global state
+- 13 Critical/High severity fixes across all modules
+
+#### Infrastructure
+- Dual-lock unification: write operations acquire `_lock` and `_write_lock` consistently
+- WAL (Write-Ahead Log) replay with error recovery
+- Structured error responses with consistent JSON format
+- 60+ exception handlers now log errors instead of silently swallowing
+
+#### Configuration
+- QUERY_WEIGHTS normalized (total=1.0) for balanced scoring
+- ATTENTION_MULTIPLIER=0.5, ATTENTION_ADDITIVE=0.15 tunable constants
+- PCNNConfig centralizes all tuning parameters
+
+### Changed
+- `start_api_v2.py`: slimmed to ~95 lines, uses AppState + CORS + async middleware + router includes
+- All routers receive `AppState` via dependency injection
+- Error handling: bare except → except Exception with logging
+
 ## [6.0.0] - 2026-04-19
 
 ### Added — Agent-Driven Memory System + OpenClaw Deep Integration
@@ -211,7 +332,7 @@ All notable changes to TetraMem-XL are documented here. Format follows [Keep a C
 - Maximum 3 shortcuts per cycle, 500 total with LRU eviction
 
 #### New API Endpoints (5)
-- `POST /api/v1/self-organize/run` — trigger self-organization cycle
+- `POST /api/v1/self-organize` — trigger self-organization cycle
 - `GET /api/v1/self-organize/status` — engine status, clusters, shortcuts, entropy
 - `GET /api/v1/self-organize/history` — previous organize cycle results
 - `GET /api/v1/clusters` — detected semantic clusters
@@ -372,7 +493,7 @@ All notable changes to TetraMem-XL are documented here. Format follows [Keep a C
 
 #### Visualization UI
 - Web-based 3D topology visualization
-- Login authentication (tetramem / Hive@2026)
+- Login authentication (tetramem / <configured password>)
 - Chinese-localized interface (only "TetraMem-XL" in English)
 
 ## [2.2.0] - 2026-04-12

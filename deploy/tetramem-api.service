@@ -1,0 +1,26 @@
+[Unit]
+Description=TetraMem-XL v8.0 API Server
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/tetramem
+ExecStart=/usr/bin/python3 -m uvicorn start_api_v2:app --host 127.0.0.1 --port 8000
+Restart=always
+RestartSec=5
+StartLimitIntervalSec=300
+StartLimitBurst=10
+
+Environment=TETRAMEM_STORAGE=/opt/tetramem/tetramem_data_v2
+Environment=TETRAMEM_UI_PASSWORD=CHANGE_ME
+Environment=TETRAMEM_RESOLUTION=5
+Environment=TETRAMEM_CHECKPOINT_INTERVAL=120
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=tetramem-api
+
+WatchdogSec=60
+
+[Install]
+WantedBy=multi-user.target
